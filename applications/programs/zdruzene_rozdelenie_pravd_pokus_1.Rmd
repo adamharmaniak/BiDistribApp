@@ -11,6 +11,7 @@ suppressWarnings(suppressMessages({
   library(MASS)
   library(ggplot2)
   library(reshape2)
+  library(htmlwidgets)
   }))
 
 data <- read.csv("C:/Users/Asus ROG Strix G15/STUBA/Rocnik_3/Bakalárska_práca/data/Joint_Distribution_Data.csv", header = TRUE, sep = ",")
@@ -37,7 +38,7 @@ plot(data$Height_cm, data$Weight_kg, xlab = "Height (cm)", ylab = "Weight (kg)",
 ```
 
 ### 3D+2D: Hustota (Premenné: výška a váha)
-```{r, warning=FALSE,echo=FALSE}
+```{r, warning=FALSE}
 height <- data$Height_cm
 weight <- data$Weight_kg
 
@@ -66,5 +67,78 @@ ggplot(data, aes(x = Height_cm, y = Weight_kg)) +
   labs(x = "Height (cm)", y = "Weight (kg)", title = "2D Density Plot of Height and Weight") +
   theme_minimal()
 
+```
+
+## Pridanie diskrétnej náhodnej premennej do modelu (Vek)
+```{r,warning=FALSE}
+plot(data$Height_cm, data$Weight_kg, 
+     xlab = "Height (cm)", 
+     ylab = "Weight (kg)", 
+     main = "Height vs. Weight by Age Category",
+     col = as.numeric(as.factor(data$Age_Category)),
+     pch = 19)
+
+legend_text <- levels(as.factor(data$Age_Category))
+colors <- 1:length(legend_text)
+
+text(x = max(data$Height_cm) - 5, y = max(data$Weight_kg) - 5, labels = legend_text[1], col = colors[1], pos = 4)
+text(x = max(data$Height_cm) - 5, y = max(data$Weight_kg) - 15, labels = legend_text[2], col = colors[2], pos = 4)
+text(x = max(data$Height_cm) - 5, y = max(data$Weight_kg) - 25, labels = legend_text[3], col = colors[3], pos = 4)
+
+```
+
+### Hustota nového modelu
+#### 2D
+```{r,warning=FALSE}
+ggplot(data, aes(x = Height_cm, y = Weight_kg, color = Age_Category)) +
+  geom_point(alpha = 0.3) +
+  geom_density_2d() +
+  labs(x = "Height (cm)", y = "Weight (kg)", title = "2D Density Plot of Height and Weight by Age Category") +
+  theme_minimal() +
+  facet_wrap(~ Age_Category)
+```
+
+#### 3D
+```{r,warning=FALSE}
+age_categories <- unique(data$Age_Category)
+plots <- list()
+
+for (age in age_categories) {
+  subset_data <- subset(data, Age_Category == age)
+
+  kde <- kde2d(subset_data$Height_cm, subset_data$Weight_kg, n = 50)
+
+  plot <- plot_ly(x = kde$x, y = kde$y, z = kde$z, type = "surface") %>%
+    layout(
+      title = paste("Density for Age Category:", age),
+      scene = list(
+        xaxis = list(title = "Height (cm)"),
+        yaxis = list(title = "Weight (kg)"),
+        zaxis = list(title = "Density")
+      )
+    )
+  plots[[age]] <- plot
+}
+plots[["31-50"]]
+plots[["51-70"]]
+plots[["18-30"]]
+
+```
+
+## Hustota (váha(spojitá) vs. vek(diskrétna))
+```{r,warning=FALSE}
+data$Age_Num <- as.numeric(factor(data$Age_Category, levels = c("18-30", "31-50", "51-70"), labels = c(24, 40, 60)))
+
+age <- data$Age_Num
+weight <- data$Weight_kg
+
+kde <- kde2d(age, weight, n = 50)
+
+plot_ly(x = kde$x, y = kde$y, z = kde$z, type = "surface") %>%
+  layout(scene = list(
+    xaxis = list(title = "Age (Numerical)"),
+    yaxis = list(title = "Weight (kg)"),
+    zaxis = list(title = "Density")
+  ))
 ```
 
