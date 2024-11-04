@@ -1,0 +1,70 @@
+---
+title: "Združená pravdepodonosť"
+author: "Adam Harmaniak"
+date: "2024-10-10"
+output: html_document
+---
+
+```{r, warning=FALSE}
+suppressWarnings(suppressMessages({
+  library(plotly)
+  library(MASS)
+  library(ggplot2)
+  library(reshape2)
+  }))
+
+data <- read.csv("C:/Users/Asus ROG Strix G15/STUBA/Rocnik_3/Bakalárska_práca/data/Joint_Distribution_Data.csv", header = TRUE, sep = ",")
+```
+
+## Korelačná analýza
+```{r, warning=FALSE}
+# Pearsonova korelacia
+pearson <- cor(data$Height_cm, data$Weight_kg, method = "pearson")
+print(pearson)
+
+
+# Spearmanova korelacia
+spearman <- cor(data$Height_cm, data$Weight_kg, method = "spearman")
+print(spearman)
+
+```
+
+## Vizualizácia
+### 2D: závislosť jednotlivých premenných
+```{r, warning=FALSE}
+plot(data$Height_cm, data$Weight_kg, xlab = "Height (cm)", ylab = "Weight (kg)", main = "Height vs. Weight")
+
+```
+
+### 3D+2D: Hustota (Premenné: výška a váha)
+```{r, warning=FALSE,echo=FALSE}
+height <- data$Height_cm
+weight <- data$Weight_kg
+
+kde <- kde2d(height, weight, n = 50)
+
+plot_ly(x = kde$x, y = kde$y, z = kde$z, type = "surface") %>%
+  layout(scene = list(
+    xaxis = list(title = "Height (cm)"),
+    yaxis = list(title = "Weight (kg)"),
+    zaxis = list(title = "Density")
+  ))
+
+data_long <- melt(data, id.vars = NULL, measure.vars = c("Height_cm", "Weight_kg"),
+                  variable.name = "Variable", value.name = "Value")
+
+ggplot(data_long, aes(x = Value, color = Variable, fill = Variable)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Density of Height and Weight", x = "Value", y = "Density") +
+  theme_minimal() +
+  scale_fill_manual(values = c("blue", "green")) +
+  scale_color_manual(values = c("blue", "green"))
+
+ggplot(data, aes(x = Height_cm, y = Weight_kg)) +
+  geom_point(alpha = 0.3) +
+  geom_density_2d() +
+  labs(x = "Height (cm)", y = "Weight (kg)", title = "2D Density Plot of Height and Weight") +
+  theme_minimal()
+
+```
+
