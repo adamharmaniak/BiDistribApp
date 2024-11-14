@@ -12,23 +12,18 @@ suppressWarnings(suppressMessages({
   library(ggplot2)
   library(reshape2)
   library(htmlwidgets)
+  library(mvtnorm)
+  library(dplyr)
+  library(copula)
+  library(viridisLite)
+  library(mclust)
+  library(mixtools)
   }))
 
-data <- read.csv("C:/Users/Asus ROG Strix G15/STUBA/Rocnik_3/Bakalárska_práca/data/Joint_Distribution_Data.csv", header = TRUE, sep = ",")
+datapath <- "C:/Users/Asus ROG Strix G15/STUBA/Rocnik_3/Bakalárska_práca/data/Joint_Distribution_Data.csv"
+data <- read.csv(datapath, header = TRUE, sep = ",")
 ```
 
-## Korelačná analýza
-```{r, warning=FALSE}
-# Pearsonova korelacia
-pearson <- cor(data$Height_cm, data$Weight_kg, method = "pearson")
-print(pearson)
-
-
-# Spearmanova korelacia
-spearman <- cor(data$Height_cm, data$Weight_kg, method = "spearman")
-print(spearman)
-
-```
 
 ## Vizualizácia
 ### 2D: závislosť jednotlivých premenných
@@ -140,5 +135,118 @@ plot_ly(x = kde$x, y = kde$y, z = kde$z, type = "surface") %>%
     yaxis = list(title = "Weight (kg)"),
     zaxis = list(title = "Density")
   ))
+```
+
+## Použitie parametrického modelu
+
+### 2D
+```{r,warning=FALSE}
+data <- read.csv(datapath, header = TRUE, sep = ",")
+
+# Základné spracovanie vekových kategórií
+data$Age_Category <- factor(data$Age_Category, levels = c("18-30", "31-50", "51-70"))
+
+# Funkcia na výpočet hustoty pre každú vekovú kategóriu
+calculate_density <- function(data, category) {
+  sub_data <- filter(data, Age_Category == category)
+  if (nrow(sub_data) > 1) {  # Kontrola, či existujú dáta v kategórii
+    mu <- mean(sub_data$Weight_kg)
+    sigma <- sd(sub_data$Weight_kg)
+    x <- seq(min(data$Weight_kg), max(data$Weight_kg), length.out = 100)
+    density <- dnorm(x, mean = mu, sd = sigma)
+    return(data.frame(Weight = x, Density = density, Age_Category = category))
+  } else {
+    # Ak v kategórii nie sú dostatočné dáta, vráti prázdny dataframe
+    return(data.frame(Weight = numeric(0), Density = numeric(0), Age_Category = character(0)))
+  }
+}
+
+# Vypočíta hustoty pre každú kategóriu
+density_data <- bind_rows(
+  calculate_density(data, "18-30"),
+  calculate_density(data, "31-50"),
+  calculate_density(data, "51-70")
+)
+
+# 2D Vizualizácia
+ggplot(density_data, aes(x = Weight, y = Density, color = Age_Category)) +
+  geom_line(size = 1.2) +
+  labs(title = "Hustota rozdelenia váhy podľa vekových kategórií",
+       x = "Váha (kg)", y = "Hustota") +
+  theme_minimal()
+```
+
+```{r,warning=FALSE}
+# Načítanie dát
+data <- read.csv(datapath, header = TRUE, sep = ",")
+
+# Vytvorenie numerického veku
+data$Age_numeric <- sapply(data$Age_Category, function(category) {
+  if (category == "18-30") return((18 + 30) / 2)
+  if (category == "31-50") return((31 + 50) / 2)
+  if (category == "51-70") return((51 + 70) / 2)
+  return(NA)
+})
+
+# Odstránenie chýbajúcich hodnôt
+data <- na.omit(data)
+
+# Výpočet priemerov a kovariačných matíc pre každú kategóriu
+mean1 <- colMeans(filter(data, Age_Category == "18-30")[, c("Age_numeric", "Weight_kg")])
+mean2 <- colMeans(filter(data, Age_Category == "31-50")[, c("Age_numeric", "Weight_kg")])
+mean3 <- colMeans(filter(data, Age_Category == "51-70")[, c("Age_numeric", "Weight_kg")])
+
+cov1 <- cov(filter(data, Age_Category == "18-30")[, c("Age_numeric", "Weight_kg")])
+cov2 <- cov(filter(data, Age_Category == "31-50")[, c("Age_numeric", "Weight_kg")])
+cov3 <- cov(filter(data, Age_Category == "51-70")[, c("Age_numeric", "Weight_kg")])
+
+# Uistíme sa, že kovariačné matice sú pozitívne definitné
+cov1 <- cov1 + diag(1e-6, nrow(cov1))
+cov2 <- cov2 + diag(1e-6, nrow(cov2))
+cov3 <- cov3 + diag(1e-6, nrow(cov3))
+
+# Definícia mriežky
+grid <- expand.grid(
+  Age = seq(min(data$Age_numeric), max(data$Age_numeric), length.out = 100),
+  Weight = seq(min(data$Weight_kg), max(data$Weight_kg), length.out = 100)
+)
+
+# Výpočet hustôt
+grid_matrix <- as.matrix(grid[, c("Age", "Weight")])
+density1 <- mvtnorm::dmvnorm(grid_matrix, mean = mean1, sigma = cov1)
+density2 <- mvtnorm::dmvnorm(grid_matrix, mean = mean2, sigma = cov2)
+density3 <- mvtnorm::dmvnorm(grid_matrix, mean = mean3, sigma = cov3)
+
+# Normalizácia hustôt
+density1 <- density1 / max(density1)
+density2 <- density2 / max(density2)
+density3 <- density3 / max(density3)
+
+# Kombinácia hustôt
+grid$Density <- (density1 + density2 + density3) / 3
+grid$Density[is.na(grid$Density)] <- 0
+
+# Transformácia hustôt na maticu
+z_matrix <- matrix(grid$Density, nrow = length(unique(grid$Age)), ncol = length(unique(grid$Weight)))
+
+# Skontrolujeme, či z_matrix obsahuje len platné hodnoty
+z_matrix[is.na(z_matrix)] <- 0
+
+# Vizualizácia
+plot_ly(
+  x = unique(grid$Age), y = unique(grid$Weight), z = z_matrix,
+  type = "surface",
+  colorscale = "Viridis"
+) %>%
+  layout(
+    title = "3D Joint Density of Age and Weight (Normalized)",
+    scene = list(
+      xaxis = list(title = "Age (years)"),
+      yaxis = list(title = "Weight (kg)"),
+      zaxis = list(title = "Density")
+    )
+  )
+
+
 ```
 
