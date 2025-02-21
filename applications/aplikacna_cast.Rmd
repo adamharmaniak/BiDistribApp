@@ -6,11 +6,13 @@ output: html_document
 ---
 
 ```{r,warning=FALSE}
-library(ggplot2)
-library(plotly)
-library(copula)
-library(patchwork)
-library(dplyr)
+suppressMessages(suppressWarnings({
+  library(ggplot2)
+  library(plotly)
+  library(copula)
+  library(patchwork)
+  library(dplyr)
+}))
 
 ```
 
@@ -119,6 +121,7 @@ model_joint_distribution <- function(data, variables) {
     return(fig)
   }
 
+  # 1 diskretna a 1 spojita premenna => 2D + 3D vizualizacia
   if (length(discrete_vars) == 1 & length(continuous_vars) == 1) {
     mean_x <- mean(data[[continuous_vars]])
     sd_x <- sd(data[[continuous_vars]])
@@ -201,18 +204,10 @@ model_joint_distribution <- function(data, variables) {
 ```
 
 ```{r,warning=FALSE}
-variables <- c("wt", "cyl")
+variables <- c("gear", "mpg")
 response <- "mpg"
 
 result <- model_joint_distribution(mtcars, variables)
-
-#if (inherits(result, "plotly")) {
-#  result
-#} else if (inherits(result, "gg")) {
-#  print(result)
-#} else {
-#  print(result)
-#}
 
 print(result)
 
