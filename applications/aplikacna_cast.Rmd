@@ -18,7 +18,6 @@ suppressMessages(suppressWarnings({
 
 ```{r,warning=FALSE}
 model_joint_distribution <- function(data, variables) {
-  # Overenie nacitania dat
   print("Prvých 6 riadkov datasetu:")
   print(head(data))
 
@@ -199,12 +198,83 @@ model_joint_distribution <- function(data, variables) {
     
     return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
   }
+  
+  # 2 spojite premenne => 2D + 3D vizualizacia
+  if (length(continuous_vars) == 2) {
+    mean_x <- mean(data[[continuous_vars[1]]])
+    sd_x <- sd(data[[continuous_vars[1]]])
+    mean_y <- mean(data[[continuous_vars[2]]])
+    sd_y <- sd(data[[continuous_vars[2]]])
+    
+    cor_val <- cor(data[[continuous_vars[1]]], data[[continuous_vars[2]]], method = "pearson")
+    copula_model <- normalCopula(param = cor_val, dim = 2, dispstr = "un")
+    
+    copula_density <- function(x, y) {
+      u1 <- pnorm(x, mean = mean_x, sd = sd_x)
+      u2 <- pnorm(y, mean = mean_y, sd = sd_y)
+      
+      copula_density <- dCopula(c(u1, u2), copula = copula_model)
+      x_density <- dnorm(x, mean = mean_x, sd = sd_x)
+      y_density <- dnorm(y, mean = mean_y, sd = sd_y)
+      
+      copula_density * x_density * y_density
+    }
+    
+    x_vals <- seq(min(data[[continuous_vars[1]]]), max(data[[continuous_vars[1]]]), length.out = 100)
+    y_vals <- seq(min(data[[continuous_vars[2]]]), max(data[[continuous_vars[2]]]), length.out = 100)
+    grid <- expand.grid(x = x_vals, y = y_vals)
+
+    z_vals <- apply(as.matrix(grid), 1, function(point) {
+      copula_density(point[1], point[2])
+    })
+
+    density_vals_matrix <- matrix(z_vals, nrow = 100, ncol = 100)
+    density_vals_matrix <- density_vals_matrix / max(density_vals_matrix)
+    
+    fig_3d <- plot_ly(
+      x = ~x_vals, y = ~y_vals, z = ~density_vals_matrix,
+      type = "surface",
+      colors = colorRamp(c("blue", "cyan", "yellow", "red"))
+    ) %>% layout(
+      title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(kopula)"),
+      scene = list(
+        xaxis = list(title = continuous_vars[1]),
+        yaxis = list(title = continuous_vars[2]),
+        zaxis = list(title = "Hustota")
+      )
+    )
+    
+    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2], color = continuous_vars[2])) +
+      geom_point(size = 3, alpha = 0.7) +  
+      labs(x = continuous_vars[1], y = continuous_vars[2]) +
+      scale_color_gradient(low = "blue", high = "red") +
+      theme_minimal()
+
+    density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
+      geom_density(fill = "blue", alpha = 0.5) +
+      labs(x = NULL, y = "Hustota") +
+      theme_minimal() +
+      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+
+    density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
+      geom_density(fill = "red", alpha = 0.5) +
+      coord_flip() +
+      labs(x = NULL, y = "Hustota") +
+      theme_minimal() +
+      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+    
+    final_plot_2d <- (density_x + plot_spacer()) /
+                    (scatter_plot + density_y) +
+                    plot_layout(widths = c(4, 1), heights = c(1, 4))
+    
+    return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
+  }
 }
 
 ```
 
 ```{r,warning=FALSE}
-variables <- c("gear", "mpg")
+variables <- c("gear", "hp")
 response <- "mpg"
 
 result <- model_joint_distribution(mtcars, variables)
