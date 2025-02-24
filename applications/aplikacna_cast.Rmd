@@ -1,9 +1,13 @@
 ---
-title: "Modelling Program"
+title: "Modelling joint probability distribution of
+a mixture of continuous and categorical
+random variables"
 author: "Adam Harmaniak"
 date: "2025-02-21"
 output: html_document
 ---
+
+# Pouzite kniznice
 
 ```{r,warning=FALSE}
 suppressMessages(suppressWarnings({
@@ -12,11 +16,43 @@ suppressMessages(suppressWarnings({
   library(copula)
   library(patchwork)
   library(dplyr)
+  library(tibble)
+  library(MASS)
+  library(randomForest)
+  library(mgcv)
 }))
 
 ```
 
-```{r,warning=FALSE}
+# Funkcia na identifikaciu premennych
+
+```{r, warning=FALSE}
+identify_variables <- function(data) {
+  variable_names <- colnames(data)
+  num_variables <- length(variable_names)
+  
+  variable_types <- sapply(data, function(col) {
+    if (is.factor(col) || is.character(col) || (is.numeric(col) && length(unique(col)) < 10)) {
+      return("Diskrétna")
+    } else {
+      return("Spojitá")
+    }
+  })
+  
+  result_table <- tibble(
+    Index = seq_len(num_variables),
+    Variable_Name = variable_names,
+    Variable_Type = variable_types
+  )
+  
+  return(result_table)
+}
+```
+
+
+# Funkcia na modelovanie a vizualizaciu zdruzeneho rozdelenia pravdepodobnosti
+
+```{r, warning=FALSE}
 model_joint_distribution <- function(data, variables) {
   print("Prvých 6 riadkov datasetu:")
   print(head(data))
@@ -78,7 +114,7 @@ model_joint_distribution <- function(data, variables) {
     return(tab)
   }
 
-  # Vsetky premenne diskretne a pocet je 2 => tabulka pravdepodobnosti a 3D vizualizacia
+  # Vsetky premenne diskretne a pocet je 2 => tabulka pravdepodobnosti a 2D+3D vizualizacia
   if (length(discrete_vars) == length(variables) & length(discrete_vars) == 2) {
     tab <- as.data.frame(table(data[, discrete_vars]))
     tab$Probability <- tab$Freq / sum(tab$Freq)
@@ -86,41 +122,71 @@ model_joint_distribution <- function(data, variables) {
     tab[[discrete_vars[1]]] <- as.numeric(as.character(tab[[discrete_vars[1]]]))
     tab[[discrete_vars[2]]] <- as.numeric(as.character(tab[[discrete_vars[2]]]))
 
-    fig <- plot_ly()
+    fig_3d <- plot_ly()
     for (i in 1:nrow(tab)) {
-      fig <- fig %>% add_trace(
-        x = rep(tab[[discrete_vars[1]]][i], 2),
-        y = rep(tab[[discrete_vars[2]]][i], 2),
-        z = c(0, tab$Probability[i]),
-        type = "scatter3d",
-        mode = "lines",
-        line = list(color = "blue"),
-        showlegend = FALSE
-      )
+        fig_3d <- fig_3d %>% add_trace(
+            x = rep(tab[[discrete_vars[1]]][i], 2),
+            y = rep(tab[[discrete_vars[2]]][i], 2),
+            z = c(0, tab$Probability[i]),
+            type = "scatter3d",
+            mode = "lines",
+            line = list(color = "blue"),
+            showlegend = FALSE
+        )
     }
 
-    fig <- fig %>% add_trace(
-      x = tab[[discrete_vars[1]]],
-      y = tab[[discrete_vars[2]]],
-      z = tab$Probability,
-      type = "scatter3d",
-      mode = "markers",
-      marker = list(size = 5, color = "red"),
-      name = "Pravdepodobnosti"
+    fig_3d <- fig_3d %>% add_trace(
+        x = tab[[discrete_vars[1]]],
+        y = tab[[discrete_vars[2]]],
+        z = tab$Probability,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 5, color = "red"),
+        name = "Pravdepodobnosti"
     )
 
-    fig <- fig %>% layout(
-      scene = list(
-        xaxis = list(title = paste0(discrete_vars[1], " (X)")),
-        yaxis = list(title = paste0(discrete_vars[2], " (Y)")),
-        zaxis = list(title = "P(X, Y)")
-      )
+    fig_3d <- fig_3d %>% layout(
+        scene = list(
+            xaxis = list(title = paste0(discrete_vars[1], " (X)")),
+            yaxis = list(title = paste0(discrete_vars[2], " (Y)")),
+            zaxis = list(title = "P(X, Y)")
+        )
     )
 
-    return(fig)
+    marginal_x <- tab %>%
+  group_by(!!sym(discrete_vars[1])) %>%
+  summarise(Prob_X = sum(Probability))
+
+  marginal_y <- tab %>%
+    group_by(!!sym(discrete_vars[2])) %>%
+    summarise(Prob_Y = sum(Probability))
+  
+  # 2D vizualizacia
+  scatter_plot <- ggplot(tab, aes_string(x = discrete_vars[1], y = discrete_vars[2], fill =   "Probability")) +
+    geom_tile(color = "white") +
+    scale_fill_gradient(low = "blue", high = "red") +
+    labs(x = discrete_vars[1], y = discrete_vars[2], fill = "Pravdepodobnosť") +
+    theme_minimal()
+  
+  marginal_x_plot <- ggplot(marginal_x, aes_string(x = discrete_vars[1], y = "Prob_X")) +
+    geom_bar(stat = "identity", fill = "blue", alpha = 0.6) +
+    labs(x = NULL, y = "P(X)") +
+    theme_minimal()
+  
+  marginal_y_plot <- ggplot(marginal_y, aes_string(x = discrete_vars[2], y = "Prob_Y")) +
+    geom_bar(stat = "identity", fill = "red", alpha = 0.6) +
+    coord_flip() +
+    labs(x = NULL, y = "P(Y)") +
+    theme_minimal()
+  
+  final_plot_2d <- (marginal_x_plot + plot_spacer()) /
+                   (scatter_plot + marginal_y_plot) +
+                   plot_layout(widths = c(4, 1), heights = c(1, 4))
+
+    return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
   }
 
-  # 1 diskretna a 1 spojita premenna => 2D + 3D vizualizacia
+  # 1 diskretna a 1 spojita premenna => 2D+3D vizualizacia
   if (length(discrete_vars) == 1 & length(continuous_vars) == 1) {
     mean_x <- mean(data[[continuous_vars]])
     sd_x <- sd(data[[continuous_vars]])
@@ -188,7 +254,7 @@ model_joint_distribution <- function(data, variables) {
       geom_bar(alpha = 0.7) +
       coord_flip() +
       scale_fill_brewer(palette = "Set1") +
-      labs(x = NULL, y = "Hustota") +
+      labs(x = NULL, y = "P(Y)") +
       theme_minimal() +
       theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "right")
     
@@ -273,14 +339,15 @@ model_joint_distribution <- function(data, variables) {
 
 ```
 
-```{r,warning=FALSE}
-variables <- c("gear", "hp")
-response <- "mpg"
-
-result <- model_joint_distribution(mtcars, variables)
-
-print(result)
-
+```{r, warning=FALSE}
+variables <- identify_variables(mtcars)
+print(variables)
 ```
 
+
+```{r,warning=FALSE}
+selected_variables <- c("cyl", "disp")
+result <- model_joint_distribution(mtcars, selected_variables)
+print(result)
+```
 
