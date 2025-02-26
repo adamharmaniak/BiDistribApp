@@ -7,6 +7,9 @@ date: "2025-02-21"
 output: html_document
 ---
 
+# Dokumentacia
+
+
 # Pouzite kniznice
 
 ```{r,warning=FALSE}
@@ -54,65 +57,16 @@ identify_variables <- function(data) {
 
 ```{r, warning=FALSE}
 model_joint_distribution <- function(data, variables) {
-  print("Prvých 6 riadkov datasetu:")
-  print(head(data))
-
   # Identifikacia diskretnych a spojitych premennych
   discrete_vars <- variables[sapply(data[, variables, drop = FALSE], function(col) is.factor(col) || is.character(col) || (is.numeric(col) && length(unique(col)) < 10))]
   continuous_vars <- setdiff(variables, discrete_vars)
   
-  print(paste("Diskrétne premenné:", paste(discrete_vars, collapse=", ")))
-  print(paste("Spojité premenné:", paste(continuous_vars, collapse=", ")))
-  
-  # Ak pocet premennych presahuje 2 => vytvorenie komplexnej tabulky pravdepodobnosti
-  if (length(discrete_vars) + length(continuous_vars) > 2) {
-    # Vytvorenie tabulky s frekvenciami pre diskretne premenne
-    tab <- as.data.frame(table(data[, discrete_vars]))
-
-    # Pre kazdy spojity atribut vypocitame priemerne hodnoty pre kombinacie diskretnych premennych
-    for (cont_var in continuous_vars) {
-        mean_values <- data %>%
-            group_by(across(all_of(discrete_vars))) %>%
-            summarise(Mean_Value = mean(.data[[cont_var]], na.rm = TRUE), .groups = "drop")
-
-        # mean_values neobsahuje ziadne riadky => preskocime tuto premennu
-        if (nrow(mean_values) == 0) {
-            warning(paste("Žiadne dáta na výpočet priemeru pre premennú:", cont_var))
-            next
-        }
-
-        # Overenie, ktore diskretne premenne existuju v tab a mean_values
-        common_vars <- intersect(names(tab), discrete_vars)
-        common_vars_mv <- intersect(names(mean_values), discrete_vars)
-
-        # Existuju spolocne premenne => prevedenie na character
-        if (length(common_vars) > 0) {
-            tab <- tab %>%
-                mutate(across(all_of(common_vars), as.character))
-        }
-        if (length(common_vars_mv) > 0) {
-            mean_values <- mean_values %>%
-                mutate(across(all_of(common_vars_mv), as.character))
-        }
-
-        # Spojenie priemernych hodnot so zakladnou tabulkou
-        tab <- full_join(tab, mean_values, by = common_vars)
-
-        # Premenovanie stlpca Mean_Value na nazov spojitej premennej
-        colnames(tab)[which(colnames(tab) == "Mean_Value")] <- cont_var
-    }
-
-    # Nahrada NA vo Frequency nulami
-    tab$Freq[is.na(tab$Freq)] <- 0
-
-    # Vypocet pravdepodobnosti
-    tab$Probability <- tab$Freq / sum(tab$Freq)
-
-    # Odstranenie riadkov s nulovou frekvenciou
-    tab <- tab[tab$Freq > 0, ]
-
-    return(tab)
+  if(length(discrete_vars) + length(continuous_vars) > 2){
+    stop("Počet premenných musí byť presne 2.")
   }
+  
+  print("Prvých 6 riadkov datasetu:")
+  print(head(data))
 
   # Vsetky premenne diskretne a pocet je 2 => tabulka pravdepodobnosti a 2D+3D vizualizacia
   if (length(discrete_vars) == length(variables) & length(discrete_vars) == 2) {
@@ -339,6 +293,69 @@ model_joint_distribution <- function(data, variables) {
 
 ```
 
+```{r,warning=FALSE}
+model_multi_joint_distribution <- function(data, selected_variables) {
+  # Identifikácia diskrétnych a spojitých premenných
+  discrete_vars <- selected_variables[sapply(data[, selected_variables, drop = FALSE], 
+                                             function(col) is.factor(col) || is.character(col) || 
+                                                           (is.numeric(col) && length(unique(col)) < 10))]
+  continuous_vars <- setdiff(selected_variables, discrete_vars)
+  
+  # Ak počet premenných presahuje 2 => vytvorenie komplexnej tabuľky pravdepodobnosti
+  if (length(discrete_vars) + length(continuous_vars) > 2) {
+    # Vytvorenie tabuľky s frekvenciami pre diskrétne premenné
+    tab <- as.data.frame(table(data[, discrete_vars]))
+    
+    # Pre každú spojitú premennú vypočítame priemerné hodnoty pre kombinácie diskrétnych premenných
+    for (cont_var in continuous_vars) {
+      mean_values <- data %>%
+        group_by(across(all_of(discrete_vars))) %>%
+        summarise(Mean_Value = mean(.data[[cont_var]], na.rm = TRUE), .groups = "drop")
+      
+      # mean_values neobsahuje žiadne riadky => preskočíme túto premennú
+      if (nrow(mean_values) == 0) {
+        warning(paste("Žiadne dáta na výpočet priemeru pre premennú:", cont_var))
+        next
+      }
+      
+      # Overenie, ktoré diskrétne premenné existujú v tab a mean_values
+      common_vars <- intersect(names(tab), discrete_vars)
+      common_vars_mv <- intersect(names(mean_values), discrete_vars)
+      
+      # Existujú spoločné premenné => prevedenie na character
+      if (length(common_vars) > 0) {
+        tab <- tab %>%
+          mutate(across(all_of(common_vars), as.character))
+      }
+      if (length(common_vars_mv) > 0) {
+        mean_values <- mean_values %>%
+          mutate(across(all_of(common_vars_mv), as.character))
+      }
+      
+      # Spojenie priemerných hodnôt so základnou tabuľkou
+      tab <- full_join(tab, mean_values, by = common_vars)
+      
+      # Premenovanie stĺpca Mean_Value na názov spojitej premennej
+      colnames(tab)[which(colnames(tab) == "Mean_Value")] <- cont_var
+    }
+    
+    # Náhrada NA vo Frequency nulami
+    tab$Freq[is.na(tab$Freq)] <- 0
+    
+    # Výpočet pravdepodobnosti
+    tab$Probability <- tab$Freq / sum(tab$Freq)
+    
+    # Odstránenie riadkov s nulovou frekvenciou
+    tab <- tab[tab$Freq > 0, ]
+    
+    return(tab)
+  } else {
+    stop("Počet premenných musí byť väčší ako 2 na vytvorenie komplexnej tabuľky pravdepodobnosti.")
+  }
+}
+```
+
+
 ```{r, warning=FALSE}
 variables <- identify_variables(mtcars)
 print(variables)
@@ -346,8 +363,14 @@ print(variables)
 
 
 ```{r,warning=FALSE}
-selected_variables <- c("cyl", "disp")
+selected_variables <- c("mpg", "disp")
 result <- model_joint_distribution(mtcars, selected_variables)
 print(result)
+```
+
+```{r,warning=FALSE}
+multiple_variables <- c("mpg", "disp", "cyl")
+result2 <- model_multi_joint_distribution(mtcars, multiple_variables)
+print(result2)
 ```
 
