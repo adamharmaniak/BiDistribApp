@@ -75,6 +75,248 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
     stop("Zoznam premennych musi obsahovat prave 1 spojitu a 1 diskretnu premennu!")
   }
   
+  # Modelovanie hustoty ako hustoty normalneho rozdelenia (dnorm)
+  if (model_type == "normal") {
+    # Konverzia diskretnej premennej na faktor a zoradenie kategorii
+    data[[discrete_vars]] <- factor(data[[discrete_vars]])
+    categories <- levels(data[[discrete_vars]])
+    
+    # Vypocet hustoty pre kazdu kategoriu
+    calculate_density_3D <- function(data, category) {
+      sub_data <- filter(data, .data[[discrete_vars]] == category)
+      if (nrow(sub_data) > 1) {
+        mu <- mean(sub_data[[continuous_vars]])
+        sigma <- sd(sub_data[[continuous_vars]])
+        x <- seq(min(data[[continuous_vars]]), max(data[[continuous_vars]]), length.out = 100)
+        density <- dnorm(x, mean = mu, sd = sigma)
+        return(data.frame(Weight = x, Density = density, Age_Category = category))
+      } else {
+        return(data.frame(Weight = numeric(0), Density = numeric(0), Age_Category = character(0)))
+      }
+    }
+
+    # Spojenie hustot pre vsetky kategorie
+    density_data <- bind_rows(lapply(categories, function(cat) calculate_density_3D(data, cat)))
+
+    # Vizualizacia v 3D
+    fig_3d <- plot_ly(density_data, x = ~Weight, y = ~Age_Category, z = ~Density, 
+                       type = 'scatter3d', mode = 'lines', 
+                       color = ~Age_Category, line = list(width = 4)) %>%
+              layout(scene = list(xaxis = list(title = continuous_vars),
+                                  yaxis = list(title = discrete_vars),
+                                  zaxis = list(title = 'Hustota')))
+    
+    # 2D modelovanie
+    # Vypocet priemeru a smerodajnej odchylky pre kazdu kategoriu diskretnej premennej
+    grouped_stats <- data %>%
+      group_by(.data[[discrete_vars]]) %>%
+      summarise(mean_x = mean(.data[[continuous_vars]], na.rm = TRUE),
+                sd_x = sd(.data[[continuous_vars]], na.rm = TRUE),
+                .groups = "drop")
+    
+    # Vygenerovanie hodnot pre vykreslenie normalnych hustot pre kazdu kategoriu
+    x_vals <- seq(min(data[[continuous_vars]], na.rm = TRUE), max(data[[continuous_vars]], na.rm = TRUE), length.out = 100)
+    
+    # Vytvorenie datasetu na vizualizaciu hustotnych kriviek pre kazdu kategoriu
+    density_data <- grouped_stats %>%
+      expand_grid(x = x_vals) %>%
+      mutate(y = dnorm(x, mean = mean_x, sd = sd_x))
+    
+    # Konverzia diskretnej premennej na faktor
+    data[[discrete_vars]] <- as.factor(data[[discrete_vars]])
+    
+    scatter_plot <- ggplot(data, aes_string(x = continuous_vars, y = discrete_vars, color = discrete_vars)) +
+      geom_point(size = 3, alpha = 0.7) +
+      labs(x = continuous_vars, y = discrete_vars) +
+      theme_minimal() +
+      theme(legend.position = "right") +
+      scale_color_brewer(palette = "Set1")
+    
+    x_density <- ggplot(density_data, aes(x = x, y = y, color = as.factor(.data[[discrete_vars]]), group = .data[[discrete_vars]])) +
+      geom_line(size = 1) +
+      scale_color_brewer(palette = "Set1") +
+      labs(x = NULL, y = paste("Hustota (", continuous_vars, ")", sep = ""), color = discrete_vars) +
+      theme_minimal() +
+      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "right")
+    
+    y_bar <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
+      geom_bar(alpha = 0.7) +
+      coord_flip() +
+      scale_fill_brewer(palette = "Set1") +
+      labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
+      theme_minimal() +
+      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "right")
+    
+    final_plot_2d <- (x_density + plot_spacer()) /
+                    (scatter_plot + y_bar) +
+                    plot_layout(widths = c(4, 1), heights = c(1, 4))
+    
+    return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
+  }
+  
+  if (model_type == "kernel") {
+    # Konverzia diskretnej premennej na faktor a zoradenie kategorii
+    data[[discrete_vars]] <- factor(data[[discrete_vars]])
+    categories <- levels(data[[discrete_vars]])
+
+    # Vytvorenie konzistentnej farebnej mapy pre kategorie
+    category_colors <- setNames(RColorBrewer::brewer.pal(length(categories), "Set1"), categories)
+
+    calculate_density_3D <- function(data, category) {
+      sub_data <- filter(data, .data[[discrete_vars]] == category)
+      if (nrow(sub_data) > 1) {
+        # Optimalizovany KDE odhad
+        bw <- bw.nrd0(sub_data[[continuous_vars]])
+        kde_x <- density(sub_data[[continuous_vars]], bw = bw)
+        kde_x_fun <- approxfun(kde_x$x, kde_x$y, rule = 2)
+    
+        x <- seq(min(data[[continuous_vars]]), max(data[[continuous_vars]]), length.out = 100)
+        x_density <- kde_x_fun(x)
+    
+        return(data.frame(Weight = x, Density = x_density, Category = category))
+      } else {
+        return(data.frame(Weight = numeric(0), Density = numeric(0), Category = character(0)))
+      }
+    }
+
+    # Spojenie hustot pre vsetky kategorie
+    density_data <- bind_rows(lapply(categories, function(cat) calculate_density_3D(data, cat)))
+
+    fig_3d <- plot_ly(density_data, x = ~Weight, y = ~Category, z = ~Density, 
+                       type = 'scatter3d', mode = 'lines', 
+                       color = ~Category, colors = category_colors, line = list(width = 4)) %>%
+              layout(scene = list(xaxis = list(title = continuous_vars),
+                                  yaxis = list(title = discrete_vars),
+                                  zaxis = list(title = 'Hustota')))
+
+    data[[discrete_vars]] <- factor(data[[discrete_vars]], levels = categories)
+
+    scatter_plot <- ggplot(data, aes_string(x = continuous_vars, y = discrete_vars, color = discrete_vars)) +
+      geom_point(size = 3, alpha = 0.7) +
+      labs(x = continuous_vars, y = discrete_vars) +
+      scale_color_manual(values = category_colors) +
+      theme_minimal() +
+      theme(legend.position = "right")
+
+    x_density <- ggplot(data, aes_string(x = continuous_vars, fill = discrete_vars, color = discrete_vars)) +
+      geom_density(alpha = 0.5) +
+      scale_fill_manual(values = category_colors) +
+      scale_color_manual(values = category_colors) +
+      labs(x = NULL, y = paste("Hustota (", continuous_vars, ")", sep = "")) +
+      theme_minimal() +
+      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "right")
+
+    y_bar <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
+      geom_bar(alpha = 0.7) +
+      coord_flip() +
+      scale_fill_manual(values = category_colors) +
+      labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
+      theme_minimal() +
+      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "right")
+
+    final_plot_2d <- (x_density + plot_spacer()) /
+                    (scatter_plot + y_bar) +
+                    plot_layout(widths = c(4, 1), heights = c(1, 4))
+
+    return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
+  }
+  
+  # Modelovanie hustoty ako hustoty normalneho rozdelenia (dnorm) cez kopulu
+  if (model_type == "copula") {
+    data[[discrete_vars]] <- factor(data[[discrete_vars]])
+    categories <- levels(data[[discrete_vars]])
+
+    category_values <- as.numeric(as.factor(data[[discrete_vars]]))
+    unique_categories <- sort(unique(category_values))
+
+    weights <- table(data[[discrete_vars]]) / nrow(data)
+    cor_val <- cor(data[[continuous_vars]], category_values, method = "spearman") # Spearman pre lepsiu robustnost
+    
+    copula_model <- normalCopula(param = cor_val, dim = 2, dispstr = "un")
+
+    # Funkcia na vypocet zdruzenej hustoty pre kazdu kategoriu
+    calculate_density_3D <- function(data, category) {
+      sub_data <- filter(data, .data[[discrete_vars]] == category)
+      if (nrow(sub_data) > 1) {
+        mu_x <- mean(sub_data[[continuous_vars]])
+        sigma_x <- sd(sub_data[[continuous_vars]])
+
+        x <- seq(min(data[[continuous_vars]]), max(data[[continuous_vars]]), length.out = 100)
+        u1 <- pnorm(x, mean = mu_x, sd = sigma_x)
+
+        y_val <- as.numeric(as.factor(category))
+        u2 <- ecdf(category_values)(y_val)
+
+        copula_density <- dCopula(cbind(u1, rep(u2, length(u1))), copula = copula_model)
+        x_density <- dnorm(x, mean = mu_x, sd = sigma_x)
+
+        joint_density <- copula_density * x_density
+
+        return(data.frame(Weight = x, Density = joint_density, Category = category))
+      } else {
+        return(data.frame(Weight = numeric(0), Density = numeric(0), Category = character(0)))
+      }
+    }
+
+    # Spojenie hustot pre vsetky kategorie
+    density_data <- bind_rows(lapply(categories, function(cat) calculate_density_3D(data, cat)))
+
+    # Vizualizacia v 3D s ciarami pre kazdu kategoriu
+    fig_3d <- plot_ly(density_data, x = ~Weight, y = ~Category, z = ~Density, 
+                       type = 'scatter3d', mode = 'lines', 
+                       color = ~Category, line = list(width = 4)) %>%
+              layout(scene = list(xaxis = list(title = continuous_vars),
+                                  yaxis = list(title = discrete_vars),
+                                  zaxis = list(title = 'Hustota')))
+    
+    # 2D modelovanie
+    # Vypocet priemeru a smerodajnej odchylky pre kazdu kategoriu diskretnej premennej
+    grouped_stats <- data %>%
+      group_by(.data[[discrete_vars]]) %>%
+      summarise(mean_x = mean(.data[[continuous_vars]], na.rm = TRUE),
+                sd_x = sd(.data[[continuous_vars]], na.rm = TRUE),
+                .groups = "drop")
+    
+    # Vygenerovanie hodnot pre vykreslenie normalnych hustot pre kazdu kategoriu
+    x_vals <- seq(min(data[[continuous_vars]], na.rm = TRUE), max(data[[continuous_vars]], na.rm = TRUE), length.out = 100)
+    
+    # Vytvorenie datasetu na vizualizaciu hustotnych kriviek pre kazdu kategoriu
+    density_data <- grouped_stats %>%
+      expand_grid(x = x_vals) %>%
+      mutate(y = dnorm(x, mean = mean_x, sd = sd_x))
+    
+    # Konverzia diskretnej premennej na faktor
+    data[[discrete_vars]] <- as.factor(data[[discrete_vars]])
+    
+    scatter_plot <- ggplot(data, aes_string(x = continuous_vars, y = discrete_vars, color = discrete_vars)) +
+      geom_point(size = 3, alpha = 0.7) +
+      labs(x = continuous_vars, y = discrete_vars) +
+      theme_minimal() +
+      theme(legend.position = "right") +
+      scale_color_brewer(palette = "Set1")
+    
+    x_density <- ggplot(density_data, aes(x = x, y = y, color = as.factor(.data[[discrete_vars]]), group = .data[[discrete_vars]])) +
+      geom_line(size = 1) +
+      scale_color_brewer(palette = "Set1") +
+      labs(x = NULL, y = paste("Hustota (", continuous_vars, ")", sep = ""), color = discrete_vars) +
+      theme_minimal() +
+      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "right")
+    
+    y_bar <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
+      geom_bar(alpha = 0.7) +
+      coord_flip() +
+      scale_fill_brewer(palette = "Set1") +
+      labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
+      theme_minimal() +
+      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "right")
+    
+    final_plot_2d <- (x_density + plot_spacer()) /
+                    (scatter_plot + y_bar) +
+                    plot_layout(widths = c(4, 1), heights = c(1, 4))
+    
+    return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
+  }
+  
   # Modelovanie 3D hustoty ako hustoty normalneho rozdelenia (dnorm)
   if (model_type == "normal") {
     # 3D modelovanie
@@ -183,6 +425,13 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
     kde_y <- kde(as.numeric(as.factor(data[[discrete_vars]])))  
     kde_y_fun <- approxfun(kde_y$eval.points, kde_y$estimate, rule = 2)
     pkde_y_fun <- function(y) ks::pkde(y, kde_y)  # KDE zalozene na CDF pre diskretnu premennu
+    
+    # Odhad Pearsonovej korelacie medzi spojitou a diskretnou premennou
+    cor_val <- cor(data[[continuous_vars]], as.numeric(as.factor(data[[discrete_vars]])), method = "pearson")
+    
+    # Definicia normalnej kopuly na zaklade korelacie
+    copula_model <- normalCopula(param = cor_val, dim = 2, dispstr = "un")
+
   
     # Funkcia zdruzenej hustoty s KDE a kopulou
     copula_density <- function(x, y) {
@@ -257,8 +506,8 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
 ```
 
 ```{r,warning=FALSE}
-selected_variables <- c("mpg", "cyl")
-result <- model_mixture_joint_distribution(mtcars, selected_variables, "normal")
+selected_variables <- c("carb", "hp")
+result <- model_mixture_joint_distribution(mtcars, selected_variables, "kernel")
 print(result)
 ```
 
