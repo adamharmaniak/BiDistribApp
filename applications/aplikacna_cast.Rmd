@@ -82,13 +82,12 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
     data[[discrete_vars]] <- factor(data[[discrete_vars]])
     categories <- levels(data[[discrete_vars]])
 
-    # Vytvorenie konzistentnej farebnej mapy pre kategorie
+    # Vytvorenie farebnej mapy pre kategorie
     category_colors <- setNames(RColorBrewer::brewer.pal(length(categories), "Set1"), categories)
 
     calculate_density_3D <- function(data, category) {
       sub_data <- filter(data, .data[[discrete_vars]] == category)
       if (nrow(sub_data) > 1) {
-        # Optimalizovany KDE odhad
         bw <- bw.nrd0(sub_data[[continuous_vars]])
         kde_x <- density(sub_data[[continuous_vars]], bw = bw)
         kde_x_fun <- approxfun(kde_x$x, kde_x$y, rule = 2)
@@ -105,13 +104,15 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
     # Spojenie hustot pre vsetky kategorie
     density_data <- bind_rows(lapply(categories, function(cat) calculate_density_3D(data, cat)))
 
+    # 3D Vizualizacia
     fig_3d <- plot_ly(density_data, x = ~Weight, y = ~Category, z = ~Density, 
                        type = 'scatter3d', mode = 'lines', 
                        color = ~Category, colors = category_colors, line = list(width = 4)) %>%
               layout(scene = list(xaxis = list(title = continuous_vars),
                                   yaxis = list(title = discrete_vars),
                                   zaxis = list(title = 'Hustota')))
-
+    
+    # 2D Vizualizacia
     data[[discrete_vars]] <- factor(data[[discrete_vars]], levels = categories)
 
     scatter_plot <- ggplot(data, aes_string(x = continuous_vars, y = discrete_vars, color = discrete_vars)) +
@@ -150,9 +151,9 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
     data[[discrete_vars]] <- factor(data[[discrete_vars]])
     categories <- levels(data[[discrete_vars]])
     
-    # Definovanie farebnej škály pre konzistentnosť
-    color_palette <- RColorBrewer::brewer.pal(length(categories), "Set1")
-    names(color_palette) <- categories
+    # Vytvorenie farebnej mapy pre kategorie
+    category_colors <- RColorBrewer::brewer.pal(length(categories), "Set1")
+    names(category_colors) <- categories
     
     # Vypocet hustoty pre kazdu kategoriu
     calculate_density_3D <- function(data, category) {
@@ -171,15 +172,15 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
     # Spojenie hustot pre vsetky kategorie
     density_data <- bind_rows(lapply(categories, function(cat) calculate_density_3D(data, cat)))
 
-    # Vizualizacia v 3D
+    # 3D Vizualizacia
     fig_3d <- plot_ly(density_data, x = ~Continuous_Var, y = ~Discrete_Var, z = ~Density, 
                        type = 'scatter3d', mode = 'lines', 
-                       color = ~Discrete_Var, colors = color_palette, line = list(width = 4)) %>%
+                       color = ~Discrete_Var, colors = category_colors, line = list(width = 4)) %>%
               layout(scene = list(xaxis = list(title = continuous_vars),
                                   yaxis = list(title = discrete_vars),
                                   zaxis = list(title = 'Hustota')))
     
-    # 2D modelovanie
+    # 2D Vizualizacia
     grouped_stats <- data %>%
       group_by(.data[[discrete_vars]]) %>%
       summarise(mean_x = mean(.data[[continuous_vars]], na.rm = TRUE),
@@ -197,11 +198,11 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
       labs(x = continuous_vars, y = discrete_vars) +
       theme_minimal() +
       theme(legend.position = "right") +
-      scale_color_manual(values = color_palette)
+      scale_color_manual(values = category_colors)
     
     x_density <- ggplot(density_data, aes(x = x, y = y, color = as.factor(.data[[discrete_vars]]), group = .data[[discrete_vars]])) +
       geom_line(size = 1) +
-      scale_color_manual(values = color_palette) +
+      scale_color_manual(values = category_colors) +
       labs(x = NULL, y = paste("Hustota (", continuous_vars, ")", sep = ""), color = discrete_vars) +
       theme_minimal() +
       theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "right")
@@ -209,7 +210,7 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
     y_bar <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
       geom_bar(alpha = 0.7) +
       coord_flip() +
-      scale_fill_manual(values = color_palette) +
+      scale_fill_manual(values = category_colors) +
       labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
       theme_minimal() +
       theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "right")
@@ -227,9 +228,9 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
     data[[discrete_vars]] <- factor(data[[discrete_vars]])
     categories <- levels(data[[discrete_vars]])
     
-    # Definovanie farebnej škály pre konzistentnosť
-    color_palette <- RColorBrewer::brewer.pal(length(categories), "Set1")
-    names(color_palette) <- categories
+    # Vytvorenie farebnej mapy pre kategorie
+    category_colors <- RColorBrewer::brewer.pal(length(categories), "Set1")
+    names(category_colors) <- categories
     
     # Vypocet hustoty pre kazdu kategoriu
     calculate_density_3D_t <- function(data, category) {
@@ -249,15 +250,15 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
     # Spojenie hustot pre vsetky kategorie
     density_data_t <- bind_rows(lapply(categories, function(cat) calculate_density_3D_t(data, cat)))
 
-    # Vizualizacia v 3D
+    # 3D Vizualizacia
     fig_3d_t <- plot_ly(density_data_t, x = ~Continuous_Var, y = ~Discrete_Var, z = ~Density, 
                          type = 'scatter3d', mode = 'lines', 
-                         color = ~Discrete_Var, colors = color_palette, line = list(width = 4)) %>%
+                         color = ~Discrete_Var, colors = category_colors, line = list(width = 4)) %>%
                 layout(scene = list(xaxis = list(title = continuous_vars),
                                     yaxis = list(title = discrete_vars),
                                     zaxis = list(title = 'Hustota')))
     
-    # 2D modelovanie
+    # 2D Vizualizacia
     grouped_stats_t <- data %>%
       group_by(.data[[discrete_vars]]) %>%
       summarise(mean_x = mean(.data[[continuous_vars]], na.rm = TRUE),
@@ -276,11 +277,11 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
       labs(x = continuous_vars, y = discrete_vars) +
       theme_minimal() +
       theme(legend.position = "right") +
-      scale_color_manual(values = color_palette)
+      scale_color_manual(values = category_colors)
     
     x_density_t <- ggplot(density_data_t, aes(x = x, y = y, color = as.factor(.data[[discrete_vars]]), group = .data[[discrete_vars]])) +
       geom_line(size = 1) +
-      scale_color_manual(values = color_palette) +
+      scale_color_manual(values = category_colors) +
       labs(x = NULL, y = paste("Hustota (", continuous_vars, ")", sep = ""), color = discrete_vars) +
       theme_minimal() +
       theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "right")
@@ -288,7 +289,7 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
     y_bar_t <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
       geom_bar(alpha = 0.7) +
       coord_flip() +
-      scale_fill_manual(values = color_palette) +
+      scale_fill_manual(values = category_colors) +
       labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
       theme_minimal() +
       theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "right")
@@ -301,7 +302,7 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
     
   }
   
-  # Modelovanie hustoty pouzitim jadroveho vyhladzovania a kopule (rozklad na marginaly)
+  # Modelovanie hustoty pouzitim jadroveho vyhladzovania a kopuly (rozklad na marginaly)
   if (model_type == "kernel" && copula == "YES") {
     # Konverzia diskretnej premennej na faktor a zoradenie kategorii
   data[[discrete_vars]] <- factor(data[[discrete_vars]])
@@ -314,9 +315,9 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
   calculate_density_3D <- function(data, category) {
     sub_data <- filter(data, .data[[discrete_vars]] == category)
     if (nrow(sub_data) > 1) {
-      bw <- bw.nrd0(sub_data[[continuous_vars]])  # Optimalizovaná šírka pásma
+      bw <- bw.nrd0(sub_data[[continuous_vars]])
       kde_x <- density(sub_data[[continuous_vars]], bw = bw)
-      kde_x_fun <- approxfun(kde_x$x, kde_x$y, rule = 2)  # Aproximácia pre interpoláciu
+      kde_x_fun <- approxfun(kde_x$x, kde_x$y, rule = 2)  # aproximacia pre interpolaciu
 
       x <- seq(min(data[[continuous_vars]]), max(data[[continuous_vars]]), length.out = 100)
       x_density <- kde_x_fun(x)
@@ -332,8 +333,8 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
 
   # Fitovanie kopuly na transformovane marginalne distribucie
   data <- data %>%
-    mutate(U = ecdf(.data[[continuous_vars]])(.data[[continuous_vars]]),  # Empiricka distribućna funkcia
-           V = as.numeric(as.factor(.data[[discrete_vars]])) / length(categories))  # Normalizovana diskretna premenna
+    mutate(U = ecdf(.data[[continuous_vars]])(.data[[continuous_vars]]),
+           V = as.numeric(as.factor(.data[[discrete_vars]])) / length(categories))
   
   copula_model <- fitCopula(normalCopula(dim = 2), pobs(cbind(data$U, data$V)), method = "ml")
 
@@ -384,13 +385,176 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
   return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
   }
   
+  # Modelovanie hustoty ako hustoty normalneho rozdelenia (dnorm) a kopuly (rozklad na marginaly)
+  if (model_type == "normal" && copula == "YES") {
+    # Konverzia diskretnej premennej na faktor a zoradenie kategorii
+  data[[discrete_vars]] <- factor(data[[discrete_vars]])
+  categories <- levels(data[[discrete_vars]])
+
+  # Vytvorenie farebnej mapy pre kategorie
+  category_colors <- setNames(RColorBrewer::brewer.pal(length(categories), "Set1"), categories)
+  names(category_colors) <- categories
+
+  # Vypocet marginalnych hustot
+  calculate_density_3D <- function(data, category) {
+    sub_data <- filter(data, .data[[discrete_vars]] == category)
+    if (nrow(sub_data) > 1) {
+      mu <- mean(sub_data[[continuous_vars]])
+      sigma <- sd(sub_data[[continuous_vars]])
+      x <- seq(min(data[[continuous_vars]]), max(data[[continuous_vars]]), length.out = 100)
+      density <- dnorm(x, mean = mu, sd = sigma)
+      return(data.frame(Continuous_Var = x, Density = density, Discrete_Var = factor(category, levels = categories)))
+    } else {
+      return(data.frame(Continuous_Var = numeric(0), Density = numeric(0), Discrete_Var = character(0)))
+    }
+  }
+
+  # Spojenie hustot pre vsetky kategorie
+  density_data <- bind_rows(lapply(categories, function(cat) calculate_density_3D(data, cat)))
+
+  # Fitovanie kopuly na transformovane marginalne distribucie
+  data <- data %>%
+    mutate(U = ecdf(.data[[continuous_vars]])(.data[[continuous_vars]]),
+           V = as.numeric(as.factor(.data[[discrete_vars]])) / length(categories))
+  
+  copula_model <- fitCopula(normalCopula(dim = 2), pobs(cbind(data$U, data$V)), method = "ml")
+
+  # Generovanie hodnot z kopuly
+  simulated_copula <- rCopula(1000, copula_model@copula)
+
+  # Inverzna transformacia cez kvantilove funkcie
+  simulated_data <- data.frame(
+    Continuous_Var = quantile(data[[continuous_vars]], simulated_copula[, 1]),
+    Discrete_Var = factor(quantile(as.numeric(data[[discrete_vars]]), simulated_copula[, 2], type = 1), levels = categories)
+  )
+  
+  # 3D Vizualizacia
+  fig_3d <- plot_ly(density_data, x = ~Continuous_Var, y = ~Discrete_Var, z = ~Density, 
+                     type = 'scatter3d', mode = 'lines', 
+                     color = ~Discrete_Var, colors = category_colors, line = list(width = 4)) %>%
+            layout(scene = list(xaxis = list(title = continuous_vars),
+                                yaxis = list(title = discrete_vars),
+                                zaxis = list(title = 'Hustota')))
+
+  # 2D Vizualizacia
+  scatter_plot <- ggplot(data, aes(x = .data[[continuous_vars]], y = as.factor(.data[[discrete_vars]]), color = as.factor(.data[[discrete_vars]]))) +
+  geom_point(size = 3, alpha = 0.7) +
+  labs(x = continuous_vars, y = discrete_vars) +
+  scale_color_manual(values = category_colors) +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+  x_density <- ggplot(density_data, aes(x = Continuous_Var, y = Density, color = as.factor(Discrete_Var), group = Discrete_Var)) +
+    geom_line(size = 1) +
+    scale_color_manual(values = category_colors) +
+    labs(x = NULL, y = paste("Hustota (", continuous_vars, ")", sep = ""), color = discrete_vars) +
+    theme_minimal() +
+    theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "right")
+
+  y_bar <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
+    geom_bar(alpha = 0.7) +
+    coord_flip() +
+    scale_fill_manual(values = category_colors) +
+    labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
+    theme_minimal() +
+    theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "right")
+
+  final_plot_2d <- (x_density + plot_spacer()) /
+                  (scatter_plot + y_bar) +
+                  plot_layout(widths = c(4, 1), heights = c(1, 4))
+
+  return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
+  }
+  
+  # Modelovanie hustoty ako hustoty Studentovho t-rozdelenia (dt) a kopuly (rozklad na marginaly)
+  if (model_type == "t" && copula == "YES") {
+    # Konverzia diskretnej premennej na faktor a zoradenie kategorii
+  data[[discrete_vars]] <- factor(data[[discrete_vars]])
+  categories <- levels(data[[discrete_vars]])
+
+  # Vytvorenie farebnej mapy pre kategorie
+  category_colors <- RColorBrewer::brewer.pal(length(categories), "Set1")
+  names(category_colors) <- categories
+
+  # Vypocet marginalnych hustot pomocou Studentovho t-rozdelenia
+  calculate_density_3D_t <- function(data, category) {
+    sub_data <- filter(data, .data[[discrete_vars]] == category)
+    if (nrow(sub_data) > 2) {
+      mu <- mean(sub_data[[continuous_vars]])  # stredna hodnota
+      sigma <- sd(sub_data[[continuous_vars]])  # smerodajna odchylka
+      df_t <- nrow(sub_data) - 1  # stupne volnosti pre t-rozdelenie
+      x <- seq(min(data[[continuous_vars]]), max(data[[continuous_vars]]), length.out = 100)
+      density <- dt((x - mu) / sigma, df = df_t) / sigma
+      return(data.frame(Continuous_Var = x, Density = density, Discrete_Var = factor(category, levels = categories)))
+    } else {
+      return(data.frame(Continuous_Var = numeric(0), Density = numeric(0), Discrete_Var = factor(character(0), levels = categories)))
+    }
+  }
+
+  # Spojenie hustôt pre všetky kategórie
+  density_data_t <- bind_rows(lapply(categories, function(cat) calculate_density_3D_t(data, cat)))
+
+  # Fitovanie Studentovej t-kopuly
+  data <- data %>%
+    mutate(U = ecdf(.data[[continuous_vars]])(.data[[continuous_vars]]),
+           V = as.numeric(as.factor(.data[[discrete_vars]])) / length(categories))
+  
+  copula_model <- fitCopula(tCopula(dim = 2, df = 4), pobs(cbind(data$U, data$V)), method = "ml")
+
+  # Generovanie hodnot z kopuly
+  simulated_copula <- rCopula(1000, copula_model@copula)
+
+  # Inverzna transformacia cez kvantilove funkcie
+  simulated_data <- data.frame(
+    Continuous_Var = quantile(data[[continuous_vars]], simulated_copula[, 1]),
+    Discrete_Var = factor(quantile(as.numeric(data[[discrete_vars]]), simulated_copula[, 2], type = 1), levels = categories)
+  )
+
+  # 3D Vizualizacia
+  fig_3d_t <- plot_ly(density_data_t, x = ~Continuous_Var, y = ~Discrete_Var, z = ~Density, 
+                       type = 'scatter3d', mode = 'lines', 
+                       color = ~Discrete_Var, colors = category_colors, line = list(width = 4)) %>%
+              layout(scene = list(xaxis = list(title = continuous_vars),
+                                  yaxis = list(title = discrete_vars),
+                                  zaxis = list(title = 'Hustota')))
+
+  # 2D Vizualizacia
+  scatter_plot_t <- ggplot(data, aes(x = .data[[continuous_vars]], y = as.factor(.data[[discrete_vars]]), color = as.factor(.data[[discrete_vars]]))) +
+  geom_point(size = 3, alpha = 0.7) +
+  labs(x = continuous_vars, y = discrete_vars) +
+  scale_color_manual(values = category_colors) +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+  x_density_t <- ggplot(density_data_t, aes(x = Continuous_Var, y = Density, color = as.factor(Discrete_Var), group = Discrete_Var)) +
+    geom_line(size = 1) +
+    scale_color_manual(values = category_colors) +
+    labs(x = NULL, y = paste("Hustota (", continuous_vars, ")", sep = ""), color = discrete_vars) +
+    theme_minimal() +
+    theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "right")
+
+  y_bar_t <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
+    geom_bar(alpha = 0.7) +
+    coord_flip() +
+    scale_fill_manual(values = category_colors) +
+    labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
+    theme_minimal() +
+    theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "right")
+
+  final_plot_2d_t <- (x_density_t + plot_spacer()) /
+                     (scatter_plot_t + y_bar_t) +
+                     plot_layout(widths = c(4, 1), heights = c(1, 4))
+
+  return(list(fig_3d = fig_3d_t, final_plot_2d = final_plot_2d_t))
+  }
+  
 }
 
 ```
 
 ```{r,warning=FALSE}
 selected_variables <- c("cyl", "mpg")
-result <- model_mixture_joint_distribution(mtcars, selected_variables, "kernel", "YES")
+result <- model_mixture_joint_distribution(mtcars, selected_variables, "t", "YES")
 print(result)
 ```
 
