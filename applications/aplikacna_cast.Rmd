@@ -555,212 +555,7 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
 
 ```{r,warning=FALSE}
 selected_variables <- c("carb", "mpg")
-result <- model_mixture_joint_distribution(mtcars, selected_variables, "t", "YES")
-print(result)
-```
-
-
-```{r, warning=FALSE}
-mixture_joint_distribution_surface_plot <- function(data, selected_variables, model_type) {
-  # Identifikacia typov premennych
-  variable_types <- identify_variables(data)
-  discrete_vars <- intersect(variable_types$Diskretne, selected_variables)
-  continuous_vars <- intersect(variable_types$Spojite, selected_variables)
-  
-  if(length(selected_variables) != 2 || length(discrete_vars) == 0 || length(continuous_vars) == 0) {
-    stop("Zoznam premennych musi obsahovat prave 1 spojitu a 1 diskretnu premennu!")
-  }
-  
-  # Modelovanie 3D hustoty ako hustoty normalneho rozdelenia (dnorm, surface plot)
-  if (model_type == "normal") {
-    # 3D modelovanie
-    mean_x <- mean(data[[continuous_vars]])
-    sd_x <- sd(data[[continuous_vars]])
-
-    categories <- sort(unique(as.numeric(as.factor(data[[discrete_vars]]))))
-    weights <- table(data[[discrete_vars]]) / nrow(data)
-
-    cor_val <- cor(data[[continuous_vars]], as.numeric(as.factor(data[[discrete_vars]])), method = "pearson")
-    copula_model <- normalCopula(param = cor_val, dim = 2, dispstr = "un")
-
-    copula_density <- function(x, y) {
-      u1 <- pnorm(x, mean = mean_x, sd = sd_x)
-      u2 <- sum(sapply(seq_along(categories), function(i) {
-        pnorm(y, mean = categories[i], sd = 0.1) * weights[i]
-      }))
-      copula_density <- dCopula(c(u1, u2), copula = copula_model)
-      x_density <- dnorm(x, mean = mean_x, sd = sd_x)
-      y_density <- sum(sapply(seq_along(categories), function(i) {
-        dnorm(y, mean = categories[i], sd = 0.1) * weights[i]
-      }))
-      copula_density * x_density * y_density
-    }
-
-    x_vals <- seq(min(data[[continuous_vars]]), max(data[[continuous_vars]]), length.out = 100)
-    y_vals <- seq(min(categories), max(categories), length.out = 100)
-    grid <- expand.grid(x = x_vals, y = y_vals)
-    z_vals <- apply(as.matrix(grid), 1, function(point) {
-      copula_density(point[1], point[2])
-    })
-
-    density_vals_matrix <- matrix(z_vals, nrow = 100, ncol = 100)
-    density_vals_matrix <- t(density_vals_matrix / max(density_vals_matrix))
-
-    fig_3d <- plot_ly(
-      x = ~x_vals, y = ~y_vals, z = ~density_vals_matrix,
-      type = "surface",
-      colors = colorRamp(c("blue", "cyan", "yellow", "red"))
-    ) %>% layout(
-      title = paste("Združená hustota", continuous_vars, "a", discrete_vars, "(kopula)"),
-      scene = list(
-        xaxis = list(title = continuous_vars),
-        yaxis = list(title = discrete_vars),
-        zaxis = list(title = "Hustota")
-      )
-    )
-    
-    # 2D modelovanie
-    # Vypocet priemeru a smerodajnej odchylky pre kazdu kategoriu diskretnej premennej
-    grouped_stats <- data %>%
-      group_by(.data[[discrete_vars]]) %>%
-      summarise(mean_x = mean(.data[[continuous_vars]], na.rm = TRUE),
-                sd_x = sd(.data[[continuous_vars]], na.rm = TRUE),
-                .groups = "drop")
-    
-    # Vygenerovanie hodnot pre vykreslenie normalnych hustot pre kazdu kategoriu
-    x_vals <- seq(min(data[[continuous_vars]], na.rm = TRUE), max(data[[continuous_vars]], na.rm = TRUE), length.out = 100)
-    
-    # Vytvorenie datasetu na vizualizaciu hustotnych kriviek pre kazdu kategoriu
-    density_data <- grouped_stats %>%
-      expand_grid(x = x_vals) %>%
-      mutate(y = dnorm(x, mean = mean_x, sd = sd_x))
-    
-    # Konverzia diskretnej premennej na faktor
-    data[[discrete_vars]] <- as.factor(data[[discrete_vars]])
-    
-    scatter_plot <- ggplot(data, aes_string(x = continuous_vars, y = discrete_vars, color = discrete_vars)) +
-      geom_point(size = 3, alpha = 0.7) +
-      labs(x = continuous_vars, y = discrete_vars) +
-      theme_minimal() +
-      theme(legend.position = "right") +
-      scale_color_brewer(palette = "Set1")
-    
-    x_density <- ggplot(density_data, aes(x = x, y = y, color = as.factor(.data[[discrete_vars]]), group = .data[[discrete_vars]])) +
-      geom_line(size = 1) +
-      scale_color_brewer(palette = "Set1") +
-      labs(x = NULL, y = paste("Hustota (", continuous_vars, ")", sep = ""), color = discrete_vars) +
-      theme_minimal() +
-      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "right")
-    
-    y_bar <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
-      geom_bar(alpha = 0.7) +
-      coord_flip() +
-      scale_fill_brewer(palette = "Set1") +
-      labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "right")
-    
-    final_plot_2d <- (x_density + plot_spacer()) /
-                    (scatter_plot + y_bar) +
-                    plot_layout(widths = c(4, 1), heights = c(1, 4))
-    
-    return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
-  }
-  
-  # Modelovanie hustoty pomocou jadroveho vyhladzovania (surface plot)
-  if (model_type == "kernel") {
-    categories <- sort(unique(as.numeric(as.factor(data[[discrete_vars]]))))
-    # Odhad marginalnej hustoty spojitej premennej pomocou KDE
-    kde_x <- density(data[[continuous_vars]])
-    kde_x_fun <- approxfun(kde_x$x, kde_x$y, rule = 2)
-    ecdf_x_fun <- ecdf(data[[continuous_vars]])
-    
-    # Odhad marginalnej hustoty diskretnej premennej pomocou KDE
-    kde_y <- kde(as.numeric(as.factor(data[[discrete_vars]])))  
-    kde_y_fun <- approxfun(kde_y$eval.points, kde_y$estimate, rule = 2)
-    pkde_y_fun <- function(y) ks::pkde(y, kde_y)  # KDE zalozene na CDF pre diskretnu premennu
-    
-    # Odhad Pearsonovej korelacie medzi spojitou a diskretnou premennou
-    cor_val <- cor(data[[continuous_vars]], as.numeric(as.factor(data[[discrete_vars]])), method = "pearson")
-    
-    # Definicia normalnej kopuly na zaklade korelacie
-    copula_model <- normalCopula(param = cor_val, dim = 2, dispstr = "un")
-
-  
-    # Funkcia zdruzenej hustoty s KDE a kopulou
-    copula_density <- function(x, y) {
-      u1 <- ecdf_x_fun(x)  # Transformacia KDE na [0,1]
-      u2 <- pkde_y_fun(y)
-  
-      copula_density <- dCopula(c(u1, u2), copula = copula_model)
-      x_density <- kde_x_fun(x)  
-      y_density <- kde_y_fun(y)
-      
-      copula_density * x_density * y_density
-    }
-
-    # Generovanie bodov a vypocet hustoty
-    x_vals <- seq(min(data[[continuous_vars]]), max(data[[continuous_vars]]), length.out = 100)
-    y_vals <- seq(min(categories), max(categories), length.out = 100)
-    grid <- expand.grid(x = x_vals, y = y_vals)
-    z_vals <- apply(as.matrix(grid), 1, function(point) {
-      copula_density(point[1], point[2])
-    })
-    
-    # Normalizacia a vizualizacia
-    density_vals_matrix <- matrix(z_vals, nrow = 100, ncol = 100)
-    density_vals_matrix <- t(density_vals_matrix / max(density_vals_matrix))
-  
-    fig_3d <- plot_ly(
-      x = ~x_vals, y = ~y_vals, z = ~density_vals_matrix,
-      type = "surface",
-      colors = colorRamp(c("blue", "cyan", "yellow", "red"))
-    ) %>% layout(
-      title = paste("Združená hustota", continuous_vars, "a", discrete_vars, "(KDE + kopula)"),
-      scene = list(
-        xaxis = list(title = continuous_vars),
-        yaxis = list(title = discrete_vars),
-        zaxis = list(title = "Hustota")
-      )
-    )
-    
-    data[[discrete_vars]] <- as.factor(data[[discrete_vars]])
-
-    scatter_plot <- ggplot(data, aes_string(x = continuous_vars, y = discrete_vars, color = discrete_vars)) +
-      geom_point(size = 3, alpha = 0.7) +
-      labs(x = continuous_vars, y = discrete_vars) +
-      theme_minimal() +
-      theme(legend.position = "right") +
-      scale_color_brewer(palette = "Set1")
-    
-    x_density <- ggplot(data, aes_string(x = continuous_vars, fill = discrete_vars, color = discrete_vars)) +
-      geom_density(alpha = 0.5) +
-      scale_fill_brewer(palette = "Set1") +
-      scale_color_brewer(palette = "Set1") +
-      labs(x = NULL, y = paste("Hustota (", continuous_vars, ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "right")
-    
-    y_bar <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
-      geom_bar(alpha = 0.7) +
-      coord_flip() +
-      scale_fill_brewer(palette = "Set1") +
-      labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "right")
-    
-    final_plot_2d <- (x_density + plot_spacer()) /
-                    (scatter_plot + y_bar) +
-                    plot_layout(widths = c(4, 1), heights = c(1, 4))
-    
-    return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
-  }
-}
-```
-
-```{r,warning=FALSE}
-selected_variables <- c("cyl", "mpg")
-result <- mixture_joint_distribution_surface_plot(mtcars, selected_variables, "kernel")
+result <- model_mixture_joint_distribution(mtcars, selected_variables, "normal", "YES")
 print(result)
 ```
 
@@ -1250,7 +1045,7 @@ model_multi_joint_distribution <- function(data, selected_variables) {
     stop("Tato funkcia sluzi na modelovanie 3 a viac premennych!")
   }
   
-  # Identifikácia typov premenných
+  # Identifikacia typov premennych
   variable_types <- identify_variables(data)
   discrete_vars <- intersect(variable_types$Diskretne, selected_variables)
   continuous_vars <- intersect(variable_types$Spojite, selected_variables)
@@ -1258,23 +1053,23 @@ model_multi_joint_distribution <- function(data, selected_variables) {
   # Vytvorenie tabulky s frekvenciami pre diskretne premenne
   tab <- as.data.frame(table(data[, discrete_vars]))
   
-  # Pre každú spojitú premennú vypočítame priemerné hodnoty pre kombinácie diskrétnych premenných
+  # Pre kazdu spojitu premennu vypocitame priemerne hodnoty pre kombinacie diskretnych premennych
   for (cont_var in continuous_vars) {
     mean_values <- data %>%
       group_by(across(all_of(discrete_vars))) %>%
       summarise(Mean_Value = mean(.data[[cont_var]], na.rm = TRUE), .groups = "drop")
     
-    # mean_values neobsahuje žiadne riadky => preskočíme túto premennú
+    # mean_values neobsahuje ziadne riadky => preskocime tuto premennu
     if (nrow(mean_values) == 0) {
       warning(paste("Žiadne dáta na výpočet priemeru pre premennú:", cont_var))
       next
     }
     
-    # Overenie, ktoré diskrétne premenné existujú v tab a mean_values
+    # Overenie, ktore diskretne premenne existuju v tab a mean_values
     common_vars <- intersect(names(tab), discrete_vars)
     common_vars_mv <- intersect(names(mean_values), discrete_vars)
     
-    # Existujú spoločné premenné => prevedenie na character
+    # Existuju spolocne premenne => prevedenie na character
     if (length(common_vars) > 0) {
       tab <- tab %>%
         mutate(across(all_of(common_vars), as.character))
@@ -1284,20 +1079,20 @@ model_multi_joint_distribution <- function(data, selected_variables) {
         mutate(across(all_of(common_vars_mv), as.character))
     }
     
-    # Spojenie priemerných hodnôt so základnou tabuľkou
+    # Spojenie priemernych hodnot so zakladnou tabulkou
     tab <- full_join(tab, mean_values, by = common_vars)
     
-    # Premenovanie stĺpca Mean_Value na názov spojitej premennej
+    # Premenovanie stlpca Mean_Value na nazov spojitej premennej
     colnames(tab)[which(colnames(tab) == "Mean_Value")] <- cont_var
   }
   
   # Náhrada NA vo Frequency nulami
   tab$Freq[is.na(tab$Freq)] <- 0
   
-  # Výpočet pravdepodobnosti
+  # Vypocet pravdepodobnosti
   tab$Probability <- tab$Freq / sum(tab$Freq)
   
-  # Odstránenie riadkov s nulovou frekvenciou
+  # Odstranenie riadkov s nulovou frekvenciou
   tab <- tab[tab$Freq > 0, ]
   
   return(tab)
@@ -1314,7 +1109,7 @@ print(result2)
 
 ```{r,warning=FALSE}
 model_discrete_joint_distribution <- function(data, selected_variables) {
-  # Identifikácia typov premenných
+  # Identifikacia typov premennych
   variable_types <- identify_variables(data)
   discrete_vars <- intersect(variable_types$Diskretne, selected_variables)
   continuous_vars <- intersect(variable_types$Spojite, selected_variables)
@@ -1329,6 +1124,7 @@ model_discrete_joint_distribution <- function(data, selected_variables) {
   tab[[discrete_vars[1]]] <- as.numeric(as.character(tab[[discrete_vars[1]]]))
   tab[[discrete_vars[2]]] <- as.numeric(as.character(tab[[discrete_vars[2]]]))
 
+  # 3D Vizualizacia
   fig_3d <- plot_ly()
   for (i in 1:nrow(tab)) {
       fig_3d <- fig_3d %>% add_trace(
@@ -1368,7 +1164,7 @@ model_discrete_joint_distribution <- function(data, selected_variables) {
     group_by(!!sym(discrete_vars[2])) %>%
     summarise(Prob_Y = sum(Probability))
   
-  # 2D vizualizacia
+  # 2D Vizualizacia
   scatter_plot <- ggplot(tab, aes_string(x = discrete_vars[1], y = discrete_vars[2], fill =   "Probability")) +
     geom_tile(color = "white") +
     scale_fill_gradient(low = "blue", high = "red") +
