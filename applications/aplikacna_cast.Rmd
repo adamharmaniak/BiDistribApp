@@ -26,6 +26,7 @@ suppressMessages(suppressWarnings({
   library(ks)
   library(tidyr)
   library(evd)
+  library(mvtnorm)
 }))
 
 ```
@@ -553,7 +554,7 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
 ```
 
 ```{r,warning=FALSE}
-selected_variables <- c("cyl", "mpg")
+selected_variables <- c("carb", "mpg")
 result <- model_mixture_joint_distribution(mtcars, selected_variables, "t", "YES")
 print(result)
 ```
@@ -766,8 +767,8 @@ print(result)
 # Modelovanie zdruzeneho rozdelenia pravdepodobnosti 2 spojitych premennych
 
 ```{r, warning=FALSE}
-model_continuous_joint_distribution <- function(data, selected_variables) {
-  # Identifikácia typov premenných
+model_continuous_joint_distribution <- function(data, selected_variables, model_type, copula = "NO") {
+  # Identifikacia typov premennych
   variable_types <- identify_variables(data)
   discrete_vars <- intersect(variable_types$Diskretne, selected_variables)
   continuous_vars <- intersect(variable_types$Spojite, selected_variables)
@@ -776,50 +777,9 @@ model_continuous_joint_distribution <- function(data, selected_variables) {
     stop("Na vstup musia ist 2 spojite nahodne premenne!")
   }
   
-  # Modelovanie pomocou kopule
-  # mean_x <- mean(data[[continuous_vars[1]]])
-  # sd_x <- sd(data[[continuous_vars[1]]])
-  # mean_y <- mean(data[[continuous_vars[2]]])
-  # sd_y <- sd(data[[continuous_vars[2]]])
-  # 
-  # cor_val <- cor(data[[continuous_vars[1]]], data[[continuous_vars[2]]], method = "pearson")
-  # copula_model <- normalCopula(param = cor_val, dim = 2, dispstr = "un")
-  # 
-  # copula_density <- function(x, y) {
-  #   u1 <- pnorm(x, mean = mean_x, sd = sd_x)
-  #   u2 <- pnorm(y, mean = mean_y, sd = sd_y)
-  #   
-  #   copula_density <- dCopula(c(u1, u2), copula = copula_model)
-  #   x_density <- dnorm(x, mean = mean_x, sd = sd_x)
-  #   y_density <- dnorm(y, mean = mean_y, sd = sd_y)
-  #   
-  #   copula_density * x_density * y_density
-  # }
-  #   
-  # x_vals <- seq(min(data[[continuous_vars[1]]]), max(data[[continuous_vars[1]]]), length.out = 100)
-  # y_vals <- seq(min(data[[continuous_vars[2]]]), max(data[[continuous_vars[2]]]), length.out = 100)
-  # grid <- expand.grid(x = x_vals, y = y_vals)
-  # z_vals <- apply(as.matrix(grid), 1, function(point) {
-  #   copula_density(point[1], point[2])
-  # })
-  # density_vals_matrix <- matrix(z_vals, nrow = 100, ncol = 100)
-  # density_vals_matrix <- density_vals_matrix / max(density_vals_matrix)
-  # 
-  # fig_3d <- plot_ly(
-  #   x = ~x_vals, y = ~y_vals, z = ~density_vals_matrix,
-  #   type = "surface",
-  #   colors = colorRamp(c("blue", "cyan", "yellow", "red"))
-  # ) %>% layout(
-  #   title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(kopula)"),
-  #   scene = list(
-  #     xaxis = list(title = continuous_vars[1]),
-  #     yaxis = list(title = continuous_vars[2]),
-  #     zaxis = list(title = "Hustota")
-  #   )
-  # )
-  
-  # Modelovanie pomocou jadrového vyhladzovania
-  kde_result <- kde2d(
+  # Modelovanie hustoty pomocou jadroveho vyhladzovania
+  if (model_type == "kernel" && copula == "NO"){
+    kde_result <- kde2d(
     x = data[[continuous_vars[1]]], 
     y = data[[continuous_vars[2]]], 
     n = 100
@@ -861,13 +821,422 @@ model_continuous_joint_distribution <- function(data, selected_variables) {
                     (scatter_plot + density_y) +
                     plot_layout(widths = c(4, 1), heights = c(1, 4))
     
+    return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d)) 
+  }
+  
+  # Modelovanie zdruzenej hustoty ako hustoty normalneho rozdelenia
+  if (model_type == "normal" && copula == "NO") {
+    # Vypocet zakladnych parametrov (momentov)
+    mean_x <- mean(data[[continuous_vars[1]]], na.rm = TRUE)
+    sd_x <- sd(data[[continuous_vars[1]]], na.rm = TRUE)
+    mean_y <- mean(data[[continuous_vars[2]]], na.rm = TRUE)
+    sd_y <- sd(data[[continuous_vars[2]]], na.rm = TRUE)
+  
+    # Korelacia medzi premennymi
+    cor_val <- cor(data[[continuous_vars[1]]], data[[continuous_vars[2]]], method = "pearson", use = "complete.obs")
+  
+    # Funkcia na vypocet bivariatnej normalnej hustoty (kvazi dnorm() ale v 2D)
+    bivariate_normal_density <- function(x, y) {
+      rho <- cor_val
+      z_x <- (x - mean_x) / sd_x
+      z_y <- (y - mean_y) / sd_y
+      
+      exponent <- -1 / (2 * (1 - rho^2)) * (z_x^2 + z_y^2 - 2 * rho * z_x * z_y)
+      density <- (1 / (2 * pi * sd_x * sd_y * sqrt(1 - rho^2))) * exp(exponent)
+      
+      return(density)
+    }
+  
+    # Siet pre vypocet hustoty
+    x_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
+    y_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
+  
+    grid <- expand.grid(x = x_vals, y = y_vals)
+  
+    # Vypocet hustoty na sieti
+    grid$z <- mapply(bivariate_normal_density, grid$x, grid$y)
+    z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
+  
+    # 3D Vizualizacia
+    fig_3d <- plot_ly(
+      x = ~x_vals, y = ~y_vals, z = ~z_matrix,
+      type = "surface",
+      colors = colorRamp(c("blue", "cyan", "yellow", "red"))
+    ) %>% layout(
+      title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(bivariátne normálne rozdelenie)"),
+      scene = list(
+        xaxis = list(title = continuous_vars[1]),
+        yaxis = list(title = continuous_vars[2]),
+        zaxis = list(title = "Hustota")
+      )
+    )
+  
+    # 2D Vizualizacia
+    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2], color = continuous_vars[2])) +
+      geom_point(size = 3, alpha = 0.7) +  
+      labs(x = continuous_vars[1], y = continuous_vars[2]) +
+      scale_color_gradient(low = "blue", high = "red") +
+      theme_minimal()
+  
+    density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
+      stat_function(fun = dnorm, args = list(mean = mean_x, sd = sd_x), fill = "blue", geom = "area", alpha = 0.5) +
+      labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
+      theme_minimal() +
+      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+  
+    density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
+      stat_function(fun = dnorm, args = list(mean = mean_y, sd = sd_y), fill = "red", geom = "area", alpha = 0.5) +
+      coord_flip() +
+      labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
+      theme_minimal() +
+      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+  
+    final_plot_2d <- (density_x + plot_spacer()) /
+                     (scatter_plot + density_y) +
+                     plot_layout(widths = c(4, 1), heights = c(1, 4))
+  
     return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
+  }
+  
+  # Modelovanie zdruzenej hustoty ako hustoty Studentovho t-rozdelenia
+  if (model_type == "t" && copula == "NO") {
+    # Vypocet zakladnych parametrov (momentov)
+    mean_x <- mean(data[[continuous_vars[1]]], na.rm = TRUE)
+    sd_x <- sd(data[[continuous_vars[1]]], na.rm = TRUE)
+    mean_y <- mean(data[[continuous_vars[2]]], na.rm = TRUE)
+    sd_y <- sd(data[[continuous_vars[2]]], na.rm = TRUE)
+  
+    # Korelacia medzi premennymi (Pearson)
+    cor_val <- cor(data[[continuous_vars[1]]], data[[continuous_vars[2]]], method = "pearson", use = "complete.obs")
+  
+    # Kovariancna matica (smerodajne odchylky/rozptyly a korelacia)
+    Sigma <- matrix(c(sd_x^2, cor_val * sd_x * sd_y,
+                      cor_val * sd_x * sd_y, sd_y^2), nrow = 2)
+  
+    # Inverzna kovariancná matica
+    Sigma_inv <- solve(Sigma)
+  
+    # Determinant kovariancnej matice
+    det_Sigma <- det(Sigma)
+  
+    # Stupne volnosti
+    df <- nrow(data) - 1
+  
+    # Bivariatna Studentova t-hustota
+    bivariate_t_density <- function(x, y) {
+      z <- c(x - mean_x, y - mean_y)
+      quad_form <- t(z) %*% Sigma_inv %*% z
+  
+      coeff <- gamma((df + 2) / 2) / (gamma(df / 2) * (df * pi) * sqrt(det_Sigma))
+      exponent <- (1 + quad_form / df) ^ (-(df + 2) / 2)
+  
+      return(as.numeric(coeff * exponent))
+    }
+  
+    # Siet pre vypocet hustoty
+    x_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
+    y_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
+  
+    grid <- expand.grid(x = x_vals, y = y_vals)
+  
+    # Vypocet hustoty na sieti
+    grid$z <- mapply(bivariate_t_density, grid$x, grid$y)
+    z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
+  
+    # 3D Vizualizacia
+    fig_3d <- plot_ly(
+      x = ~x_vals, y = ~y_vals, z = ~z_matrix,
+      type = "surface",
+      colors = colorRamp(c("blue", "cyan", "yellow", "red"))
+    ) %>% layout(
+      title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(bivariátne t-rozdelenie)"),
+      scene = list(
+        xaxis = list(title = continuous_vars[1]),
+        yaxis = list(title = continuous_vars[2]),
+        zaxis = list(title = "Hustota")
+      )
+    )
+  
+    # 2D Vizualizacia
+    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2], color = continuous_vars[2])) +
+      geom_point(size = 3, alpha = 0.7) +  
+      labs(x = continuous_vars[1], y = continuous_vars[2]) +
+      scale_color_gradient(low = "blue", high = "red") +
+      theme_minimal()
+  
+    density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
+      stat_function(fun = function(x) dt((x - mean_x) / sd_x, df = df) / sd_x, fill = "blue", geom = "area", alpha = 0.5) +
+      labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
+      theme_minimal() +
+      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+  
+    density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
+      stat_function(fun = function(y) dt((y - mean_y) / sd_y, df = df) / sd_y, fill = "red", geom = "area", alpha = 0.5) +
+      coord_flip() +
+      labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
+      theme_minimal() +
+      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+  
+    final_plot_2d <- (density_x + plot_spacer()) /
+                     (scatter_plot + density_y) +
+                     plot_layout(widths = c(4, 1), heights = c(1, 4))
+  
+    return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
+  }
+  
+  # Modelovanie hustoty pomocou jadroveho vyhladzovania a kopuly (rozklad na marginaly)
+  if (model_type == "kernel" && copula == "YES") {
+    # Vypocet marginalnych hustot pomocou jadroveho vyhladzovania
+    kde_x <- density(data[[continuous_vars[1]]], n = 512)
+    kde_y <- density(data[[continuous_vars[2]]], n = 512)
+  
+    # Funkcie na ziskanie hustoty a distribucnej funkcie z KDE pre X
+    kde_x_density <- approxfun(kde_x$x, kde_x$y, rule = 2)
+    kde_x_cdf <- approxfun(kde_x$x, cumsum(kde_x$y) / sum(kde_x$y), rule = 2)
+  
+    # Funkcie na ziskanie hustoty a distribucnej funkcie z KDE pre Y
+    kde_y_density <- approxfun(kde_y$x, kde_y$y, rule = 2)
+    kde_y_cdf <- approxfun(kde_y$x, cumsum(kde_y$y) / sum(kde_y$y), rule = 2)
+  
+    # Fitovanie Gaussovej kopuly na transformovane data (empiricke CDF hodnoty)
+    u1 <- kde_x_cdf(data[[continuous_vars[1]]])
+    u2 <- kde_y_cdf(data[[continuous_vars[2]]])
+  
+    copula_model <- normalCopula(dim = 2)
+    copula_fit <- fitCopula(copula_model, pobs(cbind(u1, u2)), method = "ml")
+    copula_model_fitted <- copula_fit@copula
+  
+    # Vytvorenie siete
+    x_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
+    y_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
+  
+    grid <- expand.grid(x = x_vals, y = y_vals)
+  
+    # Funkcia pre vypocet zdruzenej hustoty KDE + kopula
+    copula_density_function <- function(x, y) {
+      u1 <- kde_x_cdf(x)
+      u2 <- kde_y_cdf(y)
+  
+      copula_part <- dCopula(cbind(u1, u2), copula = copula_model_fitted)
+  
+      marginal_x <- kde_x_density(x)
+      marginal_y <- kde_y_density(y)
+  
+      copula_part * marginal_x * marginal_y
+    }
+  
+    # Vypocet hustoty na sieti
+    grid$z <- mapply(copula_density_function, grid$x, grid$y)
+    z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
+  
+    # 3D Vizualizacia
+    fig_3d <- plot_ly(
+      x = ~x_vals, y = ~y_vals, z = ~z_matrix,
+      type = "surface",
+      colors = colorRamp(c("blue", "cyan", "yellow", "red"))
+    ) %>% layout(
+      title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(KDE + kopula)"),
+      scene = list(
+        xaxis = list(title = continuous_vars[1]),
+        yaxis = list(title = continuous_vars[2]),
+        zaxis = list(title = "Hustota")
+      )
+    )
+  
+    # 2D Vizualizacia
+    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2], color = continuous_vars[2])) +
+      geom_point(size = 3, alpha = 0.7) +
+      labs(x = continuous_vars[1], y = continuous_vars[2]) +
+      scale_color_gradient(low = "blue", high = "red") +
+      theme_minimal()
+  
+    density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
+      geom_density(fill = "blue", alpha = 0.5) +
+      labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
+      theme_minimal() +
+      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+  
+    density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
+      geom_density(fill = "red", alpha = 0.5) +
+      coord_flip() +
+      labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
+      theme_minimal() +
+      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+  
+    final_plot_2d <- (density_x + plot_spacer()) /
+                     (scatter_plot + density_y) +
+                     plot_layout(widths = c(4, 1), heights = c(1, 4))
+  
+    return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
+  }
+  
+  # Modelovanie zdruzenej hustoty ako hustoty normalneho rozdelenia a pomocou kopuly (rozklad na marginaly)
+  if (model_type == "normal" && copula == "YES") {
+    # Vypocet marginalnych parametrov
+    mean_x <- mean(data[[continuous_vars[1]]], na.rm = TRUE)
+    sd_x <- sd(data[[continuous_vars[1]]], na.rm = TRUE)
+    mean_y <- mean(data[[continuous_vars[2]]], na.rm = TRUE)
+    sd_y <- sd(data[[continuous_vars[2]]], na.rm = TRUE)
+  
+    # Korelacia medzi premennymi na fitovanie Gaussovej kopuly
+    cor_val <- cor(data[[continuous_vars[1]]], data[[continuous_vars[2]]], method = "pearson", use = "complete.obs")
+  
+    # Fitovanie kopuly
+    copula_model <- normalCopula(param = cor_val, dim = 2, dispstr = "un")
+  
+    # Vytvorenie gridu pre hustotu
+    x_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
+    y_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
+  
+    grid <- expand.grid(x = x_vals, y = y_vals)
+  
+    # Vypocet zdruzenej hustoty cez rozklad na marginaly + kopula
+    copula_density_function <- function(x, y) {
+      u1 <- pnorm(x, mean = mean_x, sd = sd_x)
+      u2 <- pnorm(y, mean = mean_y, sd = sd_y)
+  
+      copula_part <- dCopula(cbind(u1, u2), copula = copula_model)
+      marginal_x <- dnorm(x, mean = mean_x, sd = sd_x)
+      marginal_y <- dnorm(y, mean = mean_y, sd = sd_y)
+  
+      copula_part * marginal_x * marginal_y
+    }
+  
+    # Vypocet hustoty na gride
+    grid$z <- mapply(copula_density_function, grid$x, grid$y)
+  
+    # Preusporiadanie do matice pre 3D graf
+    z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
+  
+    # 3D Vizualizacia
+    fig_3d <- plot_ly(
+      x = ~x_vals, y = ~y_vals, z = ~z_matrix,
+      type = "surface",
+      colors = colorRamp(c("blue", "cyan", "yellow", "red"))
+    ) %>% layout(
+      title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(dnorm + kopula)"),
+      scene = list(
+        xaxis = list(title = continuous_vars[1]),
+        yaxis = list(title = continuous_vars[2]),
+        zaxis = list(title = "Hustota")
+      )
+    )
+  
+    # 2D Vizualizacia
+    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2], color = continuous_vars[2])) +
+      geom_point(size = 3, alpha = 0.7) +  
+      labs(x = continuous_vars[1], y = continuous_vars[2]) +
+      scale_color_gradient(low = "blue", high = "red") +
+      theme_minimal()
+  
+    density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
+      stat_function(fun = dnorm, args = list(mean = mean_x, sd = sd_x), fill = "blue", geom = "area", alpha = 0.5) +
+      labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
+      theme_minimal() +
+      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+  
+    density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
+      stat_function(fun = dnorm, args = list(mean = mean_y, sd = sd_y), fill = "red", geom = "area", alpha = 0.5) +
+      coord_flip() +
+      labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
+      theme_minimal() +
+      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+  
+    final_plot_2d <- (density_x + plot_spacer()) /
+                     (scatter_plot + density_y) +
+                     plot_layout(widths = c(4, 1), heights = c(1, 4))
+  
+    return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
+  }
+  
+  # Modelovanie zdruzenej hustoty ako hustoty Studentovho t-rozdelenia a pomocou kopuly (rozklad na marginaly)
+  if (model_type == "t" && copula == "YES") {
+    # Vypocet zakladnych parametrov marginalnych Studentovych t-rozdeleni (marginalnych momentov)
+    mean_x <- mean(data[[continuous_vars[1]]], na.rm = TRUE)
+    sd_x <- sd(data[[continuous_vars[1]]], na.rm = TRUE)
+    mean_y <- mean(data[[continuous_vars[2]]], na.rm = TRUE)
+    sd_y <- sd(data[[continuous_vars[2]]], na.rm = TRUE)
+  
+    # Stupne volnosti
+    df <- nrow(data) - 1
+    if (df < 2) df <- 2  # bezpecnostna podmienka, ak by bolo malo dat
+  
+    # Korelacia medzi premennymi pre t-kopulu
+    cor_val <- cor(data[[continuous_vars[1]]], data[[continuous_vars[2]]], method = "pearson", use = "complete.obs")
+  
+    # Fitovanie Studentovej t-kopuly
+    copula_model <- tCopula(param = cor_val, dim = 2, dispstr = "un", df = df)
+  
+    # Vytvorenie siete pre vypocet hustoty
+    x_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
+    y_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
+  
+    grid <- expand.grid(x = x_vals, y = y_vals)
+  
+    # Funkcia pre vypocet zdruzenej hustoty: marginalne hustoty + hustota kopuly
+    copula_density_function <- function(x, y) {
+      u1 <- pt((x - mean_x) / sd_x, df = df)  # distribucna funkcia t-rozdelenia
+      u2 <- pt((y - mean_y) / sd_y, df = df)
+  
+      copula_part <- dCopula(cbind(u1, u2), copula = copula_model)  # hustota kopuly
+  
+      marginal_x <- dt((x - mean_x) / sd_x, df = df) / sd_x  # hustota t-rozdelenia
+      marginal_y <- dt((y - mean_y) / sd_y, df = df) / sd_y
+  
+      copula_part * marginal_x * marginal_y
+    }
+  
+    # Vypocet hustoty na sieti
+    grid$z <- mapply(copula_density_function, grid$x, grid$y)
+    z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
+  
+    # 3D Vizualizacia
+    fig_3d <- plot_ly(
+      x = ~x_vals, y = ~y_vals, z = ~z_matrix,
+      type = "surface",
+      colors = colorRamp(c("blue", "cyan", "yellow", "red"))
+    ) %>% layout(
+      title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(t-rozdelenie + t-kopula)"),
+      scene = list(
+        xaxis = list(title = continuous_vars[1]),
+        yaxis = list(title = continuous_vars[2]),
+        zaxis = list(title = "Hustota")
+      )
+    )
+  
+    # 2D Vizualizacia
+    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2], color = continuous_vars[2])) +
+      geom_point(size = 3, alpha = 0.7) +  
+      labs(x = continuous_vars[1], y = continuous_vars[2]) +
+      scale_color_gradient(low = "blue", high = "red") +
+      theme_minimal()
+  
+    density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
+      stat_function(fun = function(x) dt((x - mean_x) / sd_x, df = df) / sd_x, fill = "blue", geom = "area", alpha = 0.5) +
+      labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
+      theme_minimal() +
+      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+  
+    density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
+      stat_function(fun = function(y) dt((y - mean_y) / sd_y, df = df) / sd_y, fill = "red", geom = "area", alpha = 0.5) +
+      coord_flip() +
+      labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
+      theme_minimal() +
+      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+  
+    final_plot_2d <- (density_x + plot_spacer()) /
+                     (scatter_plot + density_y) +
+                     plot_layout(widths = c(4, 1), heights = c(1, 4))
+  
+    return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
+  }
+  
 }
 ```
 
 ```{r,warning=FALSE}
 continuous_variables <- c("disp", "hp")
-result <- model_continuous_joint_distribution(mtcars, continuous_variables)
+result <- model_continuous_joint_distribution(mtcars, continuous_variables, "kernel", "YES")
 print(result)
 ```
 
