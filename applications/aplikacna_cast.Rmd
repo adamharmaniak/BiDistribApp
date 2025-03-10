@@ -7,9 +7,6 @@ date: "2025-02-21"
 output: html_document
 ---
 
-# Dokumentacia
-
-
 # Pouzite kniznice
 
 ```{r,warning=FALSE}
@@ -28,6 +25,8 @@ suppressMessages(suppressWarnings({
   library(evd)
   library(mvtnorm)
 }))
+
+data <- mtcars
 
 ```
 
@@ -51,34 +50,27 @@ identify_variables <- function(data) {
 ```
 
 ```{r, warning=FALSE}
-data <- mtcars
-num_variables <- length(colnames(data))
-variables <- identify_variables(data)
+printVariables <- function(data) {
+  num_variables <- length(colnames(data))
+  variables <- identify_variables(data)
 
-table_result <- tibble(
-  Index = seq_len(num_variables),
-  Variable_Name = c(variables$Diskretne, variables$Spojite),
-  Variable_Type = c(rep("Diskrétna", length(variables$Diskretne)), rep("Spojitá", length(variables$Spojite)))
-)
+  table_result <- tibble(
+    Index = seq_len(num_variables),
+    Variable_Name = c(variables$Diskretne, variables$Spojite),
+    Variable_Type = c(rep("Diskrétna", length(variables$Diskretne)), rep("Spojitá", length(variables$Spojite)))
+  )
 
-print(table_result)
+  print(table_result)
+}
 ```
 
 # Funkcia na modelovanie zdruzenej hustoty 1 spojitej a 1 diskretnej nahodnej premennej
 
 ```{r, warning=FALSE}
-model_mixture_joint_distribution <- function(data, selected_variables, model_type, copula = "NO") {
-  # Identifikacia typov premennych
-  variable_types <- identify_variables(data)
-  discrete_vars <- intersect(variable_types$Diskretne, selected_variables)
-  continuous_vars <- intersect(variable_types$Spojite, selected_variables)
-  
-  if(length(selected_variables) != 2 || length(discrete_vars) == 0 || length(continuous_vars) == 0) {
-    stop("Zoznam premennych musi obsahovat prave 1 spojitu a 1 diskretnu premennu!")
-  }
+mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, model_type) {
   
   # Modelovanie hustoty pouzitim jadroveho vyhladzovania
-  if (model_type == "kernel" && copula == "NO") {
+  if (model_type == "kernel") {
     # Konverzia diskretnej premennej na faktor a zoradenie kategorii
     data[[discrete_vars]] <- factor(data[[discrete_vars]])
     categories <- levels(data[[discrete_vars]])
@@ -147,7 +139,7 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
   }
   
   # Modelovanie hustoty ako hustoty normalneho rozdelenia (dnorm)
-  if (model_type == "normal" && copula == "NO") {
+  if (model_type == "normal") {
     # Konverzia diskretnej premennej na faktor a zoradenie kategorii
     data[[discrete_vars]] <- factor(data[[discrete_vars]])
     categories <- levels(data[[discrete_vars]])
@@ -224,7 +216,7 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
   }
   
   # Modelovanie hustoty ako hustoty Studentovho t-rozdelenia (dt)
-  if (model_type == "t" && copula == "NO") {
+  if (model_type == "t") {
     # Konverzia diskretnej premennej na faktor a zoradenie kategorii
     data[[discrete_vars]] <- factor(data[[discrete_vars]])
     categories <- levels(data[[discrete_vars]])
@@ -303,277 +295,16 @@ model_mixture_joint_distribution <- function(data, selected_variables, model_typ
     
   }
   
-  # Modelovanie hustoty pouzitim jadroveho vyhladzovania a kopuly (rozklad na marginaly)
-  if (model_type == "kernel" && copula == "YES") {
-    # Konverzia diskretnej premennej na faktor a zoradenie kategorii
-  data[[discrete_vars]] <- factor(data[[discrete_vars]])
-  categories <- levels(data[[discrete_vars]])
-
-  # Vytvorenie farebnej mapy pre kategorie
-  category_colors <- setNames(RColorBrewer::brewer.pal(length(categories), "Set1"), categories)
-
-  # Vypocet marginalnej hustoty KDE pre spojitu premennu v kazdej kategorii
-  calculate_density_3D <- function(data, category) {
-    sub_data <- filter(data, .data[[discrete_vars]] == category)
-    if (nrow(sub_data) > 1) {
-      bw <- bw.nrd0(sub_data[[continuous_vars]])
-      kde_x <- density(sub_data[[continuous_vars]], bw = bw)
-      kde_x_fun <- approxfun(kde_x$x, kde_x$y, rule = 2)  # aproximacia pre interpolaciu
-
-      x <- seq(min(data[[continuous_vars]]), max(data[[continuous_vars]]), length.out = 100)
-      x_density <- kde_x_fun(x)
-
-      return(data.frame(Continuous_Var = x, Density = x_density, Discrete_Var = category))
-    } else {
-      return(data.frame(Continuous_Var = numeric(0), Density = numeric(0), Discrete_Var = character(0)))
-    }
-  }
-
-  # Spojenie hustot pre vsetky kategorie
-  density_data <- bind_rows(lapply(categories, function(cat) calculate_density_3D(data, cat)))
-
-  # Fitovanie kopuly na transformovane marginalne distribucie
-  data <- data %>%
-    mutate(U = ecdf(.data[[continuous_vars]])(.data[[continuous_vars]]),
-           V = as.numeric(as.factor(.data[[discrete_vars]])) / length(categories))
-  
-  copula_model <- fitCopula(normalCopula(dim = 2), pobs(cbind(data$U, data$V)), method = "ml")
-
-  # Generovanie hodnot z kopuly
-  simulated_copula <- rCopula(1000, copula_model@copula)
-
-  # Inverzna transformacia cez marginalne distribucne funkcie
-  simulated_data <- data.frame(
-    Continuous_Var = quantile(data[[continuous_vars]], simulated_copula[, 1]),
-    Discrete_Var = factor(quantile(as.numeric(data[[discrete_vars]]), simulated_copula[, 2], type = 1), levels = categories)
-  )
-
-  # 3D Vizualizacia zdruzenej hustoty
-  fig_3d <- plot_ly(density_data, x = ~Continuous_Var, y = ~Discrete_Var, z = ~Density, 
-                     type = 'scatter3d', mode = 'lines', 
-                     color = ~Discrete_Var, colors = category_colors, line = list(width = 4)) %>%
-            layout(scene = list(xaxis = list(title = continuous_vars),
-                                yaxis = list(title = discrete_vars),
-                                zaxis = list(title = 'Hustota')))
-
-  scatter_plot <- ggplot(data, aes(x = .data[[continuous_vars]], y = .data[[discrete_vars]], color = as.factor(.data[[discrete_vars]]))) +
-  geom_point(size = 3, alpha = 0.7) +
-  labs(x = continuous_vars, y = discrete_vars) +
-  scale_color_manual(values = category_colors) +
-  theme_minimal() +
-  theme(legend.position = "right")
-
-  x_density <- ggplot(data, aes_string(x = continuous_vars, fill = discrete_vars, color = discrete_vars)) +
-    geom_density(alpha = 0.5) +
-    scale_fill_manual(values = category_colors) +
-    scale_color_manual(values = category_colors) +
-    labs(x = NULL, y = paste("Hustota (", continuous_vars, ")", sep = "")) +
-    theme_minimal() +
-    theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "right")
-
-  y_bar <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
-    geom_bar(alpha = 0.7) +
-    coord_flip() +
-    scale_fill_manual(values = category_colors) +
-    labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
-    theme_minimal() +
-    theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "right")
-
-  final_plot_2d <- (x_density + plot_spacer()) /
-                  (scatter_plot + y_bar) +
-                  plot_layout(widths = c(4, 1), heights = c(1, 4))
-
-  return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
-  }
-  
-  # Modelovanie hustoty ako hustoty normalneho rozdelenia (dnorm) a kopuly (rozklad na marginaly)
-  if (model_type == "normal" && copula == "YES") {
-    # Konverzia diskretnej premennej na faktor a zoradenie kategorii
-  data[[discrete_vars]] <- factor(data[[discrete_vars]])
-  categories <- levels(data[[discrete_vars]])
-
-  # Vytvorenie farebnej mapy pre kategorie
-  category_colors <- setNames(RColorBrewer::brewer.pal(length(categories), "Set1"), categories)
-  names(category_colors) <- categories
-
-  # Vypocet marginalnych hustot
-  calculate_density_3D <- function(data, category) {
-    sub_data <- filter(data, .data[[discrete_vars]] == category)
-    if (nrow(sub_data) > 1) {
-      mu <- mean(sub_data[[continuous_vars]])
-      sigma <- sd(sub_data[[continuous_vars]])
-      x <- seq(min(data[[continuous_vars]]), max(data[[continuous_vars]]), length.out = 100)
-      density <- dnorm(x, mean = mu, sd = sigma)
-      return(data.frame(Continuous_Var = x, Density = density, Discrete_Var = factor(category, levels = categories)))
-    } else {
-      return(data.frame(Continuous_Var = numeric(0), Density = numeric(0), Discrete_Var = character(0)))
-    }
-  }
-
-  # Spojenie hustot pre vsetky kategorie
-  density_data <- bind_rows(lapply(categories, function(cat) calculate_density_3D(data, cat)))
-
-  # Fitovanie kopuly na transformovane marginalne distribucie
-  data <- data %>%
-    mutate(U = ecdf(.data[[continuous_vars]])(.data[[continuous_vars]]),
-           V = as.numeric(as.factor(.data[[discrete_vars]])) / length(categories))
-  
-  copula_model <- fitCopula(normalCopula(dim = 2), pobs(cbind(data$U, data$V)), method = "ml")
-
-  # Generovanie hodnot z kopuly
-  simulated_copula <- rCopula(1000, copula_model@copula)
-
-  # Inverzna transformacia cez kvantilove funkcie
-  simulated_data <- data.frame(
-    Continuous_Var = quantile(data[[continuous_vars]], simulated_copula[, 1]),
-    Discrete_Var = factor(quantile(as.numeric(data[[discrete_vars]]), simulated_copula[, 2], type = 1), levels = categories)
-  )
-  
-  # 3D Vizualizacia
-  fig_3d <- plot_ly(density_data, x = ~Continuous_Var, y = ~Discrete_Var, z = ~Density, 
-                     type = 'scatter3d', mode = 'lines', 
-                     color = ~Discrete_Var, colors = category_colors, line = list(width = 4)) %>%
-            layout(scene = list(xaxis = list(title = continuous_vars),
-                                yaxis = list(title = discrete_vars),
-                                zaxis = list(title = 'Hustota')))
-
-  # 2D Vizualizacia
-  scatter_plot <- ggplot(data, aes(x = .data[[continuous_vars]], y = as.factor(.data[[discrete_vars]]), color = as.factor(.data[[discrete_vars]]))) +
-  geom_point(size = 3, alpha = 0.7) +
-  labs(x = continuous_vars, y = discrete_vars) +
-  scale_color_manual(values = category_colors) +
-  theme_minimal() +
-  theme(legend.position = "right")
-
-  x_density <- ggplot(density_data, aes(x = Continuous_Var, y = Density, color = as.factor(Discrete_Var), group = Discrete_Var)) +
-    geom_line(size = 1) +
-    scale_color_manual(values = category_colors) +
-    labs(x = NULL, y = paste("Hustota (", continuous_vars, ")", sep = ""), color = discrete_vars) +
-    theme_minimal() +
-    theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "right")
-
-  y_bar <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
-    geom_bar(alpha = 0.7) +
-    coord_flip() +
-    scale_fill_manual(values = category_colors) +
-    labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
-    theme_minimal() +
-    theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "right")
-
-  final_plot_2d <- (x_density + plot_spacer()) /
-                  (scatter_plot + y_bar) +
-                  plot_layout(widths = c(4, 1), heights = c(1, 4))
-
-  return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
-  }
-  
-  # Modelovanie hustoty ako hustoty Studentovho t-rozdelenia (dt) a kopuly (rozklad na marginaly)
-  if (model_type == "t" && copula == "YES") {
-    # Konverzia diskretnej premennej na faktor a zoradenie kategorii
-  data[[discrete_vars]] <- factor(data[[discrete_vars]])
-  categories <- levels(data[[discrete_vars]])
-
-  # Vytvorenie farebnej mapy pre kategorie
-  category_colors <- RColorBrewer::brewer.pal(length(categories), "Set1")
-  names(category_colors) <- categories
-
-  # Vypocet marginalnych hustot pomocou Studentovho t-rozdelenia
-  calculate_density_3D_t <- function(data, category) {
-    sub_data <- filter(data, .data[[discrete_vars]] == category)
-    if (nrow(sub_data) > 2) {
-      mu <- mean(sub_data[[continuous_vars]])  # stredna hodnota
-      sigma <- sd(sub_data[[continuous_vars]])  # smerodajna odchylka
-      df_t <- nrow(sub_data) - 1  # stupne volnosti pre t-rozdelenie
-      x <- seq(min(data[[continuous_vars]]), max(data[[continuous_vars]]), length.out = 100)
-      density <- dt((x - mu) / sigma, df = df_t) / sigma
-      return(data.frame(Continuous_Var = x, Density = density, Discrete_Var = factor(category, levels = categories)))
-    } else {
-      return(data.frame(Continuous_Var = numeric(0), Density = numeric(0), Discrete_Var = factor(character(0), levels = categories)))
-    }
-  }
-
-  # Spojenie hustôt pre všetky kategórie
-  density_data_t <- bind_rows(lapply(categories, function(cat) calculate_density_3D_t(data, cat)))
-
-  # Fitovanie Studentovej t-kopuly
-  data <- data %>%
-    mutate(U = ecdf(.data[[continuous_vars]])(.data[[continuous_vars]]),
-           V = as.numeric(as.factor(.data[[discrete_vars]])) / length(categories))
-  
-  copula_model <- fitCopula(tCopula(dim = 2, df = 4), pobs(cbind(data$U, data$V)), method = "ml")
-
-  # Generovanie hodnot z kopuly
-  simulated_copula <- rCopula(1000, copula_model@copula)
-
-  # Inverzna transformacia cez kvantilove funkcie
-  simulated_data <- data.frame(
-    Continuous_Var = quantile(data[[continuous_vars]], simulated_copula[, 1]),
-    Discrete_Var = factor(quantile(as.numeric(data[[discrete_vars]]), simulated_copula[, 2], type = 1), levels = categories)
-  )
-
-  # 3D Vizualizacia
-  fig_3d_t <- plot_ly(density_data_t, x = ~Continuous_Var, y = ~Discrete_Var, z = ~Density, 
-                       type = 'scatter3d', mode = 'lines', 
-                       color = ~Discrete_Var, colors = category_colors, line = list(width = 4)) %>%
-              layout(scene = list(xaxis = list(title = continuous_vars),
-                                  yaxis = list(title = discrete_vars),
-                                  zaxis = list(title = 'Hustota')))
-
-  # 2D Vizualizacia
-  scatter_plot_t <- ggplot(data, aes(x = .data[[continuous_vars]], y = as.factor(.data[[discrete_vars]]), color = as.factor(.data[[discrete_vars]]))) +
-  geom_point(size = 3, alpha = 0.7) +
-  labs(x = continuous_vars, y = discrete_vars) +
-  scale_color_manual(values = category_colors) +
-  theme_minimal() +
-  theme(legend.position = "right")
-
-  x_density_t <- ggplot(density_data_t, aes(x = Continuous_Var, y = Density, color = as.factor(Discrete_Var), group = Discrete_Var)) +
-    geom_line(size = 1) +
-    scale_color_manual(values = category_colors) +
-    labs(x = NULL, y = paste("Hustota (", continuous_vars, ")", sep = ""), color = discrete_vars) +
-    theme_minimal() +
-    theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "right")
-
-  y_bar_t <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
-    geom_bar(alpha = 0.7) +
-    coord_flip() +
-    scale_fill_manual(values = category_colors) +
-    labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
-    theme_minimal() +
-    theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "right")
-
-  final_plot_2d_t <- (x_density_t + plot_spacer()) /
-                     (scatter_plot_t + y_bar_t) +
-                     plot_layout(widths = c(4, 1), heights = c(1, 4))
-
-  return(list(fig_3d = fig_3d_t, final_plot_2d = final_plot_2d_t))
-  }
-  
 }
-
-```
-
-```{r,warning=FALSE}
-selected_variables <- c("carb", "mpg")
-result <- model_mixture_joint_distribution(mtcars, selected_variables, "normal", "YES")
-print(result)
 ```
 
 # Modelovanie zdruzeneho rozdelenia pravdepodobnosti 2 spojitych premennych
 
 ```{r, warning=FALSE}
-model_continuous_joint_distribution <- function(data, selected_variables, model_type, copula = "NO") {
-  # Identifikacia typov premennych
-  variable_types <- identify_variables(data)
-  discrete_vars <- intersect(variable_types$Diskretne, selected_variables)
-  continuous_vars <- intersect(variable_types$Spojite, selected_variables)
-  
-  if (length(selected_variables) != 2 || length(discrete_vars) > 0) {
-    stop("Na vstup musia ist 2 spojite nahodne premenne!")
-  }
+continuous_joint_distribution <- function(data, continuous_vars, model_type) {
   
   # Modelovanie hustoty pomocou jadroveho vyhladzovania
-  if (model_type == "kernel" && copula == "NO"){
+  if (model_type == "kernel"){
     kde_result <- kde2d(
     x = data[[continuous_vars[1]]], 
     y = data[[continuous_vars[2]]], 
@@ -620,7 +351,7 @@ model_continuous_joint_distribution <- function(data, selected_variables, model_
   }
   
   # Modelovanie zdruzenej hustoty ako hustoty normalneho rozdelenia
-  if (model_type == "normal" && copula == "NO") {
+  if (model_type == "normal") {
     # Vypocet zakladnych parametrov (momentov)
     mean_x <- mean(data[[continuous_vars[1]]], na.rm = TRUE)
     sd_x <- sd(data[[continuous_vars[1]]], na.rm = TRUE)
@@ -694,7 +425,7 @@ model_continuous_joint_distribution <- function(data, selected_variables, model_
   }
   
   # Modelovanie zdruzenej hustoty ako hustoty Studentovho t-rozdelenia
-  if (model_type == "t" && copula == "NO") {
+  if (model_type == "t") {
     # Vypocet zakladnych parametrov (momentov)
     mean_x <- mean(data[[continuous_vars[1]]], na.rm = TRUE)
     sd_x <- sd(data[[continuous_vars[1]]], na.rm = TRUE)
@@ -779,188 +510,220 @@ model_continuous_joint_distribution <- function(data, selected_variables, model_
     return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
   }
   
+}
+```
+
+```{r, warning=FALSE}
+continuous_joint_distribution_copula <- function(data, continuous_vars, model_type, copula_type = NULL) {
+
   # Modelovanie hustoty pomocou jadroveho vyhladzovania a kopuly (rozklad na marginaly)
-  if (model_type == "kernel" && copula == "YES") {
-    # Vypocet marginalnych hustot pomocou jadroveho vyhladzovania
+  if (model_type == "kernel") {
     kde_x <- density(data[[continuous_vars[1]]], n = 512)
-    kde_y <- density(data[[continuous_vars[2]]], n = 512)
-  
-    # Funkcie na ziskanie hustoty a distribucnej funkcie z KDE pre X
-    kde_x_density <- approxfun(kde_x$x, kde_x$y, rule = 2)
-    kde_x_cdf <- approxfun(kde_x$x, cumsum(kde_x$y) / sum(kde_x$y), rule = 2)
-  
-    # Funkcie na ziskanie hustoty a distribucnej funkcie z KDE pre Y
-    kde_y_density <- approxfun(kde_y$x, kde_y$y, rule = 2)
-    kde_y_cdf <- approxfun(kde_y$x, cumsum(kde_y$y) / sum(kde_y$y), rule = 2)
-  
-    # Fitovanie Gaussovej kopuly na transformovane data (empiricke CDF hodnoty)
-    u1 <- kde_x_cdf(data[[continuous_vars[1]]])
-    u2 <- kde_y_cdf(data[[continuous_vars[2]]])
-  
-    copula_model <- normalCopula(dim = 2)
-    copula_fit <- fitCopula(copula_model, pobs(cbind(u1, u2)), method = "ml")
-    copula_model_fitted <- copula_fit@copula
-  
-    # Vytvorenie siete
-    x_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
-    y_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
-  
-    grid <- expand.grid(x = x_vals, y = y_vals)
-  
-    # Funkcia pre vypocet zdruzenej hustoty KDE + kopula
-    copula_density_function <- function(x, y) {
-      u1 <- kde_x_cdf(x)
-      u2 <- kde_y_cdf(y)
-  
-      copula_part <- dCopula(cbind(u1, u2), copula = copula_model_fitted)
-  
-      marginal_x <- kde_x_density(x)
-      marginal_y <- kde_y_density(y)
-  
-      copula_part * marginal_x * marginal_y
-    }
-  
-    # Vypocet hustoty na sieti
-    grid$z <- mapply(copula_density_function, grid$x, grid$y)
-    z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
-  
-    # 3D Vizualizacia
-    fig_3d <- plot_ly(
-      x = ~x_vals, y = ~y_vals, z = ~z_matrix,
-      type = "surface",
-      colors = colorRamp(c("blue", "cyan", "yellow", "red"))
-    ) %>% layout(
-      title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(KDE + kopula)"),
-      scene = list(
-        xaxis = list(title = continuous_vars[1]),
-        yaxis = list(title = continuous_vars[2]),
-        zaxis = list(title = "Hustota")
-      )
+  kde_y <- density(data[[continuous_vars[2]]], n = 512)
+
+  # Funkcie pre hustoty a distribucne funkcie KDE
+  kde_x_density <- approxfun(kde_x$x, kde_x$y, rule = 2)
+  kde_x_cdf <- approxfun(kde_x$x, cumsum(kde_x$y) / sum(kde_x$y), rule = 2)
+
+  kde_y_density <- approxfun(kde_y$x, kde_y$y, rule = 2)
+  kde_y_cdf <- approxfun(kde_y$x, cumsum(kde_y$y) / sum(kde_y$y), rule = 2)
+
+  # Transformacia dat na jednotkovy interval
+  u1 <- kde_x_cdf(data[[continuous_vars[1]]])
+  u2 <- kde_y_cdf(data[[continuous_vars[2]]])
+
+  empirical_data <- pobs(cbind(u1, u2))  # zoradenie do [0, 1]
+
+  if (copula_type == "empirical") {
+    copula_model <- empCopula(empirical_data, smoothing = "beta")
+  } else {
+    stop("Zadaný 'copula_type' nie je podporovaný. Použi: 'empirical'.")
+  }
+
+  # Vytvorenie siete pre vypocet hustoty
+  x_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
+  y_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
+
+  grid <- expand.grid(x = x_vals, y = y_vals)
+
+  # Funkcia pre vypocet zdruzenej hustoty KDE + kopula
+  copula_density_function <- function(x, y) {
+    u1 <- kde_x_cdf(x)
+    u2 <- kde_y_cdf(y)
+
+    # Hustota kopuly v bode (u1, u2)
+    copula_density <- dCopula(cbind(u1, u2), copula = copula_model)
+
+    marginal_x <- kde_x_density(x)
+    marginal_y <- kde_y_density(y)
+
+    copula_density * marginal_x * marginal_y
+  }
+
+  # Vypocet hustoty na sieti
+  grid$z <- mapply(copula_density_function, grid$x, grid$y)
+  z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
+
+  # 3D Vizualizacia
+  fig_3d <- plot_ly(
+    x = ~x_vals, y = ~y_vals, z = ~z_matrix,
+    type = "surface",
+    colors = colorRamp(c("blue", "cyan", "yellow", "red"))
+  ) %>% layout(
+    title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], paste0(" (KDE + ", copula_type, " kopula)")),
+    scene = list(
+      xaxis = list(title = continuous_vars[1]),
+      yaxis = list(title = continuous_vars[2]),
+      zaxis = list(title = "Hustota")
     )
-  
-    # 2D Vizualizacia
-    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2], color = continuous_vars[2])) +
-      geom_point(size = 3, alpha = 0.7) +
-      labs(x = continuous_vars[1], y = continuous_vars[2]) +
-      scale_color_gradient(low = "blue", high = "red") +
-      theme_minimal()
-  
-    density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
-      geom_density(fill = "blue", alpha = 0.5) +
-      labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
-  
-    density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
-      geom_density(fill = "red", alpha = 0.5) +
-      coord_flip() +
-      labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-  
-    final_plot_2d <- (density_x + plot_spacer()) /
-                     (scatter_plot + density_y) +
-                     plot_layout(widths = c(4, 1), heights = c(1, 4))
-  
-    return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
+  )
+
+  # 2D Vizualizacia
+  scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2], color = continuous_vars[2])) +
+    geom_point(size = 3, alpha = 0.7) +
+    labs(x = continuous_vars[1], y = continuous_vars[2]) +
+    scale_color_gradient(low = "blue", high = "red") +
+    theme_minimal()
+
+  density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
+    geom_density(fill = "blue", alpha = 0.5) +
+    labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
+    theme_minimal() +
+    theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+
+  density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
+    geom_density(fill = "red", alpha = 0.5) +
+    coord_flip() +
+    labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
+    theme_minimal() +
+    theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+  final_plot_2d <- (density_x + plot_spacer()) /
+                   (scatter_plot + density_y) +
+                   plot_layout(widths = c(4, 1), heights = c(1, 4))
+
+  return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
   }
   
   # Modelovanie zdruzenej hustoty ako hustoty normalneho rozdelenia a pomocou kopuly (rozklad na marginaly)
-  if (model_type == "normal" && copula == "YES") {
+  if (model_type == "normal") {
     # Vypocet marginalnych parametrov
-    mean_x <- mean(data[[continuous_vars[1]]], na.rm = TRUE)
-    sd_x <- sd(data[[continuous_vars[1]]], na.rm = TRUE)
-    mean_y <- mean(data[[continuous_vars[2]]], na.rm = TRUE)
-    sd_y <- sd(data[[continuous_vars[2]]], na.rm = TRUE)
-  
-    # Korelacia medzi premennymi na fitovanie Gaussovej kopuly
-    cor_val <- cor(data[[continuous_vars[1]]], data[[continuous_vars[2]]], method = "pearson", use = "complete.obs")
-  
-    # Fitovanie kopuly
-    copula_model <- normalCopula(param = cor_val, dim = 2, dispstr = "un")
-  
-    # Vytvorenie gridu pre hustotu
-    x_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
-    y_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
-  
-    grid <- expand.grid(x = x_vals, y = y_vals)
-  
-    # Vypocet zdruzenej hustoty cez rozklad na marginaly + kopula
-    copula_density_function <- function(x, y) {
-      u1 <- pnorm(x, mean = mean_x, sd = sd_x)
-      u2 <- pnorm(y, mean = mean_y, sd = sd_y)
-  
-      copula_part <- dCopula(cbind(u1, u2), copula = copula_model)
-      marginal_x <- dnorm(x, mean = mean_x, sd = sd_x)
-      marginal_y <- dnorm(y, mean = mean_y, sd = sd_y)
-  
-      copula_part * marginal_x * marginal_y
-    }
-  
-    # Vypocet hustoty na gride
-    grid$z <- mapply(copula_density_function, grid$x, grid$y)
-  
-    # Preusporiadanie do matice pre 3D graf
-    z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
-  
-    # 3D Vizualizacia
-    fig_3d <- plot_ly(
-      x = ~x_vals, y = ~y_vals, z = ~z_matrix,
-      type = "surface",
-      colors = colorRamp(c("blue", "cyan", "yellow", "red"))
-    ) %>% layout(
-      title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(dnorm + kopula)"),
-      scene = list(
-        xaxis = list(title = continuous_vars[1]),
-        yaxis = list(title = continuous_vars[2]),
-        zaxis = list(title = "Hustota")
-      )
+  mean_x <- mean(data[[continuous_vars[1]]], na.rm = TRUE)
+  sd_x <- sd(data[[continuous_vars[1]]], na.rm = TRUE)
+  mean_y <- mean(data[[continuous_vars[2]]], na.rm = TRUE)
+  sd_y <- sd(data[[continuous_vars[2]]], na.rm = TRUE)
+
+  # Vypocet hodnoty marginalnych rozdeleni pre vstup do kopuly
+  u1 <- pnorm(data[[continuous_vars[1]]], mean = mean_x, sd = sd_x)
+  u2 <- pnorm(data[[continuous_vars[2]]], mean = mean_y, sd = sd_y)
+
+  if (copula_type == "Clayton") {
+    copula_model <- claytonCopula(param = 2, dim = 2)
+  } else if (copula_type == "Gumbel") {
+    copula_model <- gumbelCopula(param = 2, dim = 2)
+  } else if (copula_type == "Frank") {
+    copula_model <- frankCopula(param = 5, dim = 2)
+  } else {
+    stop("Zadaný 'copula_type' nie je podporovaný. Použi: 'Clayton', 'Gumbel', 'Frank'.")
+  }
+
+  # Fitovanie kopuly na marginálne transformované dáta
+  copula_fit <- fitCopula(copula_model, pobs(cbind(u1, u2)), method = "ml")
+  copula_model_fitted <- copula_fit@copula
+
+  # Vytvorenie gridu pre hustotu
+  x_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
+  y_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
+
+  grid <- expand.grid(x = x_vals, y = y_vals)
+
+  # Vypocet zdruzenej hustoty cez rozklad na marginaly + kopula
+  copula_density_function <- function(x, y) {
+    u1 <- pnorm(x, mean = mean_x, sd = sd_x)
+    u2 <- pnorm(y, mean = mean_y, sd = sd_y)
+
+    copula_part <- dCopula(cbind(u1, u2), copula = copula_model_fitted)
+
+    marginal_x <- dnorm(x, mean = mean_x, sd = sd_x)
+    marginal_y <- dnorm(y, mean = mean_y, sd = sd_y)
+
+    copula_part * marginal_x * marginal_y
+  }
+
+  # Vypocet hustoty na sieti
+  grid$z <- mapply(copula_density_function, grid$x, grid$y)
+  z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
+
+  # 3D Vizualizacia
+  fig_3d <- plot_ly(
+    x = ~x_vals, y = ~y_vals, z = ~z_matrix,
+    type = "surface",
+    colors = colorRamp(c("blue", "cyan", "yellow", "red"))
+  ) %>% layout(
+    title = paste0("Združená hustota ", continuous_vars[1], " a ", continuous_vars[2], " (dnorm + ", copula_type, " kopula)"),
+    scene = list(
+      xaxis = list(title = continuous_vars[1]),
+      yaxis = list(title = continuous_vars[2]),
+      zaxis = list(title = "Hustota")
     )
-  
-    # 2D Vizualizacia
-    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2], color = continuous_vars[2])) +
-      geom_point(size = 3, alpha = 0.7) +  
-      labs(x = continuous_vars[1], y = continuous_vars[2]) +
-      scale_color_gradient(low = "blue", high = "red") +
-      theme_minimal()
-  
-    density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
-      stat_function(fun = dnorm, args = list(mean = mean_x, sd = sd_x), fill = "blue", geom = "area", alpha = 0.5) +
-      labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
-  
-    density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
-      stat_function(fun = dnorm, args = list(mean = mean_y, sd = sd_y), fill = "red", geom = "area", alpha = 0.5) +
-      coord_flip() +
-      labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-  
-    final_plot_2d <- (density_x + plot_spacer()) /
-                     (scatter_plot + density_y) +
-                     plot_layout(widths = c(4, 1), heights = c(1, 4))
-  
-    return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
+  )
+
+  # 2D Vizualizacia
+  scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2], color = continuous_vars[2])) +
+    geom_point(size = 3, alpha = 0.7) +  
+    labs(x = continuous_vars[1], y = continuous_vars[2]) +
+    scale_color_gradient(low = "blue", high = "red") +
+    theme_minimal()
+
+  density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
+    stat_function(fun = dnorm, args = list(mean = mean_x, sd = sd_x), fill = "blue", geom = "area", alpha = 0.5) +
+    labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
+    theme_minimal() +
+    theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+
+  density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
+    stat_function(fun = dnorm, args = list(mean = mean_y, sd = sd_y), fill = "red", geom = "area", alpha = 0.5) +
+    coord_flip() +
+    labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
+    theme_minimal() +
+    theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+  final_plot_2d <- (density_x + plot_spacer()) /
+                   (scatter_plot + density_y) +
+                   plot_layout(widths = c(4, 1), heights = c(1, 4))
+
+  return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
   }
   
   # Modelovanie zdruzenej hustoty ako hustoty Studentovho t-rozdelenia a pomocou kopuly (rozklad na marginaly)
-  if (model_type == "t" && copula == "YES") {
-    # Vypocet zakladnych parametrov marginalnych Studentovych t-rozdeleni (marginalnych momentov)
+  if (model_type == "t") {
+    # Vypocet zakladnych parametrov marginalnych Studentovych t-rozdeleni
     mean_x <- mean(data[[continuous_vars[1]]], na.rm = TRUE)
     sd_x <- sd(data[[continuous_vars[1]]], na.rm = TRUE)
     mean_y <- mean(data[[continuous_vars[2]]], na.rm = TRUE)
     sd_y <- sd(data[[continuous_vars[2]]], na.rm = TRUE)
   
-    # Stupne volnosti
+    # Stupne volnosti marginal
     df <- nrow(data) - 1
-    if (df < 2) df <- 2  # bezpecnostna podmienka, ak by bolo malo dat
+    if (df < 2) df <- 2
   
-    # Korelacia medzi premennymi pre t-kopulu
-    cor_val <- cor(data[[continuous_vars[1]]], data[[continuous_vars[2]]], method = "pearson", use = "complete.obs")
+    # Hodnoty marginalnych distribucnych funkcii
+    u1 <- pt((data[[continuous_vars[1]]] - mean_x) / sd_x, df = df)
+    u2 <- pt((data[[continuous_vars[2]]] - mean_y) / sd_y, df = df)
   
-    # Fitovanie Studentovej t-kopuly
-    copula_model <- tCopula(param = cor_val, dim = 2, dispstr = "un", df = df)
+    if (copula_type == "Clayton") {
+      copula_model <- claytonCopula(param = 2, dim = 2)
+    } else if (copula_type == "Gumbel") {
+      copula_model <- gumbelCopula(param = 2, dim = 2)
+    } else if (copula_type == "Joe") {
+      copula_model <- joeCopula(param = 2, dim = 2)
+    } else {
+      stop("Zadaný 'copula_type' nie je podporovaný. Použi: 'Clayton', 'Gumbel', 'Joe'.")
+    }
+  
+    # Fitovanie kopuly na marginalne transformovane data
+    copula_fit <- fitCopula(copula_model, pobs(cbind(u1, u2)), method = "ml")
+    copula_model_fitted <- copula_fit@copula
   
     # Vytvorenie siete pre vypocet hustoty
     x_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
@@ -968,14 +731,14 @@ model_continuous_joint_distribution <- function(data, selected_variables, model_
   
     grid <- expand.grid(x = x_vals, y = y_vals)
   
-    # Funkcia pre vypocet zdruzenej hustoty: marginalne hustoty + hustota kopuly
+    # Funkcia pre vypocet zdruzenej hustoty
     copula_density_function <- function(x, y) {
-      u1 <- pt((x - mean_x) / sd_x, df = df)  # distribucna funkcia t-rozdelenia
+      u1 <- pt((x - mean_x) / sd_x, df = df)
       u2 <- pt((y - mean_y) / sd_y, df = df)
   
-      copula_part <- dCopula(cbind(u1, u2), copula = copula_model)  # hustota kopuly
+      copula_part <- dCopula(cbind(u1, u2), copula = copula_model_fitted)
   
-      marginal_x <- dt((x - mean_x) / sd_x, df = df) / sd_x  # hustota t-rozdelenia
+      marginal_x <- dt((x - mean_x) / sd_x, df = df) / sd_x
       marginal_y <- dt((y - mean_y) / sd_y, df = df) / sd_y
   
       copula_part * marginal_x * marginal_y
@@ -991,7 +754,7 @@ model_continuous_joint_distribution <- function(data, selected_variables, model_
       type = "surface",
       colors = colorRamp(c("blue", "cyan", "yellow", "red"))
     ) %>% layout(
-      title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(t-rozdelenie + t-kopula)"),
+      title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], paste0("(t-rozdelenie + ", copula_type, " kopula)")),
       scene = list(
         xaxis = list(title = continuous_vars[1]),
         yaxis = list(title = continuous_vars[2]),
@@ -1025,30 +788,13 @@ model_continuous_joint_distribution <- function(data, selected_variables, model_
   
     return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
   }
-  
 }
 ```
-
-```{r,warning=FALSE}
-continuous_variables <- c("disp", "hp")
-result <- model_continuous_joint_distribution(mtcars, continuous_variables, "kernel", "YES")
-print(result)
-```
-
 
 # Modelovanie zdruzeneho rozdelenia pravdepodobnosti viac ako 2 premennych
 
 ```{r,warning=FALSE}
-model_multi_joint_distribution <- function(data, selected_variables) {
-  variables_count <- length(selected_variables)
-  if (variables_count <= 2) {
-    stop("Tato funkcia sluzi na modelovanie 3 a viac premennych!")
-  }
-  
-  # Identifikacia typov premennych
-  variable_types <- identify_variables(data)
-  discrete_vars <- intersect(variable_types$Diskretne, selected_variables)
-  continuous_vars <- intersect(variable_types$Spojite, selected_variables)
+multi_joint_distribution <- function(data, discrete_vars, continuous_vars) {
   
   # Vytvorenie tabulky s frekvenciami pre diskretne premenne
   tab <- as.data.frame(table(data[, discrete_vars]))
@@ -1099,24 +845,10 @@ model_multi_joint_distribution <- function(data, selected_variables) {
 }
 ```
 
-```{r,warning=FALSE}
-multiple_variables <- c("mpg", "disp", "cyl")
-result2 <- model_multi_joint_distribution(mtcars, multiple_variables)
-print(result2)
-```
-
 # Modelovanie dvoch dikretnych nahodnych premennych
 
 ```{r,warning=FALSE}
-model_discrete_joint_distribution <- function(data, selected_variables) {
-  # Identifikacia typov premennych
-  variable_types <- identify_variables(data)
-  discrete_vars <- intersect(variable_types$Diskretne, selected_variables)
-  continuous_vars <- intersect(variable_types$Spojite, selected_variables)
-  
-  if (length(selected_variables) != 2 || length(continuous_vars) > 0) {
-    stop("Na vstup musia ist 2 diskretne nahodne premenne!")
-  }
+discrete_joint_distribution <- function(data, discrete_vars) {
   
   tab <- as.data.frame(table(data[, discrete_vars]))
   tab$Probability <- tab$Freq / sum(tab$Freq)
@@ -1190,11 +922,86 @@ model_discrete_joint_distribution <- function(data, selected_variables) {
 }
 ```
 
+# Modelovanie združeného rozdelenia pravdepodobnosti (Hustota)
+
 ```{r, warning=FALSE}
-selected_discrete_variables <- c("gear", "carb")
-result <- model_joint_distribution(mtcars, selected_discrete_variables)
-print(result)
+model_joint_distribution_density <- function(data, selected_variables, model_type = NULL, copula = FALSE, copula_type = NULL) {
+  # Identifikacia typov premennych
+  variable_types <- identify_variables(data)
+  discrete_vars <- intersect(variable_types$Diskretne, selected_variables)
+  continuous_vars <- intersect(variable_types$Spojite, selected_variables)
+  variables_count <- length(discrete_vars) + length(continuous_vars)
+  
+  if (length(selected_variables) == 2 && length(continuous_vars) == 0) {
+    if (!is.null(model_type) || copula != FALSE || !is.null(copula_type)) {
+      stop("Argumenty model_type, 'copula' a 'copula_type' sa nepouzivaju pri modelovani dvoch diskretnych premennych.")
+    }
+    result <- discrete_joint_distribution(data, discrete_vars)
+    print(result)
+  } else if (variables_count > 2) {
+    if (!is.null(model_type) || copula != FALSE || !is.null(copula_type)) {
+      stop("Argumenty model_type, 'copula' a 'copula_type' sa nepouzivaju pri modelovani vacsieho poctu premennych ako 2.")
+    }
+    result <- multi_joint_distribution(data, discrete_vars, continuous_vars)
+    print(result)
+  } else if (length(selected_variables) == 2 && length(discrete_vars) == 0) {
+    if (copula == FALSE) {
+      if (!is.null(copula_type)) {
+        stop("Argument 'copula_type' mozno pouzit len ked 'copula' = 'TRUE'.")
+      }
+      else {
+        result <- continuous_joint_distribution(data, continuous_vars, model_type)
+        print(result)
+      }
+    }
+    else {
+      if (is.null(copula_type)) {
+        stop("Ak je 'copula' = 'TRUE', musi byt specifikovany aj parameter 'copula_type'.")
+      }
+      else {
+        result <- continuous_joint_distribution_copula(data, continuous_vars, model_type, copula_type)
+        print(result)
+      }
+    }
+  } else if (length(selected_variables) == 2 && length(discrete_vars) == 1) {
+    if (copula != FALSE || !is.null(copula_type)) {
+      stop("Argumenty 'copula' a 'copula_type' sa pouzivaju iba pri modelovani dvoch spojitych premennych.")
+    }
+    result <- mixture_joint_distribution(data, discrete_vars, continuous_vars, model_type)
+    print(result)
+  }
+}
 ```
 
+```{r, warning=FALSE}
+printVariables(data)
+```
 
+```{r, warning=FALSE}
+model_joint_distribution_density(data, c("hp", "carb"), "kernel")
+```
+
+# Dokumentacia
+
+## Co dosadit za parametre
+
+### Vyber kopuly [copula_type] (moznost pri 2 spojitych premennych)
+
+Normalne rozdelenie
+- Clayton: param > 0 (cim vacsie, tym silnejsia zavislost v spodnom chvoste)
+- Gumbel: param >= 1 (cim vacsie, tym silnejsia zavislost v hornom chvoste)
+- Frank: param != 0 (kladne = pozitivna zavislost, zaporne = negativna zavislost)
+Studentovo t-rozdelenie
+- Clayton
+- Gumbel
+- Joe
+Jadrove vyhladzovanie
+- empirical
+- Gumbel
+- Frank
+
+### Typy rozdeleni [model_type] (moznost pri zmesi 2 premennych alebo 2 spojitych premennych)
+- normalne ["normal"]
+- Studentovo t-rozdelenie ["t"]
+- jadrovo vyhladene ["kernel"]
 
