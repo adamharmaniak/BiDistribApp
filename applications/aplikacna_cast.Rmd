@@ -986,7 +986,14 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
 # Modelovanie podmienenej strednej hodnoty a kvantilovej funkcie (regresia)
 
 ```{r, warning=FALSE}
-model_conditional_mean_value <- function(data, response_name, predictor_name, quantiles = 0.5, specific_x = NULL, mean_method = "loess", poly_degree = NULL) {
+model_conditional_mean_value <- function(data, selected_variables, quantiles = 0.5, specific_x = NULL, mean_method = "linear", poly_degree = NULL) {
+  
+  if (length(selected_variables) != 2) {
+    return(NULL)
+  }
+  
+  response_name <- selected_variables[1]
+  predictor_name <- selected_variables[2]
   
   if (mean_method == "poly" && is.null(poly_degree)) {
     stop("Pri pouzivani metody 'poly' je potrebne zadat stupen polynomu!")
@@ -1100,7 +1107,7 @@ model_conditional_mean_value <- function(data, response_name, predictor_name, qu
     geom_point(alpha = 0.4, color = "darkgreen") +
     geom_line(data = plot_data, aes(x = X, y = Mean), color = "blue", size = 1.2, linetype = "solid") +
     labs(
-      title = "Podmienená stredná hodnota a kvantilová funkcia",
+      title = "Podmienená stredná hodnota a vybrané kvantilové funkcie",
       x = paste0(predictor_name, " (Prediktor)"),
       y = paste0(response_name, " (Odozva)")
     ) +
@@ -1142,11 +1149,10 @@ model_conditional_mean_value <- function(data, response_name, predictor_name, qu
 ```
 
 ```{r, warning=FALSE}
-result <- model_conditional_mean_value(data, "mpg", "disp", 0.5, 100, "poly", 2)
+result <- model_conditional_mean_value(data, c("mpg", "disp"), c(0.1, 0.9), 100, "poly", 2)
 
 result$plot
 ```
-
 
 # Finálne výstupy
 ```{r, warning=FALSE}
@@ -1180,11 +1186,22 @@ Jadrove vyhladzovanie
 
 ## Co dosadit za parametre do model_conditional_mean_value()
 
+### Premenne typu 'Odozva' a 'Prediktor'
+- na vstup sa posielaju vzdy dve premenne vo forme c("Odozva", "Prediktor")
+
 ### Kvantily na vykreslenie
 - moze byt jeden a viac
 - ked chceme poslat viac => c(Q1, Q2, Q3, ...)
 - ked chceme poslat jeden => napr. Q2
 
-### Vyber metody pre vypocet podmienenej stredne hodnoty E[Y|X]
-- moznosti su: "loess" (Lokalna regresia, prisposobuje modely (linearne, kvadraticke) podla okolia), "gam" (Generalizačný aditívny model, scitava hladke funkcie), "spline" (podobné princípu MKP)
+### Vyber metody pre odhad podmienenej strednej hodnoty E[Y|X]
+- moznosti su:
+  a) Neparametricke modely
+    1. **"loess"** (Lokalna regresia, prisposobuje modely (linearne, kvadraticke) podla okolia (75% bodov))
+    2. **"gam"** (Generalizacny aditivny model, scitava hladke funkcie)
+    3. **"spline"** (podobne principu MKP)
+  b) Parametricke modely
+    1. **"linear"** (linearny regresny model)
+    2. **"poly"** (polynomialny regresny model, zadava sa aj s parametrom poly_degree = 1,2,3,..., pre *poly_degree = 1* dava          *"linear"*)
+    3. **"exp"** (exponencialny regresny model)
 
