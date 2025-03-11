@@ -77,7 +77,7 @@ printVariables <- function(data) {
 # Funkcia na modelovanie zdruzenej hustoty 1 spojitej a 1 diskretnej nahodnej premennej
 
 ```{r, warning=FALSE}
-mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, model_type) {
+mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, model_type, bw = NULL) {
   
   # Modelovanie hustoty pouzitim jadroveho vyhladzovania
   if (model_type == "kernel") {
@@ -91,7 +91,9 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
     calculate_density_3D <- function(data, category) {
       sub_data <- filter(data, .data[[discrete_vars]] == category)
       if (nrow(sub_data) > 1) {
-        bw <- bw.nrd0(sub_data[[continuous_vars]])
+        if (is.null(bw)){
+          bw <- bw.nrd0(sub_data[[continuous_vars]])
+        }
         kde_x <- density(sub_data[[continuous_vars]], bw = bw)
         kde_x_fun <- approxfun(kde_x$x, kde_x$y, rule = 2)
     
@@ -935,7 +937,7 @@ discrete_joint_distribution <- function(data, discrete_vars) {
 # Modelovanie združeného rozdelenia pravdepodobnosti (Hustota)
 
 ```{r, warning=FALSE}
-model_joint_distribution_density <- function(data, selected_variables, model_type = NULL, copula = FALSE, copula_type = NULL) {
+model_joint_distribution_density <- function(data, selected_variables, model_type = NULL, copula = FALSE, copula_type = NULL, bw = NULL) {
   # Identifikacia typov premennych
   variable_types <- identify_variables(data)
   discrete_vars <- intersect(variable_types$Diskretne, selected_variables)
@@ -977,7 +979,7 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
     if (copula != FALSE || !is.null(copula_type)) {
       stop("Argumenty 'copula' a 'copula_type' sa pouzivaju iba pri modelovani dvoch spojitych premennych.")
     }
-    result <- mixture_joint_distribution(data, discrete_vars, continuous_vars, model_type)
+    result <- mixture_joint_distribution(data, discrete_vars, continuous_vars, model_type, bw)
     print(result)
   }
 }
@@ -1182,7 +1184,7 @@ Jadrove vyhladzovanie
 ### Typy rozdeleni [model_type]
 - normalne ["normal"]
 - Studentovo t-rozdelenie ["t"]
-- jadrovo vyhladene ["kernel"]
+- jadrovo vyhladene ["kernel"] - mozne zadat aj parameter bw (bandwidth), nezadany => automatizovane vyhladzovanie
 
 ## Co dosadit za parametre do model_conditional_mean_value()
 
