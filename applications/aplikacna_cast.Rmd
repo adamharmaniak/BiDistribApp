@@ -24,6 +24,8 @@ suppressMessages(suppressWarnings({
   library(tidyr)
   library(evd)
   library(mvtnorm)
+  library(quantreg)
+  library(splines)
 }))
 
 data <- mtcars
@@ -54,10 +56,18 @@ printVariables <- function(data) {
   num_variables <- length(colnames(data))
   variables <- identify_variables(data)
 
+  all_variables <- c(variables$Diskretne, variables$Spojite)
+
+  variable_types <- c(rep("Diskrétna", length(variables$Diskretne)),
+                      rep("Spojitá", length(variables$Spojite)))
+
+  counts <- sapply(all_variables, function(var) sum(!is.na(data[[var]])))
+
   table_result <- tibble(
     Index = seq_len(num_variables),
-    Variable_Name = c(variables$Diskretne, variables$Spojite),
-    Variable_Type = c(rep("Diskrétna", length(variables$Diskretne)), rep("Spojitá", length(variables$Spojite)))
+    Variable_Name = all_variables,
+    Variable_Type = variable_types,
+    Pocet_pozorovani = counts
   )
 
   print(table_result)
@@ -973,19 +983,182 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
 }
 ```
 
+# Modelovanie podmienenej strednej hodnoty a kvantilovej funkcie (regresia)
+
 ```{r, warning=FALSE}
-printVariables(data)
+model_conditional_mean_value <- function(data, response_name, predictor_name, quantiles = 0.5, specific_x = NULL, mean_method = "loess", poly_degree = NULL) {
+  
+  if (mean_method == "poly" && is.null(poly_degree)) {
+    stop("Pri pouzivani metody 'poly' je potrebne zadat stupen polynomu!")
+  }
+  
+  if (mean_method != "poly" && !is.null(poly_degree)) {
+    stop("Stupen polynomu sa zadava iba pri metode 'poly'!")
+  }
+  
+  variable_types <- identify_variables(data)
+
+  if (!(response_name %in% colnames(data))) {
+    stop(paste("Premenna", response_name, "nie je v datach!"))
+  }
+
+  if (!(predictor_name %in% colnames(data))) {
+    stop(paste("Premenna", predictor_name, "nie je v datach!"))
+  }
+
+  if (!(response_name %in% c(variable_types$Spojite, variable_types$Diskretne))) {
+    stop(paste("Premenna", response_name, "nie je rozpoznana ako spojita ani diskretna."))
+  }
+
+  if (!(predictor_name %in% variable_types$Spojite)) {
+    stop(paste("Prediktor", predictor_name, "musi byt spojita premenna!"))
+  }
+
+  response <- data[[response_name]]
+  predictor <- data[[predictor_name]]
+
+  # X sekvencia pre predikcie
+  x_seq <- seq(min(predictor), max(predictor), length.out = 200)
+
+  # Odhad podmienenej strednej hodnoty E[Y|X] podla metody
+  if (mean_method == "loess") {
+    loess_fit <- loess(response ~ predictor, span = 0.75)
+    mean_pred <- predict(loess_fit, newdata = data.frame(predictor = x_seq))
+  } else if (mean_method == "gam") {
+    gam_fit <- gam(response ~ s(predictor))
+    mean_pred <- predict(gam_fit, newdata = data.frame(predictor = x_seq))
+  } else if (mean_method == "spline") {
+    spline_fit <- lm(response ~ bs(predictor, df = 5))
+    mean_pred <- predict(spline_fit, newdata = data.frame(predictor = x_seq))
+  } else if (mean_method == "linear") {
+    lm_fit <- lm(response ~ predictor)
+    mean_pred <- predict(lm_fit, newdata = data.frame(predictor = x_seq))
+
+  } else if (mean_method == "poly") {
+    poly_fit <- lm(response ~ poly(predictor, degree = poly_degree, raw = TRUE))
+    mean_pred <- predict(poly_fit, newdata = data.frame(predictor = x_seq))
+
+  } else if (mean_method == "exp") {
+    nls_fit <- nls(response ~ a * exp(b * predictor), 
+                   start = list(a = 1, b = 0.01))
+    mean_pred <- predict(nls_fit, newdata = data.frame(predictor = x_seq))
+
+  } else {
+    stop("Neplatna metoda mean_method! Vyber: 'loess', 'gam', 'spline', 'linear', 'poly', alebo 'exp'.")
+  }
+
+  # Odhad podmienenej kvantilovej funkcie pre viac kvantilov
+  quantile_preds <- list()
+
+  for (q in quantiles) {
+    rq_fit <- rq(response ~ predictor, tau = q)
+    quantile_preds[[as.character(q)]] <- predict(rq_fit, newdata = data.frame(predictor = x_seq))
+  }
+
+  if (is.null(specific_x)) {
+    specific_x <- median(predictor, na.rm = TRUE)
+  }
+
+  # Predikcia pre konkretny bod X podla mean_method
+  # Neparametricke modely
+  if (mean_method == "loess") {
+    specific_mean <- predict(loess_fit, newdata = data.frame(predictor = specific_x))
+  } else if (mean_method == "gam") {
+    specific_mean <- predict(gam_fit, newdata = data.frame(predictor = specific_x))
+  } else if (mean_method == "spline") {
+    specific_mean <- predict(spline_fit, newdata = data.frame(predictor = specific_x))
+  } 
+  # Parametricke modely
+    else if (mean_method == "linear") {
+    specific_mean <- predict(lm_fit, newdata = data.frame(predictor = specific_x))
+
+  } else if (mean_method == "poly") {
+    specific_mean <- predict(poly_fit, newdata = data.frame(predictor = specific_x))
+
+  } else if (mean_method == "exp") {
+    specific_mean <- predict(nls_fit, newdata = data.frame(predictor = specific_x))
+  }
+
+  # Kvantily pre konkretne X
+  specific_quantiles <- list()
+
+  for (q in quantiles) {
+    rq_fit <- rq(response ~ predictor, tau = q)
+    specific_quantiles[[as.character(q)]] <- predict(rq_fit, newdata = data.frame(predictor = specific_x))
+  }
+
+  plot_data <- data.frame(
+    X = x_seq,
+    Mean = mean_pred
+  )
+
+  for (q in quantiles) {
+    plot_data[[paste0("Quantile_", q)]] <- quantile_preds[[as.character(q)]]
+  }
+
+  p <- ggplot(data, aes_string(x = predictor_name, y = response_name)) +
+    geom_point(alpha = 0.4, color = "darkgreen") +
+    geom_line(data = plot_data, aes(x = X, y = Mean), color = "blue", size = 1.2, linetype = "solid") +
+    labs(
+      title = "Podmienená stredná hodnota a kvantilová funkcia",
+      x = paste0(predictor_name, " (Prediktor)"),
+      y = paste0(response_name, " (Odozva)")
+    ) +
+    theme_minimal()
+
+  # Kvantilove krivky
+  for (q in quantiles) {
+    p <- p + geom_line(data = plot_data, aes_string(x = "X", y = paste0("Quantile_", q)),
+                       size = 1, linetype = "dashed", color = "red")
+  }
+
+  # Bod pre specific_x
+  p <- p + geom_point(aes(x = specific_x, y = specific_mean), color = "blue", size = 3)
+
+  for (q in quantiles) {
+    p <- p + geom_point(aes(x = specific_x, y = specific_quantiles[[as.character(q)]]), color = "red", size = 3)
+  }
+
+  # Popisky pre specific_x
+  label_text <- paste0("E[Y|X=", round(specific_x, 2), "]=", round(specific_mean, 2))
+  p <- p + annotate("text", x = specific_x, y = specific_mean,
+                    label = label_text, hjust = -0.1, color = "blue")
+
+  for (q in quantiles) {
+    q_label <- paste0("Q_", q, "(Y|X=", round(specific_x, 2), ")=", round(specific_quantiles[[as.character(q)]], 2))
+    p <- p + annotate("text", x = specific_x, y = specific_quantiles[[as.character(q)]],
+                      label = q_label, hjust = -0.1, color = "red")
+  }
+
+  return(list(
+    plot = p,
+    conditional_mean = data.frame(X = x_seq, E_Y_given_X = mean_pred),
+    conditional_quantiles = dplyr::select(plot_data, X, dplyr::starts_with("Quantile_")),
+    specific_x = specific_x,
+    specific_mean = specific_mean,
+    specific_quantiles = specific_quantiles
+  ))
+}
 ```
 
 ```{r, warning=FALSE}
+result <- model_conditional_mean_value(data, "mpg", "disp", 0.5, 100, "poly", 2)
+
+result$plot
+```
+
+
+# Finálne výstupy
+```{r, warning=FALSE}
+printVariables(data)
 model_joint_distribution_density(data, c("hp", "carb"), "kernel")
 ```
 
 # Dokumentacia
 
-## Co dosadit za parametre
+## Co dosadit za parametre do model_joint_distribution_density()
 
-### Vyber kopuly [copula_type] (moznost pri 2 spojitych premennych)
+### Vyber kopuly [copula_type]
 
 Normalne rozdelenie
 - Clayton: param > 0 (cim vacsie, tym silnejsia zavislost v spodnom chvoste)
@@ -1000,8 +1173,18 @@ Jadrove vyhladzovanie
 - Gumbel
 - Frank
 
-### Typy rozdeleni [model_type] (moznost pri zmesi 2 premennych alebo 2 spojitych premennych)
+### Typy rozdeleni [model_type]
 - normalne ["normal"]
 - Studentovo t-rozdelenie ["t"]
 - jadrovo vyhladene ["kernel"]
+
+## Co dosadit za parametre do model_conditional_mean_value()
+
+### Kvantily na vykreslenie
+- moze byt jeden a viac
+- ked chceme poslat viac => c(Q1, Q2, Q3, ...)
+- ked chceme poslat jeden => napr. Q2
+
+### Vyber metody pre vypocet podmienenej stredne hodnoty E[Y|X]
+- moznosti su: "loess" (Lokalna regresia, prisposobuje modely (linearne, kvadraticke) podla okolia), "gam" (Generalizačný aditívny model, scitava hladke funkcie), "spline" (podobné princípu MKP)
 
