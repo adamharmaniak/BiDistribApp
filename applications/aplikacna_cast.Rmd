@@ -988,7 +988,7 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
 # Modelovanie podmienenej strednej hodnoty a kvantilovej funkcie (regresia)
 
 ```{r, warning=FALSE}
-model_conditional_mean_value <- function(data, selected_variables, quantiles = 0.5, specific_x = NULL, mean_method = "linear", poly_degree = NULL) {
+model_conditional_mean_value <- function(data, selected_variables, mean_method = "linear", poly_degree = NULL, quantiles = 0.5, specific_x = NULL) {
   
   if (length(selected_variables) != 2) {
     return(NULL)
@@ -1151,7 +1151,7 @@ model_conditional_mean_value <- function(data, selected_variables, quantiles = 0
 ```
 
 ```{r, warning=FALSE}
-result <- model_conditional_mean_value(data, c("mpg", "disp"), c(0.1, 0.9), 100, "poly", 2)
+result <- model_conditional_mean_value(data, c("mpg", "disp"), "poly", 3)
 
 result$plot
 ```
@@ -1159,7 +1159,7 @@ result$plot
 # Finálne výstupy
 ```{r, warning=FALSE}
 printVariables(data)
-model_joint_distribution_density(data, c("hp", "carb"), "kernel")
+model_joint_distribution_density(data, c("mpg", "disp"), "kernel")
 ```
 
 # Dokumentacia
