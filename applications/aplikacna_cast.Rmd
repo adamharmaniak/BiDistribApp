@@ -1179,16 +1179,13 @@ model_conditional_mean_value <- function(data, selected_variables, mean_method =
   return(list(
     plot = p,
     conditional_mean = data.frame(X = x_seq, E_Y_given_X = mean_pred),
-    conditional_quantiles = dplyr::select(plot_data, X, dplyr::starts_with("Quantile_")),
-    specific_x = specific_x,
-    specific_mean = specific_mean,
-    specific_quantiles = specific_quantiles
+    conditional_quantiles = dplyr::select(plot_data, X, dplyr::starts_with("Quantile_"))
   ))
 }
 ```
 
 ```{r, warning=FALSE}
-result <- model_conditional_mean_value(data, c("mpg", "hp"), "poly", "poly", 2, 3, c(0.05, 0.95), 150)
+result <- model_conditional_mean_value(data, c("carb", "hp"), "poly", "poly", 2, 3, c(0.05, 0.95), 150)
 
 result$plot
 ```
@@ -1196,7 +1193,7 @@ result$plot
 # Finálne výstupy
 ```{r, warning=FALSE}
 printVariables(data)
-model_joint_distribution_density(data, c("mpg", "disp"), "kernel", TRUE, "empirical", 0.2)
+model_joint_distribution_density(data, c("hp", "carb"), model_type = "normal")
 ```
 
 # Dokumentacia
@@ -1251,4 +1248,12 @@ Jadrove vyhladzovanie
   b) Parametricke modely
     1. **"linear"** (linearny regresny model)
     2. **"poly"** (polynomialny regresny model, zadava sa aj s parametrom poly_quant_degree = 1,2,3,..., pre *poly_quant_degree = 1* dava          *"linear"*)
+    
+    
+*Pridat*
+- copula -> use_copula
+- kernel - explicitne zadavat bw aj pre marginalu
+- normal_copula - dat uzivatleovi moznost vyberu pocitania marginalnych hustot (napr. cez pnorm() alebo lognorm atd.)
+- rozdelit funkciu model_conditional_mean_value na dve
+- pridat funkciu na modelovanie klasikacnych metod (logisticka regresia)
 
