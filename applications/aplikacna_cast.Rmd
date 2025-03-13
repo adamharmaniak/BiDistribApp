@@ -988,7 +988,7 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
 # Modelovanie podmienenej strednej hodnoty a kvantilovej funkcie (regresia)
 
 ```{r, warning=FALSE}
-model_conditional_mean_value <- function(data, selected_variables, mean_method = "linear", poly_degree = NULL, quantiles = 0.5, specific_x = NULL) {
+model_conditional_mean_value <- function(data, selected_variables, mean_method = "linear", quantile_method = "linear", poly_mean_degree = NULL, poly_quant_degree = NULL, quantiles = 0.5, specific_x = NULL) {
   
   if (length(selected_variables) != 2) {
     return(NULL)
@@ -997,12 +997,20 @@ model_conditional_mean_value <- function(data, selected_variables, mean_method =
   response_name <- selected_variables[1]
   predictor_name <- selected_variables[2]
   
-  if (mean_method == "poly" && is.null(poly_degree)) {
-    stop("Pri pouzivani metody 'poly' je potrebne zadat stupen polynomu!")
+  if (mean_method == "poly" && is.null(poly_mean_degree)) {
+    stop("Pri pouziti mean_method = 'poly' je potrebne zadat aj poly_mean_degree!")
   }
   
-  if (mean_method != "poly" && !is.null(poly_degree)) {
-    stop("Stupen polynomu sa zadava iba pri metode 'poly'!")
+  if (!is.null(poly_mean_degree) && mean_method != "poly") {
+    stop("poly_mean_degree sa pouziva iba pri mean_method = 'poly'.")
+  }
+  
+  if (quantile_method == "poly" && is.null(poly_quant_degree)) {
+    stop("Pri pouziti quantile_method = 'poly' je potrebne zadat aj poly_quant_degree!")
+  }
+  
+  if (!is.null(poly_quant_degree) && quantile_method != "poly") {
+    stop("poly_quant_degree sa pouziva iba pri quantile_method = 'poly'.")
   }
   
   variable_types <- identify_variables(data)
@@ -1044,7 +1052,7 @@ model_conditional_mean_value <- function(data, selected_variables, mean_method =
     mean_pred <- predict(lm_fit, newdata = data.frame(predictor = x_seq))
 
   } else if (mean_method == "poly") {
-    poly_fit <- lm(response ~ poly(predictor, degree = poly_degree, raw = TRUE))
+    poly_fit <- lm(response ~ poly(predictor, degree = poly_mean_degree, raw = TRUE))
     mean_pred <- predict(poly_fit, newdata = data.frame(predictor = x_seq))
 
   } else if (mean_method == "exp") {
@@ -1060,7 +1068,20 @@ model_conditional_mean_value <- function(data, selected_variables, mean_method =
   quantile_preds <- list()
 
   for (q in quantiles) {
-    rq_fit <- rq(response ~ predictor, tau = q)
+    
+    if (quantile_method == "linear") {
+      rq_fit <- rq(response ~ predictor, tau = q)
+      
+    } else if (quantile_method == "poly") {
+      rq_fit <- rq(response ~ poly(predictor, degree = poly_quant_degree, raw = TRUE), tau = q)
+      
+    } else if (quantile_method == "spline") {
+      rq_fit <- rq(response ~ ns(predictor, df = 4), tau = q)
+      
+    } else {
+      stop("Neplatna quantile_method! Vyber: 'linear', 'poly', alebo 'spline'.")
+    }
+    
     quantile_preds[[as.character(q)]] <- predict(rq_fit, newdata = data.frame(predictor = x_seq))
   }
 
@@ -1092,7 +1113,20 @@ model_conditional_mean_value <- function(data, selected_variables, mean_method =
   specific_quantiles <- list()
 
   for (q in quantiles) {
-    rq_fit <- rq(response ~ predictor, tau = q)
+    
+    if (quantile_method == "linear") {
+      rq_fit <- rq(response ~ predictor, tau = q)
+      
+    } else if (quantile_method == "poly") {
+      rq_fit <- rq(response ~ poly(predictor, degree = poly_quant_degree, raw = TRUE), tau = q)
+      
+    } else if (quantile_method == "spline") {
+      rq_fit <- rq(response ~ ns(predictor, df = 4), tau = q)
+      
+    } else {
+      stop("Neplatna quantile_method! Vyber: 'linear', 'poly', alebo 'spline'.")
+    }
+    
     specific_quantiles[[as.character(q)]] <- predict(rq_fit, newdata = data.frame(predictor = specific_x))
   }
 
@@ -1117,27 +1151,30 @@ model_conditional_mean_value <- function(data, selected_variables, mean_method =
 
   # Kvantilove krivky
   for (q in quantiles) {
-    p <- p + geom_line(data = plot_data, aes_string(x = "X", y = paste0("Quantile_", q)),
-                       size = 1, linetype = "dashed", color = "red")
+    p <- p + geom_line(
+      data = plot_data,
+      aes_string(x = "X", y = paste0("Quantile_", q)),
+      size = 1, linetype = "dashed", color = "red"
+    )
+  
+    p <- p + geom_point(data = data.frame(specific_x = specific_x, y_val = specific_quantiles[[as.character(q)]]),
+                      mapping = aes(x = specific_x, y = y_val),
+                      color = "red", size = 3)
+
+    q_label <- paste0("Q_", q, "(Y|X=", round(specific_x, 2), ")=", round(specific_quantiles[[as.character(q)]], 2))
+    p <- p + annotate("text", 
+                      x = specific_x, 
+                      y = specific_quantiles[[as.character(q)]],
+                      label = q_label, hjust = -0.1, color = "red")
   }
+  
+  p <- p + geom_point(data = data.frame(specific_x = specific_x, specific_mean = specific_mean),
+                    mapping = aes(x = specific_x, y = specific_mean),
+                    color = "blue", size = 3)
 
-  # Bod pre specific_x
-  p <- p + geom_point(aes(x = specific_x, y = specific_mean), color = "blue", size = 3)
-
-  for (q in quantiles) {
-    p <- p + geom_point(aes(x = specific_x, y = specific_quantiles[[as.character(q)]]), color = "red", size = 3)
-  }
-
-  # Popisky pre specific_x
   label_text <- paste0("E[Y|X=", round(specific_x, 2), "]=", round(specific_mean, 2))
   p <- p + annotate("text", x = specific_x, y = specific_mean,
                     label = label_text, hjust = -0.1, color = "blue")
-
-  for (q in quantiles) {
-    q_label <- paste0("Q_", q, "(Y|X=", round(specific_x, 2), ")=", round(specific_quantiles[[as.character(q)]], 2))
-    p <- p + annotate("text", x = specific_x, y = specific_quantiles[[as.character(q)]],
-                      label = q_label, hjust = -0.1, color = "red")
-  }
 
   return(list(
     plot = p,
@@ -1151,7 +1188,7 @@ model_conditional_mean_value <- function(data, selected_variables, mean_method =
 ```
 
 ```{r, warning=FALSE}
-result <- model_conditional_mean_value(data, c("mpg", "disp"), "poly", 3)
+result <- model_conditional_mean_value(data, c("mpg", "hp"), "poly", "poly", 2, 3, c(0.05, 0.95), 150)
 
 result$plot
 ```
@@ -1159,7 +1196,7 @@ result$plot
 # Finálne výstupy
 ```{r, warning=FALSE}
 printVariables(data)
-model_joint_distribution_density(data, c("mpg", "disp"), "kernel")
+model_joint_distribution_density(data, c("mpg", "disp"), "kernel", TRUE, "empirical", 0.2)
 ```
 
 # Dokumentacia
@@ -1204,6 +1241,14 @@ Jadrove vyhladzovanie
     3. **"spline"** (podobne principu MKP)
   b) Parametricke modely
     1. **"linear"** (linearny regresny model)
-    2. **"poly"** (polynomialny regresny model, zadava sa aj s parametrom poly_degree = 1,2,3,..., pre *poly_degree = 1* dava          *"linear"*)
+    2. **"poly"** (polynomialny regresny model, zadava sa aj s parametrom poly_mean_degree = 1,2,3,..., pre *poly_mean_degree = 1* dava          *"linear"*)
     3. **"exp"** (exponencialny regresny model)
+    
+### Vyber metody pre odhad podmienenej kvantilovej funkcie
+- moznosti su:
+  a) Neparametricke modely
+    1. **"spline"** (podobne principu MKP)
+  b) Parametricke modely
+    1. **"linear"** (linearny regresny model)
+    2. **"poly"** (polynomialny regresny model, zadava sa aj s parametrom poly_quant_degree = 1,2,3,..., pre *poly_quant_degree = 1* dava          *"linear"*)
 
