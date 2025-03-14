@@ -28,8 +28,6 @@ suppressMessages(suppressWarnings({
   library(splines)
 }))
 
-data <- mtcars
-
 ```
 
 # Identifikacia a vypis premennych
@@ -77,10 +75,11 @@ printVariables <- function(data) {
 # Funkcia na modelovanie zdruzenej hustoty 1 spojitej a 1 diskretnej nahodnej premennej
 
 ```{r, warning=FALSE}
-mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, model_type, bw = NULL) {
+mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, model_type, bw) {
   
   # Modelovanie hustoty pouzitim jadroveho vyhladzovania
-  if (model_type == "kernel") {
+   if (model_type == "kernel") {
+
     # Konverzia diskretnej premennej na faktor a zoradenie kategorii
     data[[discrete_vars]] <- factor(data[[discrete_vars]])
     categories <- levels(data[[discrete_vars]])
@@ -88,18 +87,32 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
     # Vytvorenie farebnej mapy pre kategorie
     category_colors <- setNames(RColorBrewer::brewer.pal(length(categories), "Set1"), categories)
 
+    # Vypocet globalneho bw (pre 2D aj 3D)
+    if (is.null(bw)) {
+      global_bw <- bw.nrd0(data[[continuous_vars]])
+    } else {
+      global_bw <- bw
+    }
+
+    # Funkcia na vypocet hustoty pre 3D
     calculate_density_3D <- function(data, category) {
       sub_data <- filter(data, .data[[discrete_vars]] == category)
+
       if (nrow(sub_data) > 1) {
-        if (is.null(bw)){
-          bw <- bw.nrd0(sub_data[[continuous_vars]])
+
+        # Vypocet lokalneho bw pre kazdu kategoriu (ak nie je dane globalne)
+        if (is.null(bw)) {
+          bw_cat <- bw.nrd0(sub_data[[continuous_vars]])
+        } else {
+          bw_cat <- bw
         }
-        kde_x <- density(sub_data[[continuous_vars]], bw = bw)
+
+        kde_x <- density(sub_data[[continuous_vars]], bw = bw_cat)
         kde_x_fun <- approxfun(kde_x$x, kde_x$y, rule = 2)
-    
+
         x <- seq(min(data[[continuous_vars]]), max(data[[continuous_vars]]), length.out = 100)
         x_density <- kde_x_fun(x)
-    
+
         return(data.frame(Weight = x, Density = x_density, Category = category))
       } else {
         return(data.frame(Weight = numeric(0), Density = numeric(0), Category = character(0)))
@@ -110,13 +123,18 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
     density_data <- bind_rows(lapply(categories, function(cat) calculate_density_3D(data, cat)))
 
     # 3D Vizualizacia
-    fig_3d <- plot_ly(density_data, x = ~Weight, y = ~Category, z = ~Density, 
-                       type = 'scatter3d', mode = 'lines', 
-                       color = ~Category, colors = category_colors, line = list(width = 4)) %>%
-              layout(scene = list(xaxis = list(title = continuous_vars),
-                                  yaxis = list(title = discrete_vars),
-                                  zaxis = list(title = 'Hustota')))
-    
+    fig_3d <- plot_ly(
+      density_data,
+      x = ~Weight, y = ~Category, z = ~Density,
+      type = 'scatter3d', mode = 'lines',
+      color = ~Category, colors = category_colors, line = list(width = 4)
+    ) %>%
+      layout(scene = list(
+        xaxis = list(title = continuous_vars),
+        yaxis = list(title = discrete_vars),
+        zaxis = list(title = 'Hustota')
+      ))
+
     # 2D Vizualizacia
     data[[discrete_vars]] <- factor(data[[discrete_vars]], levels = categories)
 
@@ -127,8 +145,12 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
       theme_minimal() +
       theme(legend.position = "right")
 
+    # Prepocet, lebo geom_density() neberie priamo bw
+    reference_bw <- bw.nrd0(data[[continuous_vars]])
+    adjust_factor <- global_bw / reference_bw
+
     x_density <- ggplot(data, aes_string(x = continuous_vars, fill = discrete_vars, color = discrete_vars)) +
-      geom_density(alpha = 0.5) +
+      geom_density(alpha = 0.5, adjust = adjust_factor) +
       scale_fill_manual(values = category_colors) +
       scale_color_manual(values = category_colors) +
       labs(x = NULL, y = paste("Hustota (", continuous_vars, ")", sep = "")) +
@@ -144,8 +166,8 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
       theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "right")
 
     final_plot_2d <- (x_density + plot_spacer()) /
-                    (scatter_plot + y_bar) +
-                    plot_layout(widths = c(4, 1), heights = c(1, 4))
+      (scatter_plot + y_bar) +
+      plot_layout(widths = c(4, 1), heights = c(1, 4))
 
     return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
   }
@@ -526,7 +548,7 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type) {
 ```
 
 ```{r, warning=FALSE}
-continuous_joint_distribution_copula <- function(data, continuous_vars, model_type, copula_type = NULL) {
+continuous_joint_distribution_copula <- function(data, continuous_vars, model_type, copula_type, marginal_density = "dnorm") {
 
   # Modelovanie hustoty pomocou jadroveho vyhladzovania a kopuly (rozklad na marginaly)
   if (model_type == "kernel") {
@@ -648,6 +670,15 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
   y_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
 
   grid <- expand.grid(x = x_vals, y = y_vals)
+  
+  # Funkcia na vypocet marginalnej hustoty podla vyberu
+    marginal_density_function <- function(value, mean, sd) {
+      if (marginal_density == "dnorm") {
+        return(dnorm(value, mean = mean, sd = sd))
+      } else if (marginal_density == "log_dnorm") {
+        return(exp(dnorm(value, mean = mean, sd = sd, log = TRUE)))
+      }
+    }
 
   # Vypocet zdruzenej hustoty cez rozklad na marginaly + kopula
   copula_density_function <- function(x, y) {
@@ -656,8 +687,8 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
 
     copula_part <- dCopula(cbind(u1, u2), copula = copula_model_fitted)
 
-    marginal_x <- dnorm(x, mean = mean_x, sd = sd_x)
-    marginal_y <- dnorm(y, mean = mean_y, sd = sd_y)
+    marginal_x <- marginal_density_function(x, mean_x, sd_x)
+    marginal_y <- marginal_density_function(y, mean_y, sd_y)
 
     copula_part * marginal_x * marginal_y
   }
@@ -937,7 +968,7 @@ discrete_joint_distribution <- function(data, discrete_vars) {
 # Modelovanie združeného rozdelenia pravdepodobnosti (Hustota)
 
 ```{r, warning=FALSE}
-model_joint_distribution_density <- function(data, selected_variables, model_type = NULL, copula = FALSE, copula_type = NULL, bw = NULL) {
+model_joint_distribution_density <- function(data, selected_variables, model_type = NULL, use_copula = FALSE, copula_type = NULL, marginal_density = NULL, bw = NULL) {
   # Identifikacia typov premennych
   variable_types <- identify_variables(data)
   discrete_vars <- intersect(variable_types$Diskretne, selected_variables)
@@ -945,38 +976,47 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
   variables_count <- length(discrete_vars) + length(continuous_vars)
   
   if (length(selected_variables) == 2 && length(continuous_vars) == 0) {
-    if (!is.null(model_type) || copula != FALSE || !is.null(copula_type)) {
-      stop("Argumenty model_type, 'copula' a 'copula_type' sa nepouzivaju pri modelovani dvoch diskretnych premennych.")
+    if (!is.null(model_type) || use_copula != FALSE || !is.null(copula_type) || !is.null(bw)) {
+      stop("Argumenty model_type, 'use_copula', 'copula_type' a 'bw' sa nepouzivaju pri modelovani dvoch diskretnych premennych.")
     }
     result <- discrete_joint_distribution(data, discrete_vars)
     print(result)
   } else if (variables_count > 2) {
-    if (!is.null(model_type) || copula != FALSE || !is.null(copula_type)) {
-      stop("Argumenty model_type, 'copula' a 'copula_type' sa nepouzivaju pri modelovani vacsieho poctu premennych ako 2.")
+    if (!is.null(model_type) || use_copula != FALSE || !is.null(copula_type) || !is.null(bw)) {
+      stop("Argumenty model_type, 'use_copula', 'copula_type' a 'bw' sa nepouzivaju pri modelovani vacsieho poctu premennych ako 2.")
     }
     result <- multi_joint_distribution(data, discrete_vars, continuous_vars)
     print(result)
   } else if (length(selected_variables) == 2 && length(discrete_vars) == 0) {
-    if (copula == FALSE) {
+    if (use_copula == FALSE) {
       if (!is.null(copula_type)) {
-        stop("Argument 'copula_type' mozno pouzit len ked 'copula' = 'TRUE'.")
+        stop("Argument 'copula_type' mozno pouzit len ked 'use_copula' = 'TRUE'.")
       }
       else {
+        if (!is.null(bw)) {
+          stop("Parameter bandwidth ('bw') sa zadava iba pri jadrovom vyhladzovani zmesi.")
+        }
         result <- continuous_joint_distribution(data, continuous_vars, model_type)
         print(result)
       }
     }
     else {
       if (is.null(copula_type)) {
-        stop("Ak je 'copula' = 'TRUE', musi byt specifikovany aj parameter 'copula_type'.")
+        stop("Ak je 'use_copula' = 'TRUE', musi byt specifikovany aj parameter 'copula_type'.")
       }
       else {
+        if (!is.null(bw)) {
+          stop("Parameter bandwidth ('bw') sa zadava iba pri jadrovom vyhladzovani zmesi.")
+        }
+        if (model_type != "normal" && !is.null(marginal_density)){
+          stop("Parameter marginal_density sa zadava iba pri model_type = 'normal' s kopulou")
+        }
         result <- continuous_joint_distribution_copula(data, continuous_vars, model_type, copula_type)
         print(result)
       }
     }
   } else if (length(selected_variables) == 2 && length(discrete_vars) == 1) {
-    if (copula != FALSE || !is.null(copula_type)) {
+    if (use_copula != FALSE || !is.null(copula_type)) {
       stop("Argumenty 'copula' a 'copula_type' sa pouzivaju iba pri modelovani dvoch spojitych premennych.")
     }
     result <- mixture_joint_distribution(data, discrete_vars, continuous_vars, model_type, bw)
@@ -988,7 +1028,7 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
 # Modelovanie podmienenej strednej hodnoty a kvantilovej funkcie (regresia)
 
 ```{r, warning=FALSE}
-model_conditional_mean_value <- function(data, selected_variables, mean_method = "linear", quantile_method = "linear", poly_mean_degree = NULL, poly_quant_degree = NULL, quantiles = 0.5, specific_x = NULL) {
+model_conditional_mean_value <- function(data, selected_variables, mean_method = "linear", poly_mean_degree = NULL, specific_x = NULL) {
   
   if (length(selected_variables) != 2) {
     return(NULL)
@@ -1003,14 +1043,6 @@ model_conditional_mean_value <- function(data, selected_variables, mean_method =
   
   if (!is.null(poly_mean_degree) && mean_method != "poly") {
     stop("poly_mean_degree sa pouziva iba pri mean_method = 'poly'.")
-  }
-  
-  if (quantile_method == "poly" && is.null(poly_quant_degree)) {
-    stop("Pri pouziti quantile_method = 'poly' je potrebne zadat aj poly_quant_degree!")
-  }
-  
-  if (!is.null(poly_quant_degree) && quantile_method != "poly") {
-    stop("poly_quant_degree sa pouziva iba pri quantile_method = 'poly'.")
   }
   
   variable_types <- identify_variables(data)
@@ -1185,6 +1217,30 @@ model_conditional_mean_value <- function(data, selected_variables, mean_method =
 ```
 
 ```{r, warning=FALSE}
+model_conditional_quantile_fun <- function(data, selected_variables, quantile_method = "linear", poly_quant_degree = NULL, quantiles = 0.5) {
+  if (length(selected_variables) != 2) {
+    return(NULL)
+  }
+  
+  response_name <- selected_variables[1]
+  predictor_name <- selected_variables[2]
+  
+  if (quantile_method == "poly" && is.null(poly_quant_degree)) {
+    stop("Pri pouziti quantile_method = 'poly' je potrebne zadat aj poly_quant_degree!")
+  }
+  
+  if (!is.null(poly_quant_degree) && quantile_method != "poly") {
+    stop("poly_quant_degree sa pouziva iba pri quantile_method = 'poly'.")
+  }
+  
+  variable_types <- identify_variables(data)
+  
+  
+}
+```
+
+
+```{r, warning=FALSE}
 result <- model_conditional_mean_value(data, c("carb", "hp"), "poly", "poly", 2, 3, c(0.05, 0.95), 150)
 
 result$plot
@@ -1193,7 +1249,7 @@ result$plot
 # Finálne výstupy
 ```{r, warning=FALSE}
 printVariables(data)
-model_joint_distribution_density(data, c("hp", "carb"), model_type = "normal")
+model_joint_distribution_density(data = mtcars, selected_variables = c("hp", "mpg"), model_type = "normal", use_copula = TRUE, copula_type = "Clayton", marginal_density = "log_dnorm")
 ```
 
 # Dokumentacia
@@ -1251,9 +1307,8 @@ Jadrove vyhladzovanie
     
     
 *Pridat*
-- copula -> use_copula
-- kernel - explicitne zadavat bw aj pre marginalu
-- normal_copula - dat uzivatleovi moznost vyberu pocitania marginalnych hustot (napr. cez pnorm() alebo lognorm atd.)
-- rozdelit funkciu model_conditional_mean_value na dve
-- pridat funkciu na modelovanie klasikacnych metod (logisticka regresia)
+- pridat funkciu na modelovanie klasifikacnych metod (napr. logisticka regresia)
+- model_conditional_mean_value:
+  a) osetrit formatovanie diskretnej premennej ako odozvy (v pripade ze by bolo nespravne. Neciselne hodnoty apod.)
+  b) rozdelit funkciu na dve (pre strednu hodnotu a pre kvantily)
 
