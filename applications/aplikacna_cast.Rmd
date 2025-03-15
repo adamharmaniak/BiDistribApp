@@ -1304,7 +1304,7 @@ combine_conditional_models <- function(data, selected_variables, mean_method = "
 
 
 ```{r}
-result <- combine_conditional_models(data, c("cyl", "mpg"), "poly", "poly", 3, 3, c(0.05, 0.95))
+result <- combine_conditional_models(data, c("carb", "mpg"), "poly", "poly", 3, 3, c(0.05, 0.95))
 
 result$combined_plot
 ```
@@ -1375,6 +1375,69 @@ plot_decision_boundary <- function(data, response_name, predictor_names, model, 
       plot.subtitle = element_text(size = 10)
     )
   
+  return(p)
+}
+
+plot_classification_1D <- function(data, response_name, predictor_name, model, method) {
+
+    if (!is.factor(data[[response_name]])) {
+      data[[response_name]] <- as.factor(data[[response_name]])
+    }
+  
+    grid_x <- seq(min(data[[predictor_name]]), max(data[[predictor_name]]), length.out = 300)
+    grid <- data.frame(x = grid_x)
+    names(grid) <- predictor_name
+
+    # Predikcia na grid
+    if (method == "logistic") {
+  
+      response <- data[[response_name]]
+  
+      if (length(levels(response)) == 2) {
+        probs <- predict(model, newdata = grid, type = "response")
+        grid$pred <- ifelse(probs > 0.5,
+                            levels(response)[2],
+                            levels(response)[1])
+      } else {
+        grid$pred <- predict(model, newdata = grid, type = "class")
+      }
+  
+    } else if (method == "lda") {
+      grid$pred <- predict(model, newdata = grid)$class
+    } else if (method == "qda") {
+      grid$pred <- predict(model, newdata = grid)$class
+    } else if (method == "knn") {
+      grid$pred <- class::knn(
+        train = model$train_data,
+        test = grid,
+        cl = model$train_response,
+        k = model$k
+      )
+    }
+  
+    # Vytvorenie grafu
+    p <- ggplot() +
+      geom_tile(data = grid, aes_string(x = predictor_name, y = "pred", fill = "pred"), alpha = 0.3, height = 0.5) +
+      
+      # Skutočné hodnoty (triedy)
+      geom_point(data = data,
+                 aes_string(x = predictor_name, y = response_name, shape = response_name, color = response_name),
+                 size = 3) +
+  
+      labs(
+        title = paste0("Rozhodovacia hranica pre metódu: ", method),
+        subtitle = paste("Prediktor:", predictor_name, "| Odozva:", response_name),
+        x = paste0(predictor_name, " (Prediktor)"),
+        y = paste0(response_name, " (Trieda)"),
+        fill = "Predikcia modelu"
+      ) +
+      
+      theme_minimal() +
+      theme(
+        plot.title = element_text(size = 14, face = "bold"),
+        plot.subtitle = element_text(size = 10)
+      )
+
   return(p)
 }
 
@@ -1525,9 +1588,16 @@ classification_model <- function(data, response_name, predictor_names, method = 
     accuracy = accuracy,
     confusion_matrix = confusion_mat
   )
+  
+  if (length(predictor_names) == 1) {
 
-  # Ak su len 2 prediktory => graf rozhodovacich hranic
-  if (length(predictor_names) == 2) {
+    result$decision_plot <- plot_classification_1D(
+      data, response_name, predictor_names[1], model, method
+    )
+
+  } else if (length(predictor_names) == 2) {
+    # Ak su len 2 prediktory => graf rozhodovacich hranic
+
     result$decision_plot <- plot_decision_boundary(
       data, response_name, predictor_names, model, method
     )
@@ -1539,7 +1609,7 @@ classification_model <- function(data, response_name, predictor_names, method = 
 ```
 
 ```{r}
-result <- classification_model(data = mtcars, response_name = "carb", predictor_names = c("hp", "mpg"), method = "logistic")
+result <- classification_model(data = mtcars, response_name = "carb", predictor_names = c("mpg", "hp"), method = "logistic")
 
 result$accuracy
 result$confusion_matrix
