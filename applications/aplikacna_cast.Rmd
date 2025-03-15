@@ -1842,3 +1842,14 @@ method:
   - *"lda"* - linearna diskriminacna analyza
   - *"qda"* - kvadraticka diskriminacna analyza
   - *"knn"* - metoda k-najblizsich susedov
+  
+*Pridat*
+Podarilo sa:
+  - copula -> use_copula
+  - kernel - explicitne zadavat bw aj pre marginalu
+  - normal_copula - dat uzivatelovi moznost vyberu pocitania marginalnych hustot (napr. cez dnorm() alebo lognorm atd.)
+  - rozdelit funkciu model_conditional_mean_value na dve
+  - pridat funkciu na modelovanie klasikacnych metod (napr. logisticka regresia)
+  - vyriesit normovanie plochy pod hustotou pre mix premennych na sucet = 1
+Zatial sa nepodarilo:
+  - modelovanie podmienenej hustoty pravdepodobnosti
