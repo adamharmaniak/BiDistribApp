@@ -77,52 +77,76 @@ printVariables <- function(data) {
 
 ```{r, warning=FALSE}
 mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, model_type, bw) {
+  category_probs <- prop.table(table(data[[discrete_vars]]))
   
   # Modelovanie hustoty pouzitim jadroveho vyhladzovania
-   if (model_type == "kernel") {
+  if (model_type == "kernel") {
 
     # Konverzia diskretnej premennej na faktor a zoradenie kategorii
     data[[discrete_vars]] <- factor(data[[discrete_vars]])
     categories <- levels(data[[discrete_vars]])
-
+  
     # Vytvorenie farebnej mapy pre kategorie
     category_colors <- setNames(RColorBrewer::brewer.pal(length(categories), "Set1"), categories)
-
+  
+    # Vypocet pravdepodobnosti pre kazdu kategoriu (váhy v zmesi)
+    category_probs <- prop.table(table(data[[discrete_vars]]))
+  
     # Vypocet globalneho bw (pre 2D aj 3D)
     if (is.null(bw)) {
       global_bw <- bw.nrd0(data[[continuous_vars]])
     } else {
       global_bw <- bw
     }
-
-    # Funkcia na vypocet hustoty pre 3D
+  
+    # Funkcia na vypocet hustoty pre 3D s normovanim podľa vahy triedy
     calculate_density_3D <- function(data, category) {
       sub_data <- filter(data, .data[[discrete_vars]] == category)
-
+  
       if (nrow(sub_data) > 1) {
-
+  
         # Vypocet lokalneho bw pre kazdu kategoriu (ak nie je dane globalne)
         if (is.null(bw)) {
           bw_cat <- bw.nrd0(sub_data[[continuous_vars]])
         } else {
           bw_cat <- bw
         }
-
+  
         kde_x <- density(sub_data[[continuous_vars]], bw = bw_cat)
         kde_x_fun <- approxfun(kde_x$x, kde_x$y, rule = 2)
-
+  
         x <- seq(min(data[[continuous_vars]]), max(data[[continuous_vars]]), length.out = 100)
         x_density <- kde_x_fun(x)
-
-        return(data.frame(Weight = x, Density = x_density, Category = category))
+  
+        # Normovanie hustoty podla pravdepodobnosti kategorie
+        weighted_density <- x_density * category_probs[[category]]
+  
+        return(data.frame(Weight = x, Density = weighted_density, Category = category))
       } else {
         return(data.frame(Weight = numeric(0), Density = numeric(0), Category = character(0)))
       }
     }
-
+  
     # Spojenie hustot pre vsetky kategorie
     density_data <- bind_rows(lapply(categories, function(cat) calculate_density_3D(data, cat)))
-
+  
+    # Celkove overenie suctu plochy pod hustotou
+    # Trapezove pravidlo na vypocet integralu pre kazdu kategoriu
+    integral_check <- sapply(categories, function(cat) {
+      sub_density <- filter(density_data, Category == cat)
+      if (nrow(sub_density) > 1) {
+        dx <- diff(sub_density$Weight)[1]
+        sum(sub_density$Density) * dx
+      } else {
+        0
+      }
+    })
+  
+    # Sucet plosnych integralov
+    total_integral <- sum(integral_check)
+  
+    message("Kontrola normovania zmesi hustoty: Celkovy integral = ", round(total_integral, 4))
+  
     # 3D Vizualizacia
     fig_3d <- plot_ly(
       density_data,
@@ -135,21 +159,21 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
         yaxis = list(title = discrete_vars),
         zaxis = list(title = 'Hustota')
       ))
-
+  
     # 2D Vizualizacia
     data[[discrete_vars]] <- factor(data[[discrete_vars]], levels = categories)
-
+  
     scatter_plot <- ggplot(data, aes_string(x = continuous_vars, y = discrete_vars, color = discrete_vars)) +
       geom_point(size = 3, alpha = 0.7) +
       labs(x = continuous_vars, y = discrete_vars) +
       scale_color_manual(values = category_colors) +
       theme_minimal() +
       theme(legend.position = "right")
-
+  
     # Prepocet, lebo geom_density() neberie priamo bw
     reference_bw <- bw.nrd0(data[[continuous_vars]])
     adjust_factor <- global_bw / reference_bw
-
+  
     x_density <- ggplot(data, aes_string(x = continuous_vars, fill = discrete_vars, color = discrete_vars)) +
       geom_density(alpha = 0.5, adjust = adjust_factor) +
       scale_fill_manual(values = category_colors) +
@@ -157,7 +181,7 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
       labs(x = NULL, y = paste("Hustota (", continuous_vars, ")", sep = "")) +
       theme_minimal() +
       theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "right")
-
+  
     y_bar <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
       geom_bar(alpha = 0.7) +
       coord_flip() +
@@ -165,12 +189,17 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
       labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
       theme_minimal() +
       theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "right")
-
+  
     final_plot_2d <- (x_density + plot_spacer()) /
       (scatter_plot + y_bar) +
       plot_layout(widths = c(4, 1), heights = c(1, 4))
-
-    return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
+  
+    return(list(
+      fig_3d = fig_3d,
+      final_plot_2d = final_plot_2d,
+      total_integral = total_integral,
+      integral_per_category = integral_check
+    ))
   }
   
   # Modelovanie hustoty ako hustoty normalneho rozdelenia (dnorm)
@@ -969,7 +998,7 @@ discrete_joint_distribution <- function(data, discrete_vars) {
 # Modelovanie združeného rozdelenia pravdepodobnosti (Hustota)
 
 ```{r, warning=FALSE}
-model_joint_distribution_density <- function(data, selected_variables, model_type = NULL, use_copula = FALSE, copula_type = NULL, marginal_density = NULL, bw = NULL) {
+model_joint_distribution_density <- function(data, selected_variables, model_type = NULL, bw = NULL, use_copula = FALSE, copula_type = NULL, marginal_density = NULL) {
   # Identifikacia typov premennych
   variable_types <- identify_variables(data)
   discrete_vars <- intersect(variable_types$Diskretne, selected_variables)
@@ -1620,7 +1649,7 @@ result$decision_plot
 # Finálne výstupy
 ```{r, warning=FALSE}
 printVariables(data)
-model_joint_distribution_density(data = mtcars, selected_variables = c("hp", "mpg"), model_type = "normal", use_copula = TRUE, copula_type = "Clayton", marginal_density = "log_dnorm")
+model_joint_distribution_density(data = mtcars, selected_variables = c("carb", "mpg"), model_type = "kernel", bw = 1.2)
 ```
 
 # Dokumentacia
@@ -1651,6 +1680,7 @@ Jadrove vyhladzovanie
 
 ### Premenne typu 'Odozva' a 'Prediktor'
 - na vstup sa posielaju vzdy dve premenne vo forme c("Odozva", "Prediktor")
+- "Prediktor" musi byt spojita premenna
 
 ### Kvantily na vykreslenie
 - moze byt jeden a viac
@@ -1679,7 +1709,7 @@ Jadrove vyhladzovanie
 
 ## Co dosadit za parametre do classification_model()
 response_name - nazov premennej (odozvy), napr. "carb" (DISKRETNA)
-predictor_names - nazvy premennych prediktorov, napr. c("hp", "cyl", ...)
+predictor_names - nazvy premennych prediktorov, napr. c("hp", "cyl", ...) alebo iba jeden "hp"
 
 ### Vyber klasifikacnej metody
 method:
