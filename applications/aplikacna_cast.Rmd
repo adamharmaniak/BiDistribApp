@@ -1025,95 +1025,96 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
 }
 ```
 
-# Modelovanie podmienenej strednej hodnoty a kvantilovej funkcie (regresia)
+# Modelovanie podmienenej strednej hodnoty a kvantilových funkcie (regresia)
 
 ```{r, warning=FALSE}
-model_conditional_mean_value <- function(data, selected_variables, mean_method = "linear", poly_mean_degree = NULL, specific_x = NULL) {
-  
-  if (length(selected_variables) != 2) {
-    return(NULL)
-  }
-  
+model_conditional_mean <- function(data, selected_variables, mean_method = "linear", poly_mean_degree = NULL, specific_x = NULL) {
   response_name <- selected_variables[1]
   predictor_name <- selected_variables[2]
-  
-  if (mean_method == "poly" && is.null(poly_mean_degree)) {
-    stop("Pri pouziti mean_method = 'poly' je potrebne zadat aj poly_mean_degree!")
-  }
-  
-  if (!is.null(poly_mean_degree) && mean_method != "poly") {
-    stop("poly_mean_degree sa pouziva iba pri mean_method = 'poly'.")
-  }
-  
+
   variable_types <- identify_variables(data)
-
-  if (!(response_name %in% colnames(data))) {
-    stop(paste("Premenna", response_name, "nie je v datach!"))
-  }
-
-  if (!(predictor_name %in% colnames(data))) {
-    stop(paste("Premenna", predictor_name, "nie je v datach!"))
-  }
-
-  if (!(response_name %in% c(variable_types$Spojite, variable_types$Diskretne))) {
-    stop(paste("Premenna", response_name, "nie je rozpoznana ako spojita ani diskretna."))
-  }
-
-  if (!(predictor_name %in% variable_types$Spojite)) {
-    stop(paste("Prediktor", predictor_name, "musi byt spojita premenna!"))
-  }
 
   response <- data[[response_name]]
   predictor <- data[[predictor_name]]
 
-  # X sekvencia pre predikcie
   x_seq <- seq(min(predictor), max(predictor), length.out = 200)
 
-  # Odhad podmienenej strednej hodnoty E[Y|X] podla metody
+  # Fitovanie modelu pre E[Y|X]
   if (mean_method == "loess") {
-    loess_fit <- loess(response ~ predictor, span = 0.75)
-    mean_pred <- predict(loess_fit, newdata = data.frame(predictor = x_seq))
+    fit <- loess(response ~ predictor, span = 0.75)
   } else if (mean_method == "gam") {
-    gam_fit <- gam(response ~ s(predictor))
-    mean_pred <- predict(gam_fit, newdata = data.frame(predictor = x_seq))
+    fit <- gam(response ~ s(predictor))
   } else if (mean_method == "spline") {
-    spline_fit <- lm(response ~ bs(predictor, df = 5))
-    mean_pred <- predict(spline_fit, newdata = data.frame(predictor = x_seq))
+    fit <- lm(response ~ bs(predictor, df = 5))
   } else if (mean_method == "linear") {
-    lm_fit <- lm(response ~ predictor)
-    mean_pred <- predict(lm_fit, newdata = data.frame(predictor = x_seq))
-
+    fit <- lm(response ~ predictor)
   } else if (mean_method == "poly") {
-    poly_fit <- lm(response ~ poly(predictor, degree = poly_mean_degree, raw = TRUE))
-    mean_pred <- predict(poly_fit, newdata = data.frame(predictor = x_seq))
-
+    fit <- lm(response ~ poly(predictor, degree = poly_mean_degree, raw = TRUE))
   } else if (mean_method == "exp") {
-    nls_fit <- nls(response ~ a * exp(b * predictor), 
-                   start = list(a = 1, b = 0.01))
-    mean_pred <- predict(nls_fit, newdata = data.frame(predictor = x_seq))
-
+    fit <- nls(response ~ a * exp(b * predictor), start = list(a = 1, b = 0.01))
   } else {
-    stop("Neplatna metoda mean_method! Vyber: 'loess', 'gam', 'spline', 'linear', 'poly', alebo 'exp'.")
+    stop("Neplatný mean_method!")
   }
 
-  # Odhad podmienenej kvantilovej funkcie pre viac kvantilov
+  mean_pred <- predict(fit, newdata = data.frame(predictor = x_seq))
+
+  # Konkrétny bod na x
+  if (is.null(specific_x)) {
+    specific_x <- median(predictor, na.rm = TRUE)
+  }
+  specific_mean <- predict(fit, newdata = data.frame(predictor = specific_x))
+
+  # Vizualizácia
+  p <- ggplot(data, aes_string(x = predictor_name, y = response_name)) +
+    geom_point(alpha = 0.4, color = "darkgreen") +
+    geom_line(aes(x = x_seq, y = mean_pred), color = "blue", size = 1.2) +
+    geom_point(aes(x = specific_x, y = specific_mean), color = "blue", size = 3) +
+    annotate("text", x = specific_x, y = specific_mean,
+             label = paste0("E[Y|X=", round(specific_x, 2), "]=", round(specific_mean, 2)),
+             hjust = -0.1, color = "blue") +
+    labs(
+      title = "Podmienená stredná hodnota",
+      x = paste0(predictor_name, " (Prediktor)"),
+      y = paste0(response_name, " (Odozva)")
+    ) +
+    theme_minimal()
+
+  return(list(
+    plot = p,
+    conditional_mean = data.frame(X = x_seq, E_Y_given_X = mean_pred),
+    specific_x = specific_x,
+    specific_mean = specific_mean
+  ))
+}
+```
+
+```{r, warning=FALSE}
+model_conditional_quantiles <- function(data, selected_variables, quantile_method = "linear", poly_quant_degree = NULL, quantiles = 0.5, specific_x = NULL) {
+
+  response_name <- selected_variables[1]
+  predictor_name <- selected_variables[2]
+
+  variable_types <- identify_variables(data)
+
+  response <- data[[response_name]]
+  predictor <- data[[predictor_name]]
+
+  x_seq <- seq(min(predictor), max(predictor), length.out = 200)
+
+  # Vypocet kvantilov
   quantile_preds <- list()
 
   for (q in quantiles) {
-    
     if (quantile_method == "linear") {
       rq_fit <- rq(response ~ predictor, tau = q)
-      
     } else if (quantile_method == "poly") {
       rq_fit <- rq(response ~ poly(predictor, degree = poly_quant_degree, raw = TRUE), tau = q)
-      
     } else if (quantile_method == "spline") {
       rq_fit <- rq(response ~ ns(predictor, df = 4), tau = q)
-      
     } else {
-      stop("Neplatna quantile_method! Vyber: 'linear', 'poly', alebo 'spline'.")
+      stop("Neplatný quantile_method!")
     }
-    
+
     quantile_preds[[as.character(q)]] <- predict(rq_fit, newdata = data.frame(predictor = x_seq))
   }
 
@@ -1121,59 +1122,138 @@ model_conditional_mean_value <- function(data, selected_variables, mean_method =
     specific_x <- median(predictor, na.rm = TRUE)
   }
 
-  # Predikcia pre konkretny bod X podla mean_method
-  # Neparametricke modely
-  if (mean_method == "loess") {
-    specific_mean <- predict(loess_fit, newdata = data.frame(predictor = specific_x))
-  } else if (mean_method == "gam") {
-    specific_mean <- predict(gam_fit, newdata = data.frame(predictor = specific_x))
-  } else if (mean_method == "spline") {
-    specific_mean <- predict(spline_fit, newdata = data.frame(predictor = specific_x))
-  } 
-  # Parametricke modely
-    else if (mean_method == "linear") {
-    specific_mean <- predict(lm_fit, newdata = data.frame(predictor = specific_x))
-
-  } else if (mean_method == "poly") {
-    specific_mean <- predict(poly_fit, newdata = data.frame(predictor = specific_x))
-
-  } else if (mean_method == "exp") {
-    specific_mean <- predict(nls_fit, newdata = data.frame(predictor = specific_x))
-  }
-
-  # Kvantily pre konkretne X
+  # Konkretne kvantily pre specific_x
   specific_quantiles <- list()
 
   for (q in quantiles) {
-    
     if (quantile_method == "linear") {
       rq_fit <- rq(response ~ predictor, tau = q)
-      
     } else if (quantile_method == "poly") {
       rq_fit <- rq(response ~ poly(predictor, degree = poly_quant_degree, raw = TRUE), tau = q)
-      
     } else if (quantile_method == "spline") {
       rq_fit <- rq(response ~ ns(predictor, df = 4), tau = q)
-      
-    } else {
-      stop("Neplatna quantile_method! Vyber: 'linear', 'poly', alebo 'spline'.")
     }
-    
+
     specific_quantiles[[as.character(q)]] <- predict(rq_fit, newdata = data.frame(predictor = specific_x))
   }
 
-  plot_data <- data.frame(
-    X = x_seq,
-    Mean = mean_pred
-  )
-
+  plot_data <- data.frame(X = x_seq)
   for (q in quantiles) {
     plot_data[[paste0("Quantile_", q)]] <- quantile_preds[[as.character(q)]]
   }
 
+  # Vizualizacia
   p <- ggplot(data, aes_string(x = predictor_name, y = response_name)) +
     geom_point(alpha = 0.4, color = "darkgreen") +
-    geom_line(data = plot_data, aes(x = X, y = Mean), color = "blue", size = 1.2, linetype = "solid") +
+    labs(
+      title = "Podmienené kvantilové funkcie",
+      x = paste0(predictor_name, " (Prediktor)"),
+      y = paste0(response_name, " (Odozva)")
+    ) +
+    theme_minimal()
+
+  for (q in quantiles) {
+    p <- p + geom_line(
+      data = plot_data,
+      aes_string(x = "X", y = paste0("Quantile_", q)),
+      size = 1,
+      linetype = "dashed",
+      color = "red"
+    )
+
+    p <- p + geom_point(data = data.frame(specific_x = specific_x, y_val = specific_quantiles[[as.character(q)]]),
+                        mapping = aes(x = specific_x, y = y_val),
+                        color = "red", size = 3)
+
+    q_label <- paste0("Q_", q, "(Y|X=", round(specific_x, 2), ")=", round(specific_quantiles[[as.character(q)]], 2))
+    p <- p + annotate("text", x = specific_x, y = specific_quantiles[[as.character(q)]],
+                      label = q_label, hjust = -0.1, color = "red")
+  }
+
+  return(list(
+    plot = p,
+    conditional_quantiles = dplyr::select(plot_data, X, dplyr::starts_with("Quantile_")),
+    specific_x = specific_x,
+    specific_quantiles = specific_quantiles
+  ))
+}
+```
+
+```{r, warning=FALSE}
+combine_conditional_models <- function(data, selected_variables, mean_method = "linear", quantile_method = "linear", poly_mean_degree = NULL, poly_quant_degree = NULL, quantiles = 0.5, specific_x = NULL) {
+  if (length(selected_variables) != 2) {
+    stop("Zadavaju sa dve premenne: odozva a prediktor.")
+  }
+
+  response_name <- selected_variables[1]
+  predictor_name <- selected_variables[2]
+
+  if (mean_method == "poly" && is.null(poly_mean_degree)) {
+    stop("Pri mean_method = 'poly' je treba zadat aj poly_mean_degree.")
+  }
+
+  if (!is.null(poly_mean_degree) && mean_method != "poly") {
+    stop("poly_mean_degree sa pouziva iba pri mean_method = 'poly'.")
+  }
+
+  if (quantile_method == "poly" && is.null(poly_quant_degree)) {
+    stop("Pri quantile_method = 'poly' je treba zadat poly_quant_degree.")
+  }
+
+  if (!is.null(poly_quant_degree) && quantile_method != "poly") {
+    stop("poly_quant_degree sa pouziva iba pri quantile_method = 'poly'.")
+  }
+
+  variable_types <- identify_variables(data)
+
+  if (!(response_name %in% colnames(data))) {
+    stop(paste("Premenna", response_name, "nie je v datach."))
+  }
+
+  if (!(predictor_name %in% colnames(data))) {
+    stop(paste("Premenna", predictor_name, "nie je v datach."))
+  }
+
+  if (!(response_name %in% c(variable_types$Spojite, variable_types$Diskretne))) {
+    stop(paste("Premenna", response_name, "nie je rozpoznana ako spojita alebo diskretna."))
+  }
+
+  if (!(predictor_name %in% variable_types$Spojite)) {
+    stop(paste("Prediktor", predictor_name, "musi byt spojita premenna."))
+  }
+
+  # Podmienena stredna hodnota
+  mean_result <- model_conditional_mean(
+    data = data,
+    selected_variables = selected_variables,
+    mean_method = mean_method,
+    poly_mean_degree = poly_mean_degree,
+    specific_x = specific_x
+  )
+
+  # Podmienene kvantilove funkcie
+  quantile_result <- model_conditional_quantiles(
+    data = data,
+    selected_variables = selected_variables,
+    quantile_method = quantile_method,
+    poly_quant_degree = poly_quant_degree,
+    quantiles = quantiles,
+    specific_x = specific_x
+  )
+
+  # --- Spajanie grafov do jedneho ---
+  p <- ggplot(data, aes_string(x = predictor_name, y = response_name)) +
+    geom_point(alpha = 0.4, color = "darkgreen") +
+    geom_line(data = mean_result$conditional_mean, aes(x = X, y = E_Y_given_X),
+              color = "blue", size = 1.2, linetype = "solid") +
+    geom_point(data = data.frame(specific_x = mean_result$specific_x, specific_mean = mean_result$specific_mean),
+               mapping = aes(x = specific_x, y = specific_mean),
+               color = "blue", size = 3) +
+    annotate("text",
+             x = mean_result$specific_x,
+             y = mean_result$specific_mean,
+             label = paste0("E[Y|X=", round(mean_result$specific_x, 2), "]=", round(mean_result$specific_mean, 2)),
+             hjust = -0.1, color = "blue") +
     labs(
       title = "Podmienená stredná hodnota a vybrané kvantilové funkcie",
       x = paste0(predictor_name, " (Prediktor)"),
@@ -1181,69 +1261,43 @@ model_conditional_mean_value <- function(data, selected_variables, mean_method =
     ) +
     theme_minimal()
 
-  # Kvantilove krivky
   for (q in quantiles) {
+    quant_data <- quantile_result$conditional_quantiles
+    col_name <- paste0("Quantile_", q)
+
     p <- p + geom_line(
-      data = plot_data,
-      aes_string(x = "X", y = paste0("Quantile_", q)),
-      size = 1, linetype = "dashed", color = "red"
+      data = quant_data,
+      aes_string(x = "X", y = col_name),
+      size = 1,
+      linetype = "dashed",
+      color = "red"
     )
-  
-    p <- p + geom_point(data = data.frame(specific_x = specific_x, y_val = specific_quantiles[[as.character(q)]]),
-                      mapping = aes(x = specific_x, y = y_val),
-                      color = "red", size = 3)
 
-    q_label <- paste0("Q_", q, "(Y|X=", round(specific_x, 2), ")=", round(specific_quantiles[[as.character(q)]], 2))
-    p <- p + annotate("text", 
-                      x = specific_x, 
-                      y = specific_quantiles[[as.character(q)]],
-                      label = q_label, hjust = -0.1, color = "red")
+    p <- p + geom_point(data = data.frame(specific_x = quantile_result$specific_x,
+                                          y_val = quantile_result$specific_quantiles[[as.character(q)]]),
+                        mapping = aes(x = specific_x, y = y_val),
+                        color = "red", size = 3)
+
+    p <- p + annotate("text",
+                      x = quantile_result$specific_x,
+                      y = quantile_result$specific_quantiles[[as.character(q)]],
+                      label = paste0("Q_", q, "(Y|X=", round(quantile_result$specific_x, 2), ")=", round(quantile_result$specific_quantiles[[as.character(q)]], 2)),
+                      hjust = -0.1, color = "red")
   }
-  
-  p <- p + geom_point(data = data.frame(specific_x = specific_x, specific_mean = specific_mean),
-                    mapping = aes(x = specific_x, y = specific_mean),
-                    color = "blue", size = 3)
-
-  label_text <- paste0("E[Y|X=", round(specific_x, 2), "]=", round(specific_mean, 2))
-  p <- p + annotate("text", x = specific_x, y = specific_mean,
-                    label = label_text, hjust = -0.1, color = "blue")
 
   return(list(
-    plot = p,
-    conditional_mean = data.frame(X = x_seq, E_Y_given_X = mean_pred),
-    conditional_quantiles = dplyr::select(plot_data, X, dplyr::starts_with("Quantile_"))
+    combined_plot = p,
+    mean_result = mean_result,
+    quantile_result = quantile_result
   ))
 }
 ```
 
-```{r, warning=FALSE}
-model_conditional_quantile_fun <- function(data, selected_variables, quantile_method = "linear", poly_quant_degree = NULL, quantiles = 0.5) {
-  if (length(selected_variables) != 2) {
-    return(NULL)
-  }
-  
-  response_name <- selected_variables[1]
-  predictor_name <- selected_variables[2]
-  
-  if (quantile_method == "poly" && is.null(poly_quant_degree)) {
-    stop("Pri pouziti quantile_method = 'poly' je potrebne zadat aj poly_quant_degree!")
-  }
-  
-  if (!is.null(poly_quant_degree) && quantile_method != "poly") {
-    stop("poly_quant_degree sa pouziva iba pri quantile_method = 'poly'.")
-  }
-  
-  variable_types <- identify_variables(data)
-  
-  
-}
-```
-
 
 ```{r, warning=FALSE}
-result <- model_conditional_mean_value(data, c("carb", "hp"), "poly", "poly", 2, 3, c(0.05, 0.95), 150)
+result <- combine_conditional_models(data, c("carb", "hp"), "poly", "poly", 2, 3, c(0.05, 0.95), 150)
 
-result$plot
+result$combined_plot
 ```
 
 # Finálne výstupy
