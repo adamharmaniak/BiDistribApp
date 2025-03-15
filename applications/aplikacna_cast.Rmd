@@ -26,6 +26,7 @@ suppressMessages(suppressWarnings({
   library(mvtnorm)
   library(quantreg)
   library(splines)
+  library(nnet)
 }))
 
 ```
@@ -1025,7 +1026,7 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
 }
 ```
 
-# Modelovanie podmienenej strednej hodnoty a kvantilových funkcie (regresia)
+# Modelovanie podmienenej strednej hodnoty a vybraných kvantilových funkcií (regresia)
 
 ```{r, warning=FALSE}
 model_conditional_mean <- function(data, selected_variables, mean_method = "linear", poly_mean_degree = NULL, specific_x = NULL) {
@@ -1179,7 +1180,7 @@ model_conditional_quantiles <- function(data, selected_variables, quantile_metho
 }
 ```
 
-```{r, warning=FALSE}
+```{r}
 combine_conditional_models <- function(data, selected_variables, mean_method = "linear", quantile_method = "linear", poly_mean_degree = NULL, poly_quant_degree = NULL, quantiles = 0.5, specific_x = NULL) {
   if (length(selected_variables) != 2) {
     stop("Zadavaju sa dve premenne: odozva a prediktor.")
@@ -1222,7 +1223,20 @@ combine_conditional_models <- function(data, selected_variables, mean_method = "
     stop(paste("Prediktor", predictor_name, "musi byt spojita premenna."))
   }
 
-  # Podmienena stredna hodnota
+  if (response_name %in% variable_types$Diskretne) {
+
+    # Ak je odozva typu faktor alebo character => pretypovanie na cislo
+    if (is.factor(data[[response_name]])) {
+      message(paste("Premenna", response_name, "je faktor. Pretypovanie na cislo."))
+      data[[response_name]] <- as.numeric(data[[response_name]])
+    }
+
+    if (is.character(data[[response_name]])) {
+      message(paste("Premenna", response_name, "je character. Pretypovanie na cislo."))
+      data[[response_name]] <- as.numeric(as.factor(data[[response_name]]))
+    }
+  }
+
   mean_result <- model_conditional_mean(
     data = data,
     selected_variables = selected_variables,
@@ -1231,7 +1245,6 @@ combine_conditional_models <- function(data, selected_variables, mean_method = "
     specific_x = specific_x
   )
 
-  # Podmienene kvantilove funkcie
   quantile_result <- model_conditional_quantiles(
     data = data,
     selected_variables = selected_variables,
@@ -1241,7 +1254,6 @@ combine_conditional_models <- function(data, selected_variables, mean_method = "
     specific_x = specific_x
   )
 
-  # --- Spajanie grafov do jedneho ---
   p <- ggplot(data, aes_string(x = predictor_name, y = response_name)) +
     geom_point(alpha = 0.4, color = "darkgreen") +
     geom_line(data = mean_result$conditional_mean, aes(x = X, y = E_Y_given_X),
@@ -1273,6 +1285,7 @@ combine_conditional_models <- function(data, selected_variables, mean_method = "
       color = "red"
     )
 
+    # Bod na konkretnom specific_x
     p <- p + geom_point(data = data.frame(specific_x = quantile_result$specific_x,
                                           y_val = quantile_result$specific_quantiles[[as.character(q)]]),
                         mapping = aes(x = specific_x, y = y_val),
@@ -1294,11 +1307,240 @@ combine_conditional_models <- function(data, selected_variables, mean_method = "
 ```
 
 
-```{r, warning=FALSE}
-result <- combine_conditional_models(data, c("carb", "hp"), "poly", "poly", 2, 3, c(0.05, 0.95), 150)
+```{r}
+df <- mtcars
+df$cyl <- as.factor(df$cyl)
+result <- combine_conditional_models(data, c("cyl", "mpg"), "poly", "poly", 3, 3, c(0.05, 0.95))
 
 result$combined_plot
 ```
+
+# Modelovanie predikčných modelov pre diskrétne premenné (klasifikačné metódy)
+```{r}
+plot_decision_boundary <- function(data, response_name, predictor_names, model, method) {
+  
+  if (!is.factor(data[[response_name]])) {
+    data[[response_name]] <- as.factor(data[[response_name]])
+  }
+  
+  # Grid pre vizualizaciu rozhodovacich hranic
+  x_seq <- seq(min(data[[predictor_names[1]]]), max(data[[predictor_names[1]]]), length.out = 200)
+  y_seq <- seq(min(data[[predictor_names[2]]]), max(data[[predictor_names[2]]]), length.out = 200)
+  
+  grid <- expand.grid(X1 = x_seq, X2 = y_seq)
+  names(grid) <- predictor_names
+  
+  # Predikcia modelu na grid
+  if (method == "logistic") {
+    response <- data[[response_name]]
+
+    if (length(levels(as.factor(response))) == 2) {
+      # Binarna logisticka regresia
+      probs <- predict(model, newdata = grid, type = "response")
+      grid$pred <- ifelse(probs > 0.5,
+                          levels(as.factor(response))[2],
+                          levels(as.factor(response))[1])
+    } else {
+      # Multinomicka logisticka regresia
+      grid$pred <- predict(model, newdata = grid, type = "class")
+    }
+    
+  } else if (method == "lda") {
+    grid$pred <- predict(model, newdata = grid)$class
+  } else if (method == "qda") {
+    grid$pred <- predict(model, newdata = grid)$class
+  } else if (method == "knn") {
+    grid$pred <- class::knn(
+      train = model$train_data,
+      test = grid,
+      cl = model$train_response,
+      k = model$k
+    )
+  }
+  
+  p <- ggplot() +
+    # Rozhodovacie oblasti (predikcie modelu)
+    geom_tile(data = grid, aes_string(x = predictor_names[1], y = predictor_names[2], fill = "pred"), alpha = 0.3) +
+    
+    # Skutocne data (odozvy)
+    geom_point(data = data, aes_string(x = predictor_names[1], y = predictor_names[2], color = response_name, shape = response_name), size = 3) +
+    
+    labs(
+      title = paste0("Rozhodovacia hranica pre metódu: ", method),
+      subtitle = paste("Prediktory:", paste(predictor_names, collapse = " a "), "| Odozva:", response_name),
+      x = paste0(predictor_names[1], " (Prediktor)"),
+      y = paste0(predictor_names[2], " (Prediktor)"),
+      fill = "Predikcia modelu",
+      color = "Skutočná odozva",
+      shape = "Skutočná odozva"
+    ) +
+    
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 14, face = "bold"),
+      plot.subtitle = element_text(size = 10)
+    )
+  
+  return(p)
+}
+
+classification_model <- function(data, response_name, predictor_names, method = "logistic", k = NULL) {
+
+  if (!(response_name %in% colnames(data))) {
+    stop(paste("Premenná", response_name, "nie je v dátach!"))
+  }
+
+  predictors_exist <- predictor_names %in% colnames(data)
+  if (!all(predictors_exist)) {
+    stop(paste("Tieto prediktory chybaju v datach:", paste(predictor_names[!predictors_exist], collapse = ", ")))
+  }
+
+  response <- data[[response_name]]
+  
+  if (is.numeric(response) && length(unique(response)) == 2) {
+    message("Konvertovanie ciselnej odozvy na faktor.")
+    response <- as.factor(response)
+    data[[response_name]] <- response
+  }
+  
+  # Osetrenie kategorii s malym poctom pozorovani pre QDA
+  if (method == "qda") {
+    class_sizes <- table(response)
+    too_small_classes <- names(class_sizes[class_sizes < 4])
+
+    if (length(too_small_classes) > 0) {
+      warning(paste("Tieto triedy maju menej ako 4 pozorovania a budu odstranene:", paste(too_small_classes, collapse = ", ")))
+
+      data <- data[!(response %in% too_small_classes), ]
+      response <- data[[response_name]]
+    }
+  }
+
+  # Zostavenie formuly pre modelovanie
+  formula_str <- paste(response_name, "~", paste(predictor_names, collapse = " + "))
+  formula <- as.formula(formula_str)
+
+  # Trenovanie modelu
+  if (method == "logistic") { # logisticka regresia
+
+    if (length(levels(response)) == 2) {
+      # Klasicka binarna logisticka regresia
+      model <- glm(formula, data = data, family = binomial)
+      probs <- predict(model, newdata = data, type = "response")
+      preds <- ifelse(probs > 0.5, levels(response)[2], levels(response)[1])
+    } else {
+      # Multinomicka logisticka regresia pre viac ako dve triedy
+      model <- nnet::multinom(formula, data = data, trace = FALSE)
+      preds <- predict(model, newdata = data)
+    }
+
+  } else if (method == "lda") { # linearna diskriminacna analyza
+
+    model <- MASS::lda(formula, data = data)
+
+  } else if (method == "qda") { # kvadraticka diskriminacna analyza
+
+    model <- MASS::qda(formula, data = data)
+
+  } else if (method == "knn") { # metoda k-najblizsich susedov
+    train_data <- data[, predictor_names]
+    train_response <- data[[response_name]]
+    
+    if (is.null(k)) {
+      message("Optimalizujem parameter 'k' pre k-NN...")
+      
+      accuracy_scores <- numeric(20)
+
+      for (i in 1:20) {
+        preds_i <- class::knn(
+          train = train_data,
+          test = train_data,
+          cl = train_response,
+          k = i
+        )
+        acc_i <- mean(preds_i == train_response)
+        accuracy_scores[i] <- acc_i
+      }
+
+      # Najlepsie k (ak je viac rovnakych, berieme najmensie)
+      k <- which.max(accuracy_scores)
+      message(paste("Optimalne k je:", k, "s presnostou:", round(accuracy_scores[k], 4)))
+    }
+
+    model <- list(
+      train_data = train_data,
+      train_response = train_response,
+      k = k
+    )
+
+  }
+  else {
+    stop("Neplatna metoda. Vyber: 'logistic', 'lda', 'qda' alebo 'knn'.")
+  }
+
+  # Predikcie
+  if (method %in% c("logistic", "lda", "qda")) {
+  
+    if (method == "logistic") {
+  
+      if (length(levels(response)) == 2) {
+        # Klasicka binarna logisticka regresia
+        probs <- predict(model, newdata = data, type = "response")
+        preds <- ifelse(probs > 0.5, levels(response)[2], levels(response)[1])
+  
+      } else {
+        # Multinomicka logisticka regresia
+        preds <- predict(model, newdata = data, type = "class")
+      }
+  
+    } else if (method == "lda") {
+      preds <- predict(model, newdata = data)$class
+  
+    } else if (method == "qda") {
+      preds <- predict(model, newdata = data)$class
+    }
+  
+  } else if (method == "knn") {
+
+  preds <- class::knn(
+    train = model$train_data,
+    test = model$train_data,
+    cl = model$train_response,
+    k = model$k
+  )
+}
+
+  # Vypocet presnosti
+  accuracy <- mean(preds == response)
+  confusion_mat <- table(Predicted = preds, Actual = response)
+
+  result <- list(
+    model = model,
+    predictions = preds,
+    accuracy = accuracy,
+    confusion_matrix = confusion_mat
+  )
+
+  # Ak su len 2 prediktory => graf rozhodovacich hranic
+  if (length(predictor_names) == 2) {
+    result$decision_plot <- plot_decision_boundary(
+      data, response_name, predictor_names, model, method
+    )
+  }
+
+  return(result)
+}
+
+```
+
+```{r}
+result <- classification_model(data = mtcars, response_name = "carb", predictor_names = c("hp", "mpg"), method = "logistic")
+
+result$accuracy
+result$confusion_matrix
+result$decision_plot
+```
+
 
 # Finálne výstupy
 ```{r, warning=FALSE}
@@ -1362,7 +1604,4 @@ Jadrove vyhladzovanie
     
 *Pridat*
 - pridat funkciu na modelovanie klasifikacnych metod (napr. logisticka regresia)
-- model_conditional_mean_value:
-  a) osetrit formatovanie diskretnej premennej ako odozvy (v pripade ze by bolo nespravne. Neciselne hodnoty apod.)
-  b) rozdelit funkciu na dve (pre strednu hodnotu a pre kvantily)
 
