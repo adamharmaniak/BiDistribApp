@@ -1215,10 +1215,6 @@ combine_conditional_models <- function(data, selected_variables, mean_method = "
     stop(paste("Premenna", predictor_name, "nie je v datach."))
   }
 
-  if (!(response_name %in% c(variable_types$Spojite, variable_types$Diskretne))) {
-    stop(paste("Premenna", response_name, "nie je rozpoznana ako spojita alebo diskretna."))
-  }
-
   if (!(predictor_name %in% variable_types$Spojite)) {
     stop(paste("Prediktor", predictor_name, "musi byt spojita premenna."))
   }
@@ -1308,8 +1304,6 @@ combine_conditional_models <- function(data, selected_variables, mean_method = "
 
 
 ```{r}
-df <- mtcars
-df$cyl <- as.factor(df$cyl)
 result <- combine_conditional_models(data, c("cyl", "mpg"), "poly", "poly", 3, 3, c(0.05, 0.95))
 
 result$combined_plot
@@ -1387,7 +1381,7 @@ plot_decision_boundary <- function(data, response_name, predictor_names, model, 
 classification_model <- function(data, response_name, predictor_names, method = "logistic", k = NULL) {
 
   if (!(response_name %in% colnames(data))) {
-    stop(paste("Premenná", response_name, "nie je v dátach!"))
+    stop(paste("Premenna", response_name, "nie je v datach!"))
   }
 
   predictors_exist <- predictor_names %in% colnames(data)
@@ -1396,6 +1390,17 @@ classification_model <- function(data, response_name, predictor_names, method = 
   }
 
   response <- data[[response_name]]
+  
+  if (!is.factor(response)) {
+    unique_values <- length(unique(response))
+    if (is.numeric(response) && unique_values <= 10) {
+      message(paste("Odozva", response_name, "ma", unique_values, "unikatnych hodnot. Konverzia na faktor..."))
+      response <- as.factor(response)
+      data[[response_name]] <- response
+    } else {
+      stop(paste("Odozva", response_name, "nie je diskretna! Musi byt faktor alebo mat konecny pocet kategorii."))
+    }
+  }
   
   if (is.numeric(response) && length(unique(response)) == 2) {
     message("Konvertovanie ciselnej odozvy na faktor.")
@@ -1572,7 +1577,7 @@ Jadrove vyhladzovanie
 - Studentovo t-rozdelenie ["t"]
 - jadrovo vyhladene ["kernel"] - mozne zadat aj parameter bw (bandwidth), nezadany => automatizovane vyhladzovanie
 
-## Co dosadit za parametre do model_conditional_mean_value()
+## Co dosadit za parametre do combine_conditional_models()
 
 ### Premenne typu 'Odozva' a 'Prediktor'
 - na vstup sa posielaju vzdy dve premenne vo forme c("Odozva", "Prediktor")
@@ -1601,7 +1606,14 @@ Jadrove vyhladzovanie
     1. **"linear"** (linearny regresny model)
     2. **"poly"** (polynomialny regresny model, zadava sa aj s parametrom poly_quant_degree = 1,2,3,..., pre *poly_quant_degree = 1* dava          *"linear"*)
     
-    
-*Pridat*
-- pridat funkciu na modelovanie klasifikacnych metod (napr. logisticka regresia)
 
+## Co dosadit za parametre do classification_model()
+response_name - nazov premennej (odozvy), napr. "carb" (DISKRETNA)
+predictor_names - nazvy premennych prediktorov, napr. c("hp", "cyl", ...)
+
+### Vyber klasifikacnej metody
+method:
+  - *"logistic"* - spravi logisticku regresiu alebo multinomicku logisticku regresiu (podla poctu prediktorov)
+  - *"lda"* - linearna diskriminacna analyza
+  - *"qda"* - kvadraticka diskriminacna analyza
+  - *"knn"* - metoda k-najblizsich susedov
