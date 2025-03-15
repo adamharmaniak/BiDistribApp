@@ -1360,7 +1360,7 @@ plot_decision_boundary <- function(data, response_name, predictor_names, model, 
     geom_point(data = data, aes_string(x = predictor_names[1], y = predictor_names[2], color = response_name, shape = response_name), size = 3) +
     
     labs(
-      title = paste0("Rozhodovacia hranica pre metódu: ", method),
+      title = paste0("Predikčný model metódy: ", method),
       subtitle = paste("Prediktory:", paste(predictor_names, collapse = " a "), "| Odozva:", response_name),
       x = paste0(predictor_names[1], " (Prediktor)"),
       y = paste0(predictor_names[2], " (Prediktor)"),
@@ -1425,7 +1425,7 @@ plot_classification_1D <- function(data, response_name, predictor_name, model, m
                  size = 3) +
   
       labs(
-        title = paste0("Rozhodovacia hranica pre metódu: ", method),
+        title = paste0("Predikčný model metódy: ", method),
         subtitle = paste("Prediktor:", predictor_name, "| Odozva:", response_name),
         x = paste0(predictor_name, " (Prediktor)"),
         y = paste0(response_name, " (Trieda)"),
