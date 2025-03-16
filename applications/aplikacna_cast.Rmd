@@ -1778,7 +1778,7 @@ model_joint_distribution_density(data = mtcars, selected_variables = c("mpg", "c
 ```
 
 ```{r}
-plot_conditional_densities <- function(data, selected_variables, conditional_density_type = "kernel", mean_curve = TRUE, quantiles = NULL, n_breaks = 5, density_scaling = 2000) {
+plot_conditional_densities <- function(data, selected_variables, conditional_density_type = "kernel", mean_curve = TRUE, quantiles = NULL, n_breaks = 5, density_scaling = 2000, normal_density = TRUE, empirical_density = TRUE) {
   
   if (length(selected_variables) != 2) {
     stop("Musis zadat dve premenne: odozvu a prediktor.")
@@ -1807,32 +1807,44 @@ plot_conditional_densities <- function(data, selected_variables, conditional_den
     
     if (nrow(sub_df) < 3) return(NULL)
     
-    # Empiricka hustota
-    emp_density <- density(sub_df$residuals, n = 50)
-    
-    # Hustota normalneho rozdelenia
-    xs <- seq(min(sub_df$residuals), max(sub_df$residuals), length.out = 50)
-    theoretical_density <- dnorm(xs, mean = 0, sd = sd(sub_df$residuals, na.rm = TRUE))
+    output <- list()
     
     # Priemer odozvy v sekcii a posun pre vykreslenie hustoty
     y_mean <- mean(sub_df$response, na.rm = TRUE)
     x_max <- max(sub_df$predictor, na.rm = TRUE)
     
-    df_emp <- data.frame(
-      x = x_max - emp_density$y * density_scaling,
-      y = emp_density$x + y_mean,
-      section = unique(sub_df$section),
-      type = "empirical"
-    )
+    # Empiricka hustota
+    if (empirical_density) {
+      emp_density <- density(sub_df$residuals, n = 50)
+      
+      df_emp <- data.frame(
+        x = x_max - emp_density$y * density_scaling,
+        y = emp_density$x + y_mean,
+        section = unique(sub_df$section),
+        type = "empirical"
+      )
+      output[[length(output) + 1]] <- df_emp
+    }
     
-    df_theo <- data.frame(
-      x = x_max - theoretical_density * density_scaling,
-      y = xs + y_mean,
-      section = unique(sub_df$section),
-      type = "normal"
-    )
+    # Hustota normalneho rozdelenia
+    if (normal_density) {
+      xs <- seq(min(sub_df$residuals), max(sub_df$residuals), length.out = 50)
+      norm_density <- dnorm(xs, mean = 0, sd = sd(sub_df$residuals, na.rm = TRUE))
+      
+      df_theo <- data.frame(
+        x = x_max - norm_density * density_scaling,
+        y = xs + y_mean,
+        section = unique(sub_df$section),
+        type = "normal"
+      )
+      output[[length(output) + 1]] <- df_theo
+    }
     
-    rbind(df_emp, df_theo)
+    if (length(output) == 0) {
+      return(NULL)
+    } else {
+      return(do.call(rbind, output))
+    }
   }))
   
   # Zakladny graf
@@ -1869,7 +1881,7 @@ plot_conditional_densities <- function(data, selected_variables, conditional_den
       quantile_df <- df %>% mutate(quantile_pred = predict(rq_fit, newdata = df))
       
       p <- p + geom_line(data = quantile_df, aes(x = predictor, y = quantile_pred), color = "purple", linetype = "dashed") +
-        guides(color = guide_legend(title = "Hustota / Kvantil"))
+        guides(color = guide_legend(title = "Hustota (typ)"))
     }
   }
   
@@ -1879,7 +1891,8 @@ plot_conditional_densities <- function(data, selected_variables, conditional_den
 ```
 
 ```{r}
-plot_conditional_densities(data = iris, selected_variables = c("Sepal.Length", "Sepal.Width"), conditional_density_type = "kernel", mean_curve = TRUE, quantiles = c(0.1, 0.9), n_breaks = 3, density_scaling = 1)
+printVariables(iris)
+plot_conditional_densities(data = iris, selected_variables = c("Sepal.Length", "Petal.Length"), conditional_density_type = "kernel", mean_curve = TRUE, quantiles = c(0.1, 0.9), n_breaks = 4, density_scaling = 1, normal_density = TRUE, empirical_density = TRUE)
 ```
 
 
