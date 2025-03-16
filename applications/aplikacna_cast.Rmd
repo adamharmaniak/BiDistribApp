@@ -1458,7 +1458,7 @@ combine_conditional_models <- function(data, selected_variables, mean_method = "
 
 
 ```{r}
-result <- combine_conditional_models(data, c("carb", "mpg"), "poly", "poly", 3, 3, c(0.05, 0.95))
+result <- combine_conditional_models(data, c("carb", "hp"), "spline", "poly", NULL, 2, c(0.05, 0.95))
 
 result$combined_plot
 ```
@@ -1773,9 +1773,115 @@ result$decision_plot
 
 # Finálne výstupy
 ```{r, warning=FALSE}
-printVariables(data)
-model_joint_distribution_density(data = mtcars, selected_variables = c("carb", "mpg"), model_type = "t")
+printVariables(mtcars)
+model_joint_distribution_density(data = mtcars, selected_variables = c("mpg", "carb"), model_type = "normal")
 ```
+
+```{r}
+plot_conditional_densities <- function(data, selected_variables, conditional_density_type = "kernel", mean_curve = TRUE, quantiles = NULL, n_breaks = 5, density_scaling = 2000) {
+  
+  if (length(selected_variables) != 2) {
+    stop("Musis zadat dve premenne: odozvu a prediktor.")
+  }
+  
+  response_var <- selected_variables[1]
+  predictor_var <- selected_variables[2]
+  
+  if (!(response_var %in% names(data)) || !(predictor_var %in% names(data))) {
+    stop("Premenne nie su v datach!")
+  }
+  
+  df <- data[, c(predictor_var, response_var)]
+  colnames(df) <- c("predictor", "response")
+  
+  # Rozdelenie na sekcie pre podmienene hustoty
+  breaks <- seq(min(df$predictor, na.rm = TRUE), max(df$predictor, na.rm = TRUE), length.out = n_breaks + 1)
+  df$section <- cut(df$predictor, breaks = breaks, include.lowest = TRUE)
+  
+  # Rezidua zo zakladneho modelu
+  lm_fit <- lm(response ~ predictor, data = df)
+  df$residuals <- residuals(lm_fit)
+  
+  # Hustoty pre kazdu sekciu
+  density_data <- do.call(rbind, lapply(split(df, df$section), function(sub_df) {
+    
+    if (nrow(sub_df) < 3) return(NULL)
+    
+    # Empiricka hustota
+    emp_density <- density(sub_df$residuals, n = 50)
+    
+    # Hustota normalneho rozdelenia
+    xs <- seq(min(sub_df$residuals), max(sub_df$residuals), length.out = 50)
+    theoretical_density <- dnorm(xs, mean = 0, sd = sd(sub_df$residuals, na.rm = TRUE))
+    
+    # Priemer odozvy v sekcii a posun pre vykreslenie hustoty
+    y_mean <- mean(sub_df$response, na.rm = TRUE)
+    x_max <- max(sub_df$predictor, na.rm = TRUE)
+    
+    df_emp <- data.frame(
+      x = x_max - emp_density$y * density_scaling,
+      y = emp_density$x + y_mean,
+      section = unique(sub_df$section),
+      type = "empirical"
+    )
+    
+    df_theo <- data.frame(
+      x = x_max - theoretical_density * density_scaling,
+      y = xs + y_mean,
+      section = unique(sub_df$section),
+      type = "normal"
+    )
+    
+    rbind(df_emp, df_theo)
+  }))
+  
+  # Zakladny graf
+  p <- ggplot(df, aes(x = predictor, y = response)) +
+    geom_point(alpha = 0.6, color = "darkorange") +
+    theme_bw() +
+    labs(
+      title = paste("Podmienené hustoty pre", response_var, "podľa", predictor_var),
+      x = paste(predictor_var, "(Prediktor)"),
+      y = paste(response_var, "(Odozva)")
+    ) +
+    geom_vline(xintercept = breaks, linetype = "dashed", color = "grey50")
+  
+  # Podmienene hustoty
+  if (!is.null(density_data) && nrow(density_data) > 0) {
+    p <- p + geom_path(
+      data = density_data,
+      aes(x = x, y = y, group = interaction(section, type), color = type),
+      size = 1
+    )
+  } else {
+    warning("Nebolo mozne vypocitat hustoty pre ziadnu sekciu!")
+  }
+  
+  # Stredna hodnota regresie
+  if (mean_curve) {
+    p <- p + geom_smooth(method = "lm", formula = y ~ x, se = FALSE, color = "blue", size = 1.2)
+  }
+  
+  # Kvantilove krivky
+  if (!is.null(quantiles)) {
+    for (q in quantiles) {
+      rq_fit <- quantreg::rq(response ~ predictor, tau = q, data = df)
+      quantile_df <- df %>% mutate(quantile_pred = predict(rq_fit, newdata = df))
+      
+      p <- p + geom_line(data = quantile_df, aes(x = predictor, y = quantile_pred), color = "purple", linetype = "dashed") +
+        guides(color = guide_legend(title = "Hustota / Kvantil"))
+    }
+  }
+  
+  return(p)
+}
+
+```
+
+```{r}
+plot_conditional_densities(data = iris, selected_variables = c("Sepal.Length", "Sepal.Width"), conditional_density_type = "kernel", mean_curve = TRUE, quantiles = c(0.1, 0.9), n_breaks = 3, density_scaling = 1)
+```
+
 
 # Dokumentacia
 
@@ -1844,12 +1950,13 @@ method:
   - *"knn"* - metoda k-najblizsich susedov
   
 *Pridat*
-Podarilo sa:
+Vyriesene:
   - copula -> use_copula
   - kernel - explicitne zadavat bw aj pre marginalu
   - normal_copula - dat uzivatelovi moznost vyberu pocitania marginalnych hustot (napr. cez dnorm() alebo lognorm atd.)
   - rozdelit funkciu model_conditional_mean_value na dve
   - pridat funkciu na modelovanie klasikacnych metod (napr. logisticka regresia)
   - vyriesit normovanie plochy pod hustotou pre mix premennych na sucet = 1
-Zatial sa nepodarilo:
-  - modelovanie podmienenej hustoty pravdepodobnosti
+  - modelovanie podmienenej hustoty pravdepodobnosti (zatial iba pre jadrove vyhladzovanie)
+Riesim:
+  - modelovanie podmienenej pravdepodobnostnej funkcie (v pripade diskretnej premnnej ako odozvy)
