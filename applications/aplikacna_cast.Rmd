@@ -1456,13 +1456,6 @@ combine_conditional_models <- function(data, selected_variables, mean_method = "
 }
 ```
 
-
-```{r}
-result <- combine_conditional_models(data, c("carb", "hp"), "spline", "poly", NULL, 2, c(0.05, 0.95))
-
-result$combined_plot
-```
-
 # Modelovanie predikčných modelov pre diskrétne premenné (klasifikačné metódy)
 ```{r}
 plot_decision_boundary <- function(data, response_name, predictor_names, model, method) {
@@ -1762,23 +1755,9 @@ classification_model <- function(data, response_name, predictor_names, method = 
 
 ```
 
+# Modelovanie podmienenej hustoty 2D
 ```{r}
-result <- classification_model(data = mtcars, response_name = "carb", predictor_names = c("mpg", "hp"), method = "logistic")
-
-result$accuracy
-result$confusion_matrix
-result$decision_plot
-```
-
-
-# Finálne výstupy
-```{r, warning=FALSE}
-printVariables(mtcars)
-model_joint_distribution_density(data = mtcars, selected_variables = c("mpg", "carb"), model_type = "normal")
-```
-
-```{r}
-plot_conditional_densities <- function(data, selected_variables, conditional_density_type = "kernel", mean_curve = TRUE, quantiles = NULL, n_breaks = 5, density_scaling = 2000, normal_density = TRUE, empirical_density = TRUE) {
+plot_conditional_densities <- function(data, selected_variables, mean_curve = TRUE, quantiles = NULL, mean_poly_degree = 1, quantile_poly_degree = 1, n_breaks = 5, density_scaling = 2000, normal_density = TRUE, empirical_density = TRUE) {
   
   if (length(selected_variables) != 2) {
     stop("Musis zadat dve premenne: odozvu a prediktor.")
@@ -1871,18 +1850,36 @@ plot_conditional_densities <- function(data, selected_variables, conditional_den
   
   # Stredna hodnota regresie
   if (mean_curve) {
-    p <- p + geom_smooth(method = "lm", formula = y ~ x, se = FALSE, color = "blue", size = 1.2)
+    mean_formula <- as.formula(paste("response ~ poly(predictor, ", mean_poly_degree, ", raw = TRUE)"))
+    
+    mean_model <- lm(mean_formula, data = df)
+    mean_pred <- predict(mean_model, newdata = df)
+    
+    df$mean_pred <- mean_pred
+    
+    p <- p + geom_line(data = df, aes(x = predictor, y = mean_pred), color = "blue", size = 1.2)
   }
   
   # Kvantilove krivky
   if (!is.null(quantiles)) {
     for (q in quantiles) {
-      rq_fit <- quantreg::rq(response ~ predictor, tau = q, data = df)
-      quantile_df <- df %>% mutate(quantile_pred = predict(rq_fit, newdata = df))
+      quantile_formula <- as.formula(paste("response ~ poly(predictor, ", quantile_poly_degree, ", raw = TRUE)"))
       
-      p <- p + geom_line(data = quantile_df, aes(x = predictor, y = quantile_pred), color = "purple", linetype = "dashed") +
-        guides(color = guide_legend(title = "Hustota (typ)"))
+      rq_fit <- quantreg::rq(quantile_formula, tau = q, data = df)
+      
+      quantile_pred <- predict(rq_fit, newdata = df)
+      
+      df$quantile_pred <- quantile_pred
+      
+      p <- p + geom_line(
+        data = df,
+        aes(x = predictor, y = quantile_pred),
+        color = "purple",
+        linetype = "dashed"
+      )
     }
+    
+    p <- p + guides(color = guide_legend(title = "Hustota (typ)"))
   }
   
   return(p)
@@ -1890,9 +1887,29 @@ plot_conditional_densities <- function(data, selected_variables, conditional_den
 
 ```
 
+# Finálne výstupy
+```{r, warning=FALSE}
+printVariables(mtcars)
+model_joint_distribution_density(data = mtcars, selected_variables = c("mpg", "carb"), model_type = "normal")
+```
+
+```{r}
+result <- classification_model(data = mtcars, response_name = "carb", predictor_names = c("mpg", "hp"), method = "logistic")
+
+result$accuracy
+result$confusion_matrix
+result$decision_plot
+```
+
+```{r}
+result <- combine_conditional_models(data = mtcars, c("hp", "mpg"), "spline", "poly", NULL, 2, c(0.05, 0.95))
+
+result$combined_plot
+```
+
 ```{r}
 printVariables(iris)
-plot_conditional_densities(data = iris, selected_variables = c("Sepal.Length", "Petal.Length"), conditional_density_type = "kernel", mean_curve = TRUE, quantiles = c(0.1, 0.9), n_breaks = 4, density_scaling = 1, normal_density = TRUE, empirical_density = TRUE)
+plot_conditional_densities(data = iris, selected_variables = c("Sepal.Length", "Petal.Length"), mean_curve = TRUE, quantiles = c(0.1, 0.9), mean_poly_degree = 1, quantile_poly_degree = 2, n_breaks = 4, density_scaling = 1, normal_density = TRUE, empirical_density = TRUE)
 ```
 
 
@@ -1962,6 +1979,19 @@ method:
   - *"qda"* - kvadraticka diskriminacna analyza
   - *"knn"* - metoda k-najblizsich susedov
   
+## Co dosadit za parametre do plot_conditional_densities()
+- **data** - dataset
+- **selected_variables** -> na vstup sa posielaju vzdy dve premenne vo forme c("Odozva", "Prediktor")
+- *"Odozva"* musi byt spojita premenna
+- **mean_curve** = TRUE/FALSE -> vykreslit strednu hodnotu alebo nie
+- **quantiles** -> pre ktore kvantily pocitat kvantilove funkcie 
+- **mean_poly_degree** -> stupen polynomialnej funkcie strednej hodnoty
+- **quantile_poly_degree** -> stupen polynomialnych kvantilovych funkcii
+- **n_breaks** -> pocet rozdeleni "okna", v resp. podmienenych hustot
+- **density_scaling** -> skalovanie hustot pre lepsi fitting do grafu
+- **normal_density** -> TRUE/FALSE, ne/vykreslit podmienenu hustotu norm. rozdelenia (dnorm())
+- **empirical_density** -> TRUE/FALSE, ne/vykreslit podmienenu empiricku hustotu (density(), beru sa do uvahy rezidualne hodnoty)
+  
 *Pridat*
 Vyriesene:
   - copula -> use_copula
@@ -1970,6 +2000,6 @@ Vyriesene:
   - rozdelit funkciu model_conditional_mean_value na dve
   - pridat funkciu na modelovanie klasikacnych metod (napr. logisticka regresia)
   - vyriesit normovanie plochy pod hustotou pre mix premennych na sucet = 1
-  - modelovanie podmienenej hustoty pravdepodobnosti (zatial iba pre jadrove vyhladzovanie)
+  - modelovanie podmienenej hustoty pravdepodobnosti
 Riesim:
-  - modelovanie podmienenej pravdepodobnostnej funkcie (v pripade diskretnej premnnej ako odozvy)
+  - modelovanie podmienenej pravdepodobnostnej funkcie (v pripade diskretnej premennej ako odozvy)
