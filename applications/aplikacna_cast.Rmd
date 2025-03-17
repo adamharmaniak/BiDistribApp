@@ -33,7 +33,7 @@ suppressMessages(suppressWarnings({
 
 # Identifikacia a vypis premennych
 
-```{r, warning=FALSE}
+```{r}
 identify_variables <- function(data) {
   variable_types <- sapply(data, function(col) {
     if (is.factor(col) || is.character(col) || (is.numeric(col) && length(unique(col)) < 10)) {
@@ -48,9 +48,7 @@ identify_variables <- function(data) {
   
   return(list(Diskretne = discrete_vars, Spojite = continuous_vars))
 }
-```
 
-```{r, warning=FALSE}
 printVariables <- function(data) {
   num_variables <- length(colnames(data))
   variables <- identify_variables(data)
@@ -73,9 +71,9 @@ printVariables <- function(data) {
 }
 ```
 
-# Funkcia na modelovanie zdruzenej hustoty 1 spojitej a 1 diskretnej nahodnej premennej
+# Modelovanie združeného rozdelenia pravdepodobnosti (Hustota)
 
-```{r, warning=FALSE}
+```{r}
 mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, model_type, bw) {
 
   # Modelovanie hustoty pouzitim jadroveho vyhladzovania
@@ -485,11 +483,7 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
   }
   
 }
-```
 
-# Modelovanie zdruzeneho rozdelenia pravdepodobnosti 2 spojitych premennych
-
-```{r, warning=FALSE}
 continuous_joint_distribution <- function(data, continuous_vars, model_type) {
   
   # Modelovanie hustoty pomocou jadroveho vyhladzovania
@@ -700,9 +694,7 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type) {
   }
   
 }
-```
 
-```{r, warning=FALSE}
 continuous_joint_distribution_copula <- function(data, continuous_vars, model_type, copula_type, marginal_density = "dnorm") {
 
   # Modelovanie hustoty pomocou jadroveho vyhladzovania a kopuly (rozklad na marginaly)
@@ -987,11 +979,7 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
   }
 }
-```
 
-# Modelovanie zdruzeneho rozdelenia pravdepodobnosti viac ako 2 premennych
-
-```{r,warning=FALSE}
 multi_joint_distribution <- function(data, discrete_vars, continuous_vars) {
   
   # Vytvorenie tabulky s frekvenciami pre diskretne premenne
@@ -1041,11 +1029,7 @@ multi_joint_distribution <- function(data, discrete_vars, continuous_vars) {
   
   return(tab)
 }
-```
 
-# Modelovanie dvoch dikretnych nahodnych premennych
-
-```{r,warning=FALSE}
 discrete_joint_distribution <- function(data, discrete_vars) {
   
   tab <- as.data.frame(table(data[, discrete_vars]))
@@ -1118,11 +1102,7 @@ discrete_joint_distribution <- function(data, discrete_vars) {
 
   return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
 }
-```
 
-# Modelovanie združeného rozdelenia pravdepodobnosti (Hustota)
-
-```{r, warning=FALSE}
 model_joint_distribution_density <- function(data, selected_variables, model_type = NULL, bw = NULL, use_copula = FALSE, copula_type = NULL, marginal_density = NULL) {
   # Identifikacia typov premennych
   variable_types <- identify_variables(data)
@@ -1181,8 +1161,7 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
 ```
 
 # Modelovanie podmienenej strednej hodnoty a vybraných kvantilových funkcií (regresia)
-
-```{r, warning=FALSE}
+```{r}
 model_conditional_mean <- function(data, selected_variables, mean_method = "linear", poly_mean_degree = NULL, specific_x = NULL) {
   response_name <- selected_variables[1]
   predictor_name <- selected_variables[2]
@@ -1241,9 +1220,7 @@ model_conditional_mean <- function(data, selected_variables, mean_method = "line
     specific_mean = specific_mean
   ))
 }
-```
 
-```{r, warning=FALSE}
 model_conditional_quantiles <- function(data, selected_variables, quantile_method = "linear", poly_quant_degree = NULL, quantiles = 0.5, specific_x = NULL) {
 
   response_name <- selected_variables[1]
@@ -1332,9 +1309,7 @@ model_conditional_quantiles <- function(data, selected_variables, quantile_metho
     specific_quantiles = specific_quantiles
   ))
 }
-```
 
-```{r}
 combine_conditional_models <- function(data, selected_variables, mean_method = "linear", quantile_method = "linear", poly_mean_degree = NULL, poly_quant_degree = NULL, quantiles = 0.5, specific_x = NULL) {
   if (length(selected_variables) != 2) {
     stop("Zadavaju sa dve premenne: odozva a prediktor.")
@@ -1757,21 +1732,10 @@ classification_model <- function(data, response_name, predictor_names, method = 
 
 # Modelovanie podmienenej hustoty 2D
 ```{r}
-plot_conditional_densities <- function(data, selected_variables, mean_curve = TRUE, quantiles = NULL, mean_poly_degree = 1, quantile_poly_degree = 1, n_breaks = 5, density_scaling = 2000, normal_density = TRUE, empirical_density = TRUE) {
+plot_conditional_continuous_densities <- function(df, n_breaks = 5, density_scaling = 2000, mean_curve = TRUE, quantiles = NULL, mean_poly_degree = 1, quantile_poly_degree = 1, normal_density = TRUE, empirical_density = TRUE) {
   
-  if (length(selected_variables) != 2) {
-    stop("Musis zadat dve premenne: odozvu a prediktor.")
-  }
-  
-  response_var <- selected_variables[1]
-  predictor_var <- selected_variables[2]
-  
-  if (!(response_var %in% names(data)) || !(predictor_var %in% names(data))) {
-    stop("Premenne nie su v datach!")
-  }
-  
-  df <- data[, c(predictor_var, response_var)]
-  colnames(df) <- c("predictor", "response")
+  response_name <- attr(df, "response_var")
+  predictor_name <- attr(df, "predictor_var")
   
   # Rozdelenie na sekcie pre podmienene hustoty
   breaks <- seq(min(df$predictor, na.rm = TRUE), max(df$predictor, na.rm = TRUE), length.out = n_breaks + 1)
@@ -1831,9 +1795,9 @@ plot_conditional_densities <- function(data, selected_variables, mean_curve = TR
     geom_point(alpha = 0.6, color = "darkorange") +
     theme_bw() +
     labs(
-      title = paste("Podmienené hustoty pre", response_var, "podľa", predictor_var),
-      x = paste(predictor_var, "(Prediktor)"),
-      y = paste(response_var, "(Odozva)")
+      title = paste("Podmienené hustoty pre", response_name, "podľa", predictor_name),
+      x = paste(predictor_name, "(Prediktor)"),
+      y = paste(response_name, "(Spojitá odozva)")
     ) +
     geom_vline(xintercept = breaks, linetype = "dashed", color = "grey50")
   
@@ -1885,15 +1849,124 @@ plot_conditional_densities <- function(data, selected_variables, mean_curve = TR
   return(p)
 }
 
+plot_conditional_discrete_densities <- function(df, n_breaks = 5, density_scaling = 2000) {
+  
+  response_name <- attr(df, "response_var")
+  predictor_name <- attr(df, "predictor_var")
+  
+  # Rozdelenie prediktora na sekcie
+  breaks <- seq(min(df$predictor, na.rm = TRUE),
+                max(df$predictor, na.rm = TRUE),
+                length.out = n_breaks + 1)
+  
+  df$section <- cut(df$predictor, breaks = breaks, include.lowest = TRUE)
+  
+  # Vypocet pravdepodobnostnych funkcii v jednotlivych sekciach
+  density_data <- do.call(rbind, lapply(split(df, df$section), function(sub_df) {
+    
+    if (nrow(sub_df) < 3) return(NULL)
+    
+    # Pravdepodobnosti kategorii odozvy v ramci tejto sekcie
+    prob_table <- prop.table(table(sub_df$response))
+    
+    # Y su hodnoty odozvy, X su dlzky ciar podla pravdepodobnosti
+    y_vals <- as.numeric(levels(sub_df$response))
+    
+    x_start <- max(sub_df$predictor, na.rm = TRUE)
+    x_end <- x_start + (as.numeric(prob_table) * density_scaling)
+    
+    # Vysledny dataframe pre geom_segment + body
+    df_segment <- data.frame(
+      y = y_vals,
+      x_start = x_start,
+      x_end = x_end,
+      prob = as.numeric(prob_table),
+      section = unique(sub_df$section)
+    )
+    
+    return(df_segment)
+  }))
+  
+  if (is.null(density_data)) {
+    warning("Nebolo mozne vypocitat ziadne pravdepodobnosti!")
+  }
+  
+  # Vykreslenie grafu
+  p <- ggplot(df, aes(x = predictor, y = as.numeric(response))) +
+    geom_jitter(width = 0.1, height = 0.1, alpha = 0.6, color = "darkorange") +
+    theme_bw() +
+    labs(
+      title = paste("Podmienené pravdepodobnostné funkcie pre", response_name, "podľa", predictor_name),
+      x = paste(predictor_name, "(Prediktor)"),
+      y = paste(response_name, "(Diskrétna odozva)")
+    ) +
+    geom_vline(xintercept = breaks, linetype = "dashed", color = "grey50")
+  
+  # Podmienene pravdepodobnostne funkcie
+  if (!is.null(density_data) && nrow(density_data) > 0) {
+    
+    p <- p + geom_segment(
+      data = density_data,
+      aes(x = x_start, xend = x_end, y = y, yend = y),
+      color = "blue",
+      size = 1
+    )
+    
+    p <- p + geom_point(
+      data = density_data,
+      aes(x = x_end, y = y),
+      shape = 15,
+      color = "red",
+      size = 1.5
+    )
+  }
+  
+  return(p)
+}
+
+plot_conditional_densities <- function(data, selected_variables, n_breaks = 5, density_scaling = 2000, mean_curve = TRUE, quantiles = NULL, mean_poly_degree = 1, quantile_poly_degree = 1, normal_density = TRUE, empirical_density = TRUE) {
+  
+  response_var <- selected_variables[1]
+  predictor_var <- selected_variables[2]
+  
+  if (!(response_var %in% names(data)) || !(predictor_var %in% names(data))) {
+    stop("Premenne nie su v datach!")
+  }
+  
+  df <- data[, c(predictor_var, response_var)]
+  var_types <- identify_variables(df)
+  colnames(df) <- c("predictor", "response")
+  
+  # Atributy pre prediktor a odozvu
+  attr(df, "response_var") <- response_var
+  attr(df, "predictor_var") <- predictor_var
+  
+  if (response_var %in% var_types$Diskretne) {
+    
+    message(paste("Odozva", response_var, "bola identifikovana ako diskretna."))
+    df$response <- as.factor(df$response)
+    plot_conditional_discrete_densities(df, n_breaks, density_scaling)
+    
+  } else if (response_var %in% var_types$Spojite) {
+    
+    message(paste("Odozva", response_var, "bola identifikovana ako spojita."))
+    plot_conditional_continuous_densities(df, n_breaks, density_scaling, mean_curve, quantiles, mean_poly_degree, quantile_poly_degree, normal_density, empirical_density)
+    
+  } else {
+    
+    stop("Nebolo mozne identifikovat typ odozvy.")
+  }
+}
 ```
 
 # Finálne výstupy
-```{r, warning=FALSE}
+```{r}
 printVariables(mtcars)
 model_joint_distribution_density(data = mtcars, selected_variables = c("mpg", "carb"), model_type = "normal")
 ```
 
 ```{r}
+printVariables(mtcars)
 result <- classification_model(data = mtcars, response_name = "carb", predictor_names = c("mpg", "hp"), method = "logistic")
 
 result$accuracy
@@ -1902,84 +1975,84 @@ result$decision_plot
 ```
 
 ```{r}
+printVariables(mtcars)
 result <- combine_conditional_models(data = mtcars, c("hp", "mpg"), "spline", "poly", NULL, 2, c(0.05, 0.95))
 
 result$combined_plot
 ```
 
 ```{r}
-printVariables(iris)
-plot_conditional_densities(data = iris, selected_variables = c("Sepal.Length", "Petal.Length"), mean_curve = TRUE, quantiles = c(0.1, 0.9), mean_poly_degree = 1, quantile_poly_degree = 2, n_breaks = 4, density_scaling = 1, normal_density = TRUE, empirical_density = TRUE)
+printVariables(mtcars)
+plot_conditional_densities(data = mtcars, selected_variables = c("hp", "carb"), n_breaks = 8, density_scaling = 50, mean_curve = FALSE, quantiles = NULL, mean_poly_degree = 2, quantile_poly_degree = 3, normal_density = TRUE, empirical_density = TRUE)
 ```
 
 
 # Dokumentacia
 
-## Co dosadit za parametre do model_joint_distribution_density()
+## Co dosadit za parametre do *model_joint_distribution_density()*
+- **data** - dataset
+- **selected_variables** - premenne z datasetu (minimalne 2), c("...", "...", ...)
+- **model_type**
+  - *normalne ["normal"]*
+  - *Studentovo t-rozdelenie ["t"]*
+  - *jadrovo vyhladene ["kernel"]* - mozne zadat aj parameter **bw** (bandwidth), nezadany => automatizovane vyhladzovanie
+- **use_copula** - TRUE/FALSE - pouzit rozklad na marginaly a kopulu alebo nie
+- **copula_type**:
+  *Normalne rozdelenie ("normal")*
+  - Clayton: param > 0 (cim vacsie, tym silnejsia zavislost v spodnom chvoste)
+  - Gumbel: param >= 1 (cim vacsie, tym silnejsia zavislost v hornom chvoste)
+  - Frank: param != 0 (kladne = pozitivna zavislost, zaporne = negativna zavislost)
+  *Studentovo t-rozdelenie ("t")*
+  - Clayton
+  - Gumbel
+  - Joe
+  *Jadrove vyhladzovanie ("kernel")*
+  - empirical
+  - Gumbel
+  - Frank
+- **marginal_density**:
+  - *"log_dnorm"*
+  - *"dnorm"*
 
-### Vyber kopuly [copula_type]
-
-Normalne rozdelenie
-- Clayton: param > 0 (cim vacsie, tym silnejsia zavislost v spodnom chvoste)
-- Gumbel: param >= 1 (cim vacsie, tym silnejsia zavislost v hornom chvoste)
-- Frank: param != 0 (kladne = pozitivna zavislost, zaporne = negativna zavislost)
-Studentovo t-rozdelenie
-- Clayton
-- Gumbel
-- Joe
-Jadrove vyhladzovanie
-- empirical
-- Gumbel
-- Frank
-
-### Typy rozdeleni [model_type]
-- normalne ["normal"]
-- Studentovo t-rozdelenie ["t"]
-- jadrovo vyhladene ["kernel"] - mozne zadat aj parameter bw (bandwidth), nezadany => automatizovane vyhladzovanie
-
-## Co dosadit za parametre do combine_conditional_models()
-
-### Premenne typu 'Odozva' a 'Prediktor'
-- na vstup sa posielaju vzdy dve premenne vo forme c("Odozva", "Prediktor")
-- "Prediktor" musi byt spojita premenna
-
-### Kvantily na vykreslenie
-- moze byt jeden a viac
-- ked chceme poslat viac => c(Q1, Q2, Q3, ...)
-- ked chceme poslat jeden => napr. Q2
-
-### Vyber metody pre odhad podmienenej strednej hodnoty E[Y|X]
-- moznosti su:
+## Co dosadit za parametre do *combine_conditional_models()*
+- **data** - dataset
+- **selected_variables**
+  - c("Odozva", "Prediktor")
+  - "Prediktor" musi byt spojita premenna
+- **mean_method**: 
+  - metody pre odhad podmienenej strednej hodnoty E[Y|X]
   a) Neparametricke modely
-    1. **"loess"** (Lokalna regresia, prisposobuje modely (linearne, kvadraticke) podla okolia (75% bodov))
-    2. **"gam"** (Generalizacny aditivny model, scitava hladke funkcie)
-    3. **"spline"** (podobne principu MKP)
+    1. *"loess"* (Lokalna regresia, prisposobuje modely (linearne, kvadraticke) podla okolia (75% bodov))
+    2. *"gam"* (Generalizacny aditivny model, scitava hladke funkcie)
+    3. *"spline"* (podobne principu MKP)
   b) Parametricke modely
-    1. **"linear"** (linearny regresny model)
-    2. **"poly"** (polynomialny regresny model, zadava sa aj s parametrom poly_mean_degree = 1,2,3,..., pre *poly_mean_degree = 1* dava          *"linear"*)
-    3. **"exp"** (exponencialny regresny model)
-    
-### Vyber metody pre odhad podmienenej kvantilovej funkcie
-- moznosti su:
-  a) Neparametricke modely
-    1. **"spline"** (podobne principu MKP)
+    1. *"linear"* (linearny regresny model)
+    2. *"poly"* (polynomialny regresny model, zadava sa aj s parametrom poly_mean_degree = 1,2,3,..., pre *poly_mean_degree = 1* dava          *"linear"*)
+    3. *"exp"* (exponencialny regresny model)
+- **quantile_method**:
+  - metody pre odhad kvantilovych funkcii
+  a)Neparametricke modely
+    1. *"spline"* (podobne principu MKP)
   b) Parametricke modely
-    1. **"linear"** (linearny regresny model)
-    2. **"poly"** (polynomialny regresny model, zadava sa aj s parametrom poly_quant_degree = 1,2,3,..., pre *poly_quant_degree = 1* dava          *"linear"*)
-    
+    1. *"linear"* (linearny regresny model)
+    2. *"poly"* (polynomialny regresny model, zadava sa aj s parametrom poly_mean_degree = 1,2,3,..., pre *poly_mean_degree = 1* dava          *"linear"*)
+- **poly_mean_degree** - stupen polynomialneho odhadu E[Y|X] (pouziva sa iba pri metode *"poly"*)
+- **poly_quant_degree** - stupen polynomialneho odhadu Q[Y|X]_Q? (pouziva sa iba pri metode *"poly"*)
+- **quantiles** - kvantily, pre ktore sa vypocitaju Q[Y|X]_Q?, c(Q1, Q2, ...)
+- **specific_x** - konkretna hodnota prediktora X, pre ktoru sa vypocitaju body na Q[Y|X]_Q? a E[Y|X]
 
-## Co dosadit za parametre do classification_model()
-response_name - nazov premennej (odozvy), napr. "carb" (DISKRETNA)
-predictor_names - nazvy premennych prediktorov, napr. c("hp", "cyl", ...) alebo iba jeden "hp"
-
-### Vyber klasifikacnej metody
-method:
-  - *"logistic"* - spravi logisticku regresiu alebo multinomicku logisticku regresiu (podla poctu prediktorov)
-  - *"lda"* - linearna diskriminacna analyza
-  - *"qda"* - kvadraticka diskriminacna analyza
-  - *"knn"* - metoda k-najblizsich susedov
+## Co dosadit za parametre do *classification_model()*
+- **data** - dataset
+- **response_name** - nazov premennej (odozvy), napr. "carb" (DISKRETNA)
+- **predictor_names** - nazvy premennych prediktorov, napr. c("hp", "cyl", ...) alebo iba jeden "hp"
+- **method**:
+    - *"logistic"* - spravi logisticku regresiu alebo multinomicku logisticku regresiu (podla poctu prediktorov)
+    - *"lda"* - linearna diskriminacna analyza
+    - *"qda"* - kvadraticka diskriminacna analyza
+    - *"knn"* - metoda k-najblizsich susedov
+- **k** - kolko susedov bude brat *"knn"* metoda do uvahy
   
-## Co dosadit za parametre do plot_conditional_densities()
+## Co dosadit za parametre do *plot_conditional_continuous_densities()*
 - **data** - dataset
 - **selected_variables** -> na vstup sa posielaju vzdy dve premenne vo forme c("Odozva", "Prediktor")
 - *"Odozva"* musi byt spojita premenna
@@ -1991,6 +2064,15 @@ method:
 - **density_scaling** -> skalovanie hustot pre lepsi fitting do grafu
 - **normal_density** -> TRUE/FALSE, ne/vykreslit podmienenu hustotu norm. rozdelenia (dnorm())
 - **empirical_density** -> TRUE/FALSE, ne/vykreslit podmienenu empiricku hustotu (density(), beru sa do uvahy rezidualne hodnoty)
+
+## Co dosadit za parametre do *plot_conditional_discrete_densities()*
+- **data** - dataset
+- **selected_variables** -> na vstup sa posielaju vzdy dve premenne vo forme c("Odozva", "Prediktor")
+- *"Odozva"* musi byt diskretna premenna
+- **n_breaks** -> pocet rozdeleni "okna", v resp. podmienenych pravdepodobnostnych funkcii
+- **density_scaling** -> skalovanie P-funkcii pre lepsi fitting do grafu
+- **normal_density** -> TRUE/FALSE, ne/vykreslit podmienenu hustotu norm. rozdelenia (dnorm())
+- **empirical_density** -> TRUE/FALSE, ne/vykreslit podmienenu empiricku hustotu (density(), beru sa do uvahy rezidualne
   
 *Pridat*
 Vyriesene:
@@ -2001,5 +2083,3 @@ Vyriesene:
   - pridat funkciu na modelovanie klasikacnych metod (napr. logisticka regresia)
   - vyriesit normovanie plochy pod hustotou pre mix premennych na sucet = 1
   - modelovanie podmienenej hustoty pravdepodobnosti
-Riesim:
-  - modelovanie podmienenej pravdepodobnostnej funkcie (v pripade diskretnej premennej ako odozvy)
