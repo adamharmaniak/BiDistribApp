@@ -1,0 +1,49 @@
+\chapter{Úlohy a metódy štatistického modelovania}\label{sec:ulohy_metody}
+
+Štatistické modelovanie je neoddeliteľnou súčasťou analýzy údajov, ktorá umožňuje pochopiť a kvantifikovať vzťahy medzi rôznymi premennými. Tento prístup sa využíva naprieč rôznymi disciplínami od ekonomiky a medicíny až po moderné strojové učenie, pričom jeho cieľom je nielen predikcia budúcich hodnôt, ale aj interpretácia vzťahov medzi premennými.
+
+Základnou úlohou štatistického modelovania je konštrukcia modelov, ktoré opisujú správanie sa systému na základe dostupných údajov. Tieto modely môžu byť deterministické alebo stochastické, pričom v praxi sa často pracuje so stochastickými modelmi, ktoré berú do úvahy náhodnosť a neistotu v údajoch. Efektívne štatistické modely umožňujú analyzovať závislosti, identifikovať vzory a optimalizovať rozhodovacie procesy.
+
+Dôležitým aspektom štatistického modelovania je výber vhodných metód na analýzu údajov. Pred takýmto výberom je však dôležité porozumieť pojmu modelovania rozdelenia pravdepodobnosti náhodných premenných, ktoré predstavuje východisko pre pochopenie správania sa jednotlivých premenných a ich charakteristík. Štúdium rozdelení pravdepodobnosti je kľúčové pre kvantifikáciu pravdepodobnostných vlastností údajov, napr. tzv. momentov, ako sú stredná hodnota, smerodajná odchýlka alebo rozptyl, či funkcií bližšie popisujúcich takéto rozdelenia ako sú kvantilové funkcie alebo pravdepodobnostné hustoty. Rozdelenia môžu byť modelované rôznymi spôsobmi, ktoré si bližšie popíšeme v prvej podkapitole tejto kapitoly. Porozumenie jednorozmerným rozdeleniam pravdepodobnosti tvorí základ pre pokročilejšie modelovacie techniky a umožňuje presnejšie opisovať a predpovedať náhodné javy.
+
+Na tento základ nadväzujú ďalšie kľúčové prístupy štatistického modelovania, akými sú regresia a klasifikácia. Regresia sa zameriava na kvantitatívne predikcie, pričom jej cieľom je odhadovať spojitú výstupnú premennú na základe vstupných údajov, tzv. prediktorov. Klasifikácia sa naopak snaží predikovať správanie kvalitatívnej premennej.
+
+V tejto kapitole popíšeme základné úlohy a metódy štatistického modelovania so zameraním sa na tri hlavné oblasti: modelovanie jednorozmerného rozdelenia pravdepodobnosti, regresné a klasifikačné techniky. Najprv bude predstavený koncept rozdelenia pravdepodobnosti, jeho charakteristiky a spôsoby modelovania. Následne sa kapitola venuje regresii, jej rôznym variantom a metódam odhadu parametrov modelu. Napokon budú popísané aj klasifikačné metódy ako nástroje na rozpoznávanie vzorov a predikovanie správania sa kategoriálnych premenných. Cieľom tejto kapitoly je teda poskytnúť prehľad o troch hlavných konceptoch štatistického modelovania, ktoré zohrávajú kľúčovú úlohu v analýze dát a v aplikáciách, ako sú predikčné modely a z nich odvíjajúce sa automatizované rozhodovacie systémy.
+
+\section{Jednorozmerné modelovanie rozdelenia pravdepodobnosti}\label{sec:1D_modelovanie}
+
+Modelovanie jednorozmerného rozdelenia pravdepodobnosti je základným krokom v štatistickej analýze náhodných premenných. Slúži na opis správania sa jedinej náhodnej veličiny, ktorej hodnoty môžu byť spojité alebo diskrétne. Pravdepodobnostné rozdelenie poskytuje informácie o tom, s akou pravdepodobnosťou nadobúda náhodná premenná konkrétne hodnoty, tzv. realizácie. Náhodnú premennú teda chápeme ako zobrazenie 
+
+\begin{equation*} 
+X: \Omega \to \mathbb{R} 
+\end{equation*}
+
+Rozdelenie pravdepodobnosti náhodnej premennej $X$ je priraďovanie pravdepodobností jednotlivým hodnotám alebo množinám hodnôt, ktoré táto premenná môže nadobudnúť. Základným nástrojom na popis rozdelenia je distribučná funkcia $F_X(x)$, ktorá každému reálnemu číslu $x$ priraďuje pravdepodobnosť, že náhodná premenná nadobudne hodnotu menšiu alebo rovnú $x$: 
+
+\begin{equation*} 
+F_X(x) = P(X \leq x) 
+\end{equation*}
+
+Distribučná funkcia úplne charakterizuje rozdelenie pravdepodobnosti náhodnej premennej. V prípade diskrétnej náhodnej premennej je rozdelenie určené jej pravdepodobnostnou hmotnostnou funkciou 
+
+\begin{equation*} 
+p_X(x) = P(X = x) 
+\end{equation*} 
+
+ktorá priraďuje pravdepodobnosť každej jednotlivej hodnote náhodnej premennej $X$.
+
+Narozdiel od diskrétnej náhodnej premennej je rozdelenie spojitej náhodnej premennej popísané jej hustotou pravdepodobnosti, pričom pravdepodobnosť, že náhodná premenná $X$ nadobudne hodnotu z intervalu $\langle a, b \rangle$, sa vypočíta ako: 
+
+\begin{equation*}
+P(a \leq X \leq b) = \int_{a}^{b} f_X(x) , dx 
+\end{equation*}
+
+Hustota pravdepodobnosti $f_X(x)$ je deriváciou distribučnej funkcie $F_X(x)$, ak táto derivácia existuje: 
+
+\begin{equation*} 
+f_X(x) = \frac{d}{dx} F_X(x) 
+\end{equation*}
+
+\section{Regresia}\label{sec:regresia}
+
+\section{Klasifikačné metódy}\label{sec:klas_metody}
