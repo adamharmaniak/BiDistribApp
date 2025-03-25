@@ -1559,190 +1559,202 @@ plot_classification_1D_combined <- function(data, response_name, predictor_name,
   if (!is.factor(data[[response_name]])) {
     data[[response_name]] <- as.factor(data[[response_name]])
   }
-
+  
+  data[[response_name]] <- factor(data[[response_name]], levels = sort(as.numeric(levels(data[[response_name]]))))
   classes <- levels(data[[response_name]])
+  n_classes <- length(classes)
 
-  # Vlastne farby
-  my_colors <- c(
-    "1" = "#F8766D",
-    "2" = "#DAA520",  
-    "3" = "#00BA38",  
-    "4" = "#619CFF",  
-    "6" = "#C77CFF",  
-    "8" = "#FF61C3" 
-  )
+  # Paleta farieb a tvarov
+  my_colors <- c("#F8766D", "#DAA520", "#00BA38", "#619CFF", "#C77CFF", "#FF61C3")[1:n_classes]
+  my_shapes <- c(16, 17, 15, 3, 4, 8)[1:n_classes]
 
-  # Vlastne tvary
-  my_shapes <- c(
-    "1" = 16,
-    "2" = 17,
-    "3" = 15,
-    "4" = 3,
-    "6" = 4,
-    "8" = 8
-  )
-
-  # Typ prediktora
-  if (is.numeric(data[[predictor_name]]) && length(unique(data[[predictor_name]])) > 5) {
-    predictor_type <- "continuous"
+  # Urcenie typu prediktora
+  predictor_type <- if (is.numeric(data[[predictor_name]]) && length(unique(data[[predictor_name]])) > 5) {
+    "continuous"
   } else {
-    predictor_type <- "discrete"
+    "discrete"
   }
 
-  # Grid
-  if (predictor_type == "continuous") {
-    grid_x <- seq(
-      min(data[[predictor_name]], na.rm = TRUE),
-      max(data[[predictor_name]], na.rm = TRUE),
-      length.out = 300
-    )
+  # Vytvorenie gridu
+  grid_x <- if (predictor_type == "continuous") {
+    seq(min(data[[predictor_name]], na.rm = TRUE),
+        max(data[[predictor_name]], na.rm = TRUE),
+        length.out = 300)
   } else {
-    grid_x <- sort(unique(data[[predictor_name]]))
+    sort(unique(data[[predictor_name]]))
   }
 
   grid <- setNames(data.frame(grid_x), predictor_name)
 
-  # Ziskanie predikcii / pravdepodobnosti podla metody
   probs_long <- NULL
 
   if (method == "logistic" && length(classes) > 2) {
-
     probs <- predict(model, newdata = grid, type = "probs") %>% as.data.frame()
-
-    grid$pred_class <- apply(probs, 1, function(row) {
-      classes[which.max(row)]
-    }) %>% factor(levels = classes)
+    grid$pred_class <- apply(probs, 1, function(row) names(row)[which.max(row)])
+    grid$pred_class <- factor(grid$pred_class, levels = classes)
 
     probs[[predictor_name]] <- grid[[predictor_name]]
-
     probs_long <- probs %>%
-      tidyr::pivot_longer(
-        cols = all_of(classes),
-        names_to = "Hodnota_odozvy",
-        values_to = "Pravdepodobnost"
-      )
+      tidyr::pivot_longer(cols = all_of(classes), names_to = "Hodnota_odozvy", values_to = "Pravdepodobnost")
+    probs_long$Hodnota_odozvy <- factor(probs_long$Hodnota_odozvy, levels = classes)
 
   } else if (method == "logistic" && length(classes) == 2) {
-
     p <- predict(model, newdata = grid, type = "response")
-
+    
     probs <- data.frame(
       !!predictor_name := grid_x,
-      !!classes[1] := 1 - p,
-      !!classes[2] := p
+      !!as.character(classes[1]) := 1 - p,
+      !!as.character(classes[2]) := p
     )
-
-    grid$pred_class <- ifelse(p > 0.5, classes[2], classes[1]) %>%
+    grid$pred_class <- ifelse(p > 0.5, as.character(classes[2]), as.character(classes[1])) %>%
       factor(levels = classes)
-
     probs_long <- probs %>%
-      tidyr::pivot_longer(
-        cols = all_of(classes),
-        names_to = "Hodnota_odozvy",
-        values_to = "Pravdepodobnost"
-      )
+      tidyr::pivot_longer(cols = all_of(classes), names_to = "Hodnota_odozvy", values_to = "Pravdepodobnost")
+    probs_long$Hodnota_odozvy <- factor(probs_long$Hodnota_odozvy, levels = classes)
 
   } else if (method %in% c("lda", "qda")) {
-
     probs <- predict(model, newdata = grid)$posterior %>% as.data.frame()
-
-    grid$pred_class <- apply(probs, 1, function(row) {
-      classes[which.max(row)]
-    }) %>% factor(levels = classes)
-
+    probs <- probs[, classes, drop = FALSE]
+    grid$pred_class <- apply(probs, 1, function(row) names(row)[which.max(row)])
+    grid$pred_class <- factor(grid$pred_class, levels = classes)
     probs[[predictor_name]] <- grid[[predictor_name]]
-
     probs_long <- probs %>%
-      tidyr::pivot_longer(
-        cols = all_of(classes),
-        names_to = "Hodnota_odozvy",
-        values_to = "Pravdepodobnost"
-      )
+      tidyr::pivot_longer(cols = all_of(classes), names_to = "Hodnota_odozvy", values_to = "Pravdepodobnost")
+    probs_long$Hodnota_odozvy <- factor(probs_long$Hodnota_odozvy, levels = classes)
 
   } else if (method == "knn") {
-
     grid_matrix <- as.matrix(grid[, predictor_name, drop = FALSE])
-
     preds <- class::knn(
       train = model$train_data,
       test = grid_matrix,
       cl = model$train_response,
       k = model$k
     )
-
     grid$pred_class <- factor(preds, levels = classes)
-
   } else {
     stop("Neznama metoda!")
   }
+  
+  present_levels <- levels(droplevels(grid$pred_class))
+  present_indices <- match(present_levels, classes)
+  colors_used <- my_colors[present_indices]
 
-  # Vizualizacie
-
-  # Pravdepodobnosti podla hodnot odozvy
+  # Pravdepodobnosti
   p1 <- NULL
   if (!is.null(probs_long)) {
-
     if (predictor_type == "continuous") {
-
       p1 <- ggplot(probs_long, aes(x = .data[[predictor_name]], y = Pravdepodobnost, color = Hodnota_odozvy)) +
         geom_line(linewidth = 1) +
-        scale_color_manual(values = my_colors, name = "Hodnota_odozvy") +
+        scale_color_manual(values = my_colors) +
         labs(
           title = paste0("Pravdepodobnosti predikcie - ", method),
           x = paste0(predictor_name, " (Prediktor)"),
-          y = "Pravdepodobnost"
+          y = "Pravdepodobnosť",
+          color = "Hodnota odozvy"
         ) +
         theme_minimal()
-
     } else {
-
       p1 <- ggplot(probs_long, aes(x = factor(.data[[predictor_name]]), y = Pravdepodobnost, fill = Hodnota_odozvy)) +
         geom_col(position = "dodge") +
-        scale_fill_manual(values = my_colors, name = "Hodnota_odozvy") +
+        scale_fill_manual(values = my_colors) +
         labs(
           title = paste0("Pravdepodobnosti predikcie - ", method),
           x = predictor_name,
-          y = "Pravdepodobnost"
+          y = "Pravdepodobnosť",
+          fill = "Hodnota odozvy"
         ) +
         theme_minimal()
     }
   }
 
-  # Skutocne hodnoty odozvy + rozhodovacia hranica
+  data[[response_name]] <- factor(data[[response_name]], levels = sort(as.numeric(levels(data[[response_name]]))))
+  # Skutocne hodnoty + rozhodovacia hranica
   p2 <- ggplot() +
+    scale_y_discrete(limits = classes) +
     geom_tile(
       data = grid,
       aes(x = .data[[predictor_name]], y = pred_class, fill = pred_class),
-      height = 0.5,
-      alpha = 0.3
+      height = 0.5, alpha = 0.3
     ) +
     geom_jitter(
       data = data,
-      aes(x = .data[[predictor_name]], y = .data[[response_name]], color = .data[[response_name]], shape = .data[[response_name]]),
-      width = 0.1,
-      height = 0.1,
-      size = 2
+      aes(x = .data[[predictor_name]], y = .data[[response_name]],
+          color = .data[[response_name]],
+          shape = .data[[response_name]]),
+      width = 0.1, height = 0.1, size = 2
     ) +
-    scale_fill_manual(values = my_colors, name = "Predikcia") +
-    scale_color_manual(values = my_colors, name = "Skutocna hodnota odozvy") +
-    scale_shape_manual(values = my_shapes, name = "Skutocna hodnota odozvy") +
+    scale_fill_manual(values = setNames(colors_used, present_levels)) +
+    scale_color_manual(values = my_colors) +
+    scale_shape_manual(values = my_shapes) +
     labs(
       title = "Hodnoty odozvy + rozhodovacia hranica",
       x = paste0(predictor_name, " (Prediktor)"),
-      y = paste0(response_name, " (Odozva)")
+      y = paste0(response_name, " (Odozva)"),
+      fill = "Predikcia",
+      color = "Skutočná hodnota",
+      shape = "Skutočná hodnota"
     ) +
     theme_minimal()
 
   if (!is.null(p1)) {
-    combined_plot <- p1 / p2
+    return(p1 / p2)
   } else {
-    combined_plot <- p2
+    return(p2)
   }
-
-  return(combined_plot)
 }
 
-classification_model <- function(data, response_name, predictor_names, method = "logistic", k = NULL) {
+plot_classification_ridge_1D <- function(data, response_name, predictor_name, model, method) {
+
+  if (!is.factor(data[[response_name]])) {
+    data[[response_name]] <- as.factor(data[[response_name]])
+  }
+  
+  # Predikcie modelu podla metody
+  if (method == "logistic") {
+    response <- data[[response_name]]
+    if (length(levels(response)) == 2) {
+      probs <- predict(model, newdata = data, type = "response")
+      pred <- ifelse(probs > 0.5, levels(response)[2], levels(response)[1])
+    } else {
+      pred <- predict(model, newdata = data, type = "class")
+    }
+  } else if (method == "lda") {
+    pred <- predict(model, newdata = data)$class
+  } else if (method == "qda") {
+    pred <- predict(model, newdata = data)$class
+  } else if (method == "knn") {
+    pred <- class::knn(
+      train = model$train_data,
+      test = data[, predictor_name, drop = FALSE],
+      cl = model$train_response,
+      k = model$k
+    )
+  } else {
+    stop("Neznama metoda!")
+  }
+
+    data$pred_class <- factor(pred, levels = levels(data[[response_name]]))
+    class_var <- "pred_class"
+
+  # Ridge plot
+  p <- ggplot(data, aes_string(x = predictor_name, y = class_var, fill = class_var)) +
+    geom_density_ridges(alpha = 0.7, scale = 1.2, color = "white") +
+    labs(
+      title = paste("Ridge Plot -", method, "(Predikcia modelu)"),
+      subtitle = paste("Prediktor:", predictor_name, "| Odozva:", response_name),
+      x = paste(predictor_name, "(Prediktor)"),
+      y = paste0("Predikovaná trieda")
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 14, face = "bold"),
+      plot.subtitle = element_text(size = 10)
+    )
+
+  return(p)
+}
+
+classification_model <- function(data, response_name, predictor_names, method = "logistic", k = NULL, ridge = FALSE) {
 
   if (!(response_name %in% colnames(data))) {
     stop(paste("Premenna", response_name, "nie je v datach!"))
@@ -1891,10 +1903,17 @@ classification_model <- function(data, response_name, predictor_names, method = 
   )
   
   if (length(predictor_names) == 1) {
-
-    result$decision_plot <- plot_classification_1D_combined(
-      data, response_name, predictor_names[1], model, method
-    )
+    
+    if (ridge) {
+      result$decision_plot <- plot_classification_ridge_1D(
+        data, response_name, predictor_names[1], model, method
+      )
+    }
+    else{
+      result$decision_plot <- plot_classification_1D_combined(
+        data, response_name, predictor_names[1], model, method
+      )
+    }
 
   } else if (length(predictor_names) == 2) {
     # Ak su 2 prediktory => graf rozhodovacich hranic
@@ -2172,12 +2191,12 @@ plot_conditional_densities <- function(data, selected_variables, n_breaks = 5, d
 # Finálne výstupy
 ```{r}
 printVariables(mtcars)
-model_joint_distribution_density(data = mtcars, selected_variables = c("hp", "mpg"), model_type = "t", bw = NULL, use_copula = TRUE, copula_type = "Joe", marginal_density = NULL)
+model_joint_distribution_density(data = mtcars, selected_variables = c("carb", "cyl"), model_type = NULL, bw = NULL, use_copula = FALSE, copula_type = NULL, marginal_density = NULL)
 ```
 
 ```{r}
 printVariables(mtcars)
-result <- classification_model(data = mtcars, response_name = "carb", predictor_names = c("hp"), method = "knn", k = 5)
+result <- classification_model(data = mtcars, response_name = "carb", predictor_names = c("hp"), method = "logistic", k = NULL, ridge = FALSE)
 
 result$accuracy
 result$confusion_matrix
