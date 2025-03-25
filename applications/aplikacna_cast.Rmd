@@ -27,6 +27,7 @@ suppressMessages(suppressWarnings({
   library(quantreg)
   library(splines)
   library(nnet)
+  library(ggridges)
 }))
 
 ```
@@ -489,29 +490,39 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type) {
   # Modelovanie hustoty pomocou jadroveho vyhladzovania
   if (model_type == "kernel"){
     kde_result <- kde2d(
-    x = data[[continuous_vars[1]]], 
-    y = data[[continuous_vars[2]]], 
-    n = 100
-  )
-  
-  fig_3d <- plot_ly(
-    x = ~kde_result$x, y = ~kde_result$y, z = ~kde_result$z,
-    type = "surface",
-    colors = colorRamp(c("blue", "cyan", "yellow", "red"))
-  ) %>% layout(
-    title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(jadrové   vyhladzovanie)"),
-    scene = list(
-      xaxis = list(title = continuous_vars[1]),
-      yaxis = list(title = continuous_vars[2]),
-      zaxis = list(title = "Hustota")
+      x = data[[continuous_vars[1]]], 
+      y = data[[continuous_vars[2]]], 
+      n = 100
     )
-  )
+  
+    fig_3d <- plot_ly(
+      x = ~kde_result$x, y = ~kde_result$y, z = ~kde_result$z,
+      type = "surface",
+      colors = colorRamp(c("blue", "cyan", "yellow", "red"))
+    ) %>% layout(
+      title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(jadrové   vyhladzovanie)"),
+      scene = list(
+        xaxis = list(title = continuous_vars[1]),
+        yaxis = list(title = continuous_vars[2]),
+        zaxis = list(title = "Hustota")
+      )
+    )
     
-    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2], color = continuous_vars[2])) +
-      geom_point(size = 3, alpha = 0.7) +  
-      labs(x = continuous_vars[1], y = continuous_vars[2]) +
-      scale_color_gradient(low = "blue", high = "red") +
-      theme_minimal()
+    kde_df <- data.frame(
+      expand.grid(x = kde_result$x, y = kde_result$y),
+      z = as.vector(kde_result$z)
+    )
+    
+    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
+    geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +  
+    geom_contour(data = kde_df, aes(x = x, y = y, z = z), color = "black") +
+    labs(
+      x = continuous_vars[1],
+      y = continuous_vars[2],
+      title = paste("Scatter plot s vrstevnicami (jadrové vyhladzovanie)")
+    ) +
+    scale_color_gradient(low = "blue", high = "red") +
+    theme_minimal()
 
     density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
       geom_density(fill = "blue", alpha = 0.5) +
@@ -579,13 +590,20 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type) {
         zaxis = list(title = "Hustota")
       )
     )
+    
+    contour_df <- grid
   
     # 2D Vizualizacia
-    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2], color = continuous_vars[2])) +
-      geom_point(size = 3, alpha = 0.7) +  
-      labs(x = continuous_vars[1], y = continuous_vars[2]) +
-      scale_color_gradient(low = "blue", high = "red") +
-      theme_minimal()
+    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
+    geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
+    geom_contour(data = contour_df, aes(x = x, y = y, z = z), color = "black") +
+    labs(
+      x = continuous_vars[1],
+      y = continuous_vars[2],
+      title = paste("Scatter plot s vrstevnicami (bivariátne normálne)")
+    ) +
+    scale_color_gradient(low = "blue", high = "red") +
+    theme_minimal()
   
     density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
       stat_function(fun = dnorm, args = list(mean = mean_x, sd = sd_x), fill = "blue", geom = "area", alpha = 0.5) +
@@ -666,10 +684,17 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type) {
       )
     )
   
+    contour_df <- grid
+  
     # 2D Vizualizacia
-    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2], color = continuous_vars[2])) +
-      geom_point(size = 3, alpha = 0.7) +  
-      labs(x = continuous_vars[1], y = continuous_vars[2]) +
+    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
+      geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
+      geom_contour(data = contour_df, aes(x = x, y = y, z = z), color = "black") +
+      labs(
+        x = continuous_vars[1],
+        y = continuous_vars[2],
+        title = paste("Scatter plot s vrstevnicami (bivariátne t-rozdelenie)")
+      ) +
       scale_color_gradient(low = "blue", high = "red") +
       theme_minimal()
   
@@ -758,11 +783,18 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
       zaxis = list(title = "Hustota")
     )
   )
-
+  
   # 2D Vizualizacia
-  scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2], color = continuous_vars[2])) +
-    geom_point(size = 3, alpha = 0.7) +
-    labs(x = continuous_vars[1], y = continuous_vars[2]) +
+  contour_df <- grid
+  
+  scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
+    geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
+    geom_contour(data = contour_df, aes(x = x, y = y, z = z), color = "black", size = 0.6) +
+    labs(
+      x = continuous_vars[1],
+      y = continuous_vars[2],
+      title = paste("Scatter + vrstevnice (KDE +", copula_type, "kopula)")
+    ) +
     scale_color_gradient(low = "blue", high = "red") +
     theme_minimal()
 
@@ -859,9 +891,20 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
   )
 
   # 2D Vizualizacia
-  scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2], color = continuous_vars[2])) +
-    geom_point(size = 3, alpha = 0.7) +  
-    labs(x = continuous_vars[1], y = continuous_vars[2]) +
+   scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
+    geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
+    geom_contour(
+      data = grid,
+      aes(x = x, y = y, z = z),
+      bins = 10,
+      color = "black",
+      size = 0.6
+    ) +
+    labs(
+      x = continuous_vars[1],
+      y = continuous_vars[2],
+      title = paste("Scatter + vrstevnice (dnorm +", copula_type, "kopula)")
+    ) +
     scale_color_gradient(low = "blue", high = "red") +
     theme_minimal()
 
@@ -953,11 +996,22 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     )
   
     # 2D Vizualizacia
-    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2], color = continuous_vars[2])) +
-      geom_point(size = 3, alpha = 0.7) +  
-      labs(x = continuous_vars[1], y = continuous_vars[2]) +
-      scale_color_gradient(low = "blue", high = "red") +
-      theme_minimal()
+    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
+    geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
+    geom_contour(
+      data = grid,
+      aes(x = x, y = y, z = z),
+      bins = 10,
+      color = "black",
+      size = 0.6
+    ) +
+    labs(
+      x = continuous_vars[1],
+      y = continuous_vars[2],
+      title = paste("Scatter + vrstevnice (t-rozdelenie +", copula_type, "kopula)")
+    ) +
+    scale_color_gradient(low = "blue", high = "red") +
+    theme_minimal()
   
     density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
       stat_function(fun = function(x) dt((x - mean_x) / sd_x, df = df) / sd_x, fill = "blue", geom = "area", alpha = 0.5) +
@@ -1500,67 +1554,192 @@ plot_decision_boundary <- function(data, response_name, predictor_names, model, 
   return(p)
 }
 
-plot_classification_1D <- function(data, response_name, predictor_name, model, method) {
+plot_classification_1D_combined <- function(data, response_name, predictor_name, model, method) {
+  
+  if (!is.factor(data[[response_name]])) {
+    data[[response_name]] <- as.factor(data[[response_name]])
+  }
 
-    if (!is.factor(data[[response_name]])) {
-      data[[response_name]] <- as.factor(data[[response_name]])
-    }
-  
-    grid_x <- seq(min(data[[predictor_name]]), max(data[[predictor_name]]), length.out = 300)
-    grid <- data.frame(x = grid_x)
-    names(grid) <- predictor_name
+  classes <- levels(data[[response_name]])
 
-    # Predikcia na grid
-    if (method == "logistic") {
-  
-      response <- data[[response_name]]
-  
-      if (length(levels(response)) == 2) {
-        probs <- predict(model, newdata = grid, type = "response")
-        grid$pred <- ifelse(probs > 0.5,
-                            levels(response)[2],
-                            levels(response)[1])
-      } else {
-        grid$pred <- predict(model, newdata = grid, type = "class")
-      }
-  
-    } else if (method == "lda") {
-      grid$pred <- predict(model, newdata = grid)$class
-    } else if (method == "qda") {
-      grid$pred <- predict(model, newdata = grid)$class
-    } else if (method == "knn") {
-      grid$pred <- class::knn(
-        train = model$train_data,
-        test = grid,
-        cl = model$train_response,
-        k = model$k
+  # Vlastne farby
+  my_colors <- c(
+    "1" = "#F8766D",
+    "2" = "#DAA520",  
+    "3" = "#00BA38",  
+    "4" = "#619CFF",  
+    "6" = "#C77CFF",  
+    "8" = "#FF61C3" 
+  )
+
+  # Vlastne tvary
+  my_shapes <- c(
+    "1" = 16,
+    "2" = 17,
+    "3" = 15,
+    "4" = 3,
+    "6" = 4,
+    "8" = 8
+  )
+
+  # Typ prediktora
+  if (is.numeric(data[[predictor_name]]) && length(unique(data[[predictor_name]])) > 5) {
+    predictor_type <- "continuous"
+  } else {
+    predictor_type <- "discrete"
+  }
+
+  # Grid
+  if (predictor_type == "continuous") {
+    grid_x <- seq(
+      min(data[[predictor_name]], na.rm = TRUE),
+      max(data[[predictor_name]], na.rm = TRUE),
+      length.out = 300
+    )
+  } else {
+    grid_x <- sort(unique(data[[predictor_name]]))
+  }
+
+  grid <- setNames(data.frame(grid_x), predictor_name)
+
+  # Ziskanie predikcii / pravdepodobnosti podla metody
+  probs_long <- NULL
+
+  if (method == "logistic" && length(classes) > 2) {
+
+    probs <- predict(model, newdata = grid, type = "probs") %>% as.data.frame()
+
+    grid$pred_class <- apply(probs, 1, function(row) {
+      classes[which.max(row)]
+    }) %>% factor(levels = classes)
+
+    probs[[predictor_name]] <- grid[[predictor_name]]
+
+    probs_long <- probs %>%
+      tidyr::pivot_longer(
+        cols = all_of(classes),
+        names_to = "Hodnota_odozvy",
+        values_to = "Pravdepodobnost"
       )
-    }
-  
-    # Vytvorenie grafu
-    p <- ggplot() +
-      geom_tile(data = grid, aes_string(x = predictor_name, y = "pred", fill = "pred"), alpha = 0.3, height = 0.5) +
-      
-      # Skutočné hodnoty (triedy)
-      geom_point(data = data,
-                 aes_string(x = predictor_name, y = response_name, shape = response_name, color = response_name),
-                 size = 3) +
-  
-      labs(
-        title = paste0("Predikčný model metódy: ", method),
-        subtitle = paste("Prediktor:", predictor_name, "| Odozva:", response_name),
-        x = paste0(predictor_name, " (Prediktor)"),
-        y = paste0(response_name, " (Trieda)"),
-        fill = "Predikcia modelu"
-      ) +
-      
-      theme_minimal() +
-      theme(
-        plot.title = element_text(size = 14, face = "bold"),
-        plot.subtitle = element_text(size = 10)
+
+  } else if (method == "logistic" && length(classes) == 2) {
+
+    p <- predict(model, newdata = grid, type = "response")
+
+    probs <- data.frame(
+      !!predictor_name := grid_x,
+      !!classes[1] := 1 - p,
+      !!classes[2] := p
+    )
+
+    grid$pred_class <- ifelse(p > 0.5, classes[2], classes[1]) %>%
+      factor(levels = classes)
+
+    probs_long <- probs %>%
+      tidyr::pivot_longer(
+        cols = all_of(classes),
+        names_to = "Hodnota_odozvy",
+        values_to = "Pravdepodobnost"
       )
 
-  return(p)
+  } else if (method %in% c("lda", "qda")) {
+
+    probs <- predict(model, newdata = grid)$posterior %>% as.data.frame()
+
+    grid$pred_class <- apply(probs, 1, function(row) {
+      classes[which.max(row)]
+    }) %>% factor(levels = classes)
+
+    probs[[predictor_name]] <- grid[[predictor_name]]
+
+    probs_long <- probs %>%
+      tidyr::pivot_longer(
+        cols = all_of(classes),
+        names_to = "Hodnota_odozvy",
+        values_to = "Pravdepodobnost"
+      )
+
+  } else if (method == "knn") {
+
+    grid_matrix <- as.matrix(grid[, predictor_name, drop = FALSE])
+
+    preds <- class::knn(
+      train = model$train_data,
+      test = grid_matrix,
+      cl = model$train_response,
+      k = model$k
+    )
+
+    grid$pred_class <- factor(preds, levels = classes)
+
+  } else {
+    stop("Neznama metoda!")
+  }
+
+  # Vizualizacie
+
+  # Pravdepodobnosti podla hodnot odozvy
+  p1 <- NULL
+  if (!is.null(probs_long)) {
+
+    if (predictor_type == "continuous") {
+
+      p1 <- ggplot(probs_long, aes(x = .data[[predictor_name]], y = Pravdepodobnost, color = Hodnota_odozvy)) +
+        geom_line(linewidth = 1) +
+        scale_color_manual(values = my_colors, name = "Hodnota_odozvy") +
+        labs(
+          title = paste0("Pravdepodobnosti predikcie - ", method),
+          x = paste0(predictor_name, " (Prediktor)"),
+          y = "Pravdepodobnost"
+        ) +
+        theme_minimal()
+
+    } else {
+
+      p1 <- ggplot(probs_long, aes(x = factor(.data[[predictor_name]]), y = Pravdepodobnost, fill = Hodnota_odozvy)) +
+        geom_col(position = "dodge") +
+        scale_fill_manual(values = my_colors, name = "Hodnota_odozvy") +
+        labs(
+          title = paste0("Pravdepodobnosti predikcie - ", method),
+          x = predictor_name,
+          y = "Pravdepodobnost"
+        ) +
+        theme_minimal()
+    }
+  }
+
+  # Skutocne hodnoty odozvy + rozhodovacia hranica
+  p2 <- ggplot() +
+    geom_tile(
+      data = grid,
+      aes(x = .data[[predictor_name]], y = pred_class, fill = pred_class),
+      height = 0.5,
+      alpha = 0.3
+    ) +
+    geom_jitter(
+      data = data,
+      aes(x = .data[[predictor_name]], y = .data[[response_name]], color = .data[[response_name]], shape = .data[[response_name]]),
+      width = 0.1,
+      height = 0.1,
+      size = 2
+    ) +
+    scale_fill_manual(values = my_colors, name = "Predikcia") +
+    scale_color_manual(values = my_colors, name = "Skutocna hodnota odozvy") +
+    scale_shape_manual(values = my_shapes, name = "Skutocna hodnota odozvy") +
+    labs(
+      title = "Hodnoty odozvy + rozhodovacia hranica",
+      x = paste0(predictor_name, " (Prediktor)"),
+      y = paste0(response_name, " (Odozva)")
+    ) +
+    theme_minimal()
+
+  if (!is.null(p1)) {
+    combined_plot <- p1 / p2
+  } else {
+    combined_plot <- p2
+  }
+
+  return(combined_plot)
 }
 
 classification_model <- function(data, response_name, predictor_names, method = "logistic", k = NULL) {
@@ -1633,7 +1812,7 @@ classification_model <- function(data, response_name, predictor_names, method = 
     model <- MASS::qda(formula, data = data)
 
   } else if (method == "knn") { # metoda k-najblizsich susedov
-    train_data <- data[, predictor_names]
+    train_data <- as.matrix(data[, predictor_names, drop = FALSE])
     train_response <- data[[response_name]]
     
     if (is.null(k)) {
@@ -1702,7 +1881,7 @@ classification_model <- function(data, response_name, predictor_names, method = 
 
   # Vypocet presnosti
   accuracy <- mean(preds == response)
-  confusion_mat <- table(Predicted = preds, Actual = response)
+  confusion_mat <- table(Predikovane = preds, Skutocne = response)
 
   result <- list(
     model = model,
@@ -1713,12 +1892,12 @@ classification_model <- function(data, response_name, predictor_names, method = 
   
   if (length(predictor_names) == 1) {
 
-    result$decision_plot <- plot_classification_1D(
+    result$decision_plot <- plot_classification_1D_combined(
       data, response_name, predictor_names[1], model, method
     )
 
   } else if (length(predictor_names) == 2) {
-    # Ak su len 2 prediktory => graf rozhodovacich hranic
+    # Ak su 2 prediktory => graf rozhodovacich hranic
 
     result$decision_plot <- plot_decision_boundary(
       data, response_name, predictor_names, model, method
@@ -1732,7 +1911,7 @@ classification_model <- function(data, response_name, predictor_names, method = 
 
 # Modelovanie podmienenej hustoty 2D
 ```{r}
-plot_conditional_continuous_densities <- function(df, n_breaks = 5, density_scaling = 2000, mean_curve = TRUE, quantiles = NULL, mean_poly_degree = 1, quantile_poly_degree = 1, normal_density = TRUE, empirical_density = TRUE) {
+plot_conditional_continuous_densities <- function(df, n_breaks = 5, density_scaling = 2000, mean_curve = TRUE, quantiles = NULL, mean_poly_degree = 1, quantile_poly_degree = 1, normal_density = TRUE, empirical_density = TRUE, bw = NULL) {
   
   response_name <- attr(df, "response_var")
   predictor_name <- attr(df, "predictor_var")
@@ -1758,7 +1937,12 @@ plot_conditional_continuous_densities <- function(df, n_breaks = 5, density_scal
     
     # Empiricka hustota
     if (empirical_density) {
-      emp_density <- density(sub_df$residuals, n = 50)
+      if (is.null(bw)){
+        emp_density <- density(sub_df$residuals, n = 50, bw = "nrd0")
+      }
+      else{
+        emp_density <- density(sub_df$residuals, n = 50, bw = bw)
+      }
       
       df_emp <- data.frame(
         x = x_max - emp_density$y * density_scaling,
@@ -1849,7 +2033,7 @@ plot_conditional_continuous_densities <- function(df, n_breaks = 5, density_scal
   return(p)
 }
 
-plot_conditional_discrete_densities <- function(df, n_breaks = 5, density_scaling = 2000) {
+plot_conditional_discrete_densities <- function(df, n_breaks = 5, density_scaling = 2000, ordinal = FALSE) {
   
   response_name <- attr(df, "response_var")
   predictor_name <- attr(df, "predictor_var")
@@ -1870,7 +2054,7 @@ plot_conditional_discrete_densities <- function(df, n_breaks = 5, density_scalin
     prob_table <- prop.table(table(sub_df$response))
     
     # Y su hodnoty odozvy, X su dlzky ciar podla pravdepodobnosti
-    y_vals <- as.numeric(levels(sub_df$response))
+    y_vals <- as.numeric(names(prob_table))
     
     x_start <- max(sub_df$predictor, na.rm = TRUE)
     x_end <- x_start + (as.numeric(prob_table) * density_scaling)
@@ -1891,6 +2075,8 @@ plot_conditional_discrete_densities <- function(df, n_breaks = 5, density_scalin
     warning("Nebolo mozne vypocitat ziadne pravdepodobnosti!")
   }
   
+  print(density_data)
+  
   # Vykreslenie grafu
   p <- ggplot(df, aes(x = predictor, y = as.numeric(response))) +
     geom_jitter(width = 0.1, height = 0.1, alpha = 0.6, color = "darkorange") +
@@ -1903,8 +2089,9 @@ plot_conditional_discrete_densities <- function(df, n_breaks = 5, density_scalin
     geom_vline(xintercept = breaks, linetype = "dashed", color = "grey50")
   
   # Podmienene pravdepodobnostne funkcie
-  if (!is.null(density_data) && nrow(density_data) > 0) {
+    if (!is.null(density_data) && nrow(density_data) > 0) {
     
+    # Segmenty (vodorovne ciary)
     p <- p + geom_segment(
       data = density_data,
       aes(x = x_start, xend = x_end, y = y, yend = y),
@@ -1912,6 +2099,7 @@ plot_conditional_discrete_densities <- function(df, n_breaks = 5, density_scalin
       size = 1
     )
     
+    # Body (konce pravdepodobnostnych funkcii)
     p <- p + geom_point(
       data = density_data,
       aes(x = x_end, y = y),
@@ -1919,12 +2107,34 @@ plot_conditional_discrete_densities <- function(df, n_breaks = 5, density_scalin
       color = "red",
       size = 1.5
     )
+    
+    # Ak je premenna ordinalna, spojime body ciarou
+    if (ordinal) {
+      sections <- unique(density_data$section)
+      
+      for (s in sections) {
+        
+        sub_density <- density_data %>%
+          dplyr::filter(section == s) %>%
+          dplyr::arrange(y)
+        
+    
+        if (nrow(sub_density) >= 2) {
+          p <- p + geom_path(
+            data = sub_density,
+            aes(x = x_end, y = y),
+            color = "darkorchid",
+            linewidth = 1
+          )
+        }
+      }
+    }
   }
   
   return(p)
 }
 
-plot_conditional_densities <- function(data, selected_variables, n_breaks = 5, density_scaling = 2000, mean_curve = TRUE, quantiles = NULL, mean_poly_degree = 1, quantile_poly_degree = 1, normal_density = TRUE, empirical_density = TRUE) {
+plot_conditional_densities <- function(data, selected_variables, n_breaks = 5, density_scaling = 2000, ordinal = FALSE, mean_curve = TRUE, quantiles = NULL, mean_poly_degree = 1, quantile_poly_degree = 1, normal_density = TRUE, empirical_density = TRUE, bw = NULL) {
   
   response_var <- selected_variables[1]
   predictor_var <- selected_variables[2]
@@ -1945,12 +2155,12 @@ plot_conditional_densities <- function(data, selected_variables, n_breaks = 5, d
     
     message(paste("Odozva", response_var, "bola identifikovana ako diskretna."))
     df$response <- as.factor(df$response)
-    plot_conditional_discrete_densities(df, n_breaks, density_scaling)
+    plot_conditional_discrete_densities(df, n_breaks, density_scaling, ordinal)
     
   } else if (response_var %in% var_types$Spojite) {
     
     message(paste("Odozva", response_var, "bola identifikovana ako spojita."))
-    plot_conditional_continuous_densities(df, n_breaks, density_scaling, mean_curve, quantiles, mean_poly_degree, quantile_poly_degree, normal_density, empirical_density)
+    plot_conditional_continuous_densities(df, n_breaks, density_scaling, mean_curve, quantiles, mean_poly_degree, quantile_poly_degree, normal_density, empirical_density, bw)
     
   } else {
     
@@ -1962,12 +2172,12 @@ plot_conditional_densities <- function(data, selected_variables, n_breaks = 5, d
 # Finálne výstupy
 ```{r}
 printVariables(mtcars)
-model_joint_distribution_density(data = mtcars, selected_variables = c("mpg", "carb"), model_type = "normal")
+model_joint_distribution_density(data = mtcars, selected_variables = c("hp", "mpg"), model_type = "t", bw = NULL, use_copula = TRUE, copula_type = "Joe", marginal_density = NULL)
 ```
 
 ```{r}
 printVariables(mtcars)
-result <- classification_model(data = mtcars, response_name = "carb", predictor_names = c("mpg", "hp"), method = "logistic")
+result <- classification_model(data = mtcars, response_name = "carb", predictor_names = c("hp"), method = "knn", k = 5)
 
 result$accuracy
 result$confusion_matrix
@@ -1983,7 +2193,7 @@ result$combined_plot
 
 ```{r}
 printVariables(mtcars)
-plot_conditional_densities(data = mtcars, selected_variables = c("hp", "carb"), n_breaks = 8, density_scaling = 50, mean_curve = FALSE, quantiles = NULL, mean_poly_degree = 2, quantile_poly_degree = 3, normal_density = TRUE, empirical_density = TRUE)
+plot_conditional_densities(data = mtcars, selected_variables = c("carb", "hp"), n_breaks = 5, density_scaling = 50, ordinal = TRUE, mean_curve = FALSE, quantiles = NULL, mean_poly_degree = 2, quantile_poly_degree = 3, normal_density = FALSE, empirical_density = TRUE, bw = 1.2)
 ```
 
 
@@ -2008,8 +2218,6 @@ plot_conditional_densities(data = mtcars, selected_variables = c("hp", "carb"), 
   - Joe
   *Jadrove vyhladzovanie ("kernel")*
   - empirical
-  - Gumbel
-  - Frank
 - **marginal_density**:
   - *"log_dnorm"*
   - *"dnorm"*
@@ -2076,10 +2284,9 @@ plot_conditional_densities(data = mtcars, selected_variables = c("hp", "carb"), 
   
 *Pridat*
 Vyriesene:
-  - copula -> use_copula
-  - kernel - explicitne zadavat bw aj pre marginalu
-  - normal_copula - dat uzivatelovi moznost vyberu pocitania marginalnych hustot (napr. cez dnorm() alebo lognorm atd.)
-  - rozdelit funkciu model_conditional_mean_value na dve
-  - pridat funkciu na modelovanie klasikacnych metod (napr. logisticka regresia)
-  - vyriesit normovanie plochy pod hustotou pre mix premennych na sucet = 1
-  - modelovanie podmienenej hustoty pravdepodobnosti
+  *plot_conditional_densities*
+    - spajat body podm. pravd. fun. pri ordinalnych disk. prem.
+    - pridat na vstup mieru zhladzovania
+  - vrstevnice pre modelovanie hustoty dvoch spojitych premennych
+  - explicitne klasifikacny model pre jeden prediktor
+  
