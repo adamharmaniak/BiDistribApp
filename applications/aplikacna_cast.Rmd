@@ -1640,12 +1640,13 @@ plot_classification_1D_combined <- function(data, response_name, predictor_name,
   colors_used <- my_colors[present_indices]
 
   # Pravdepodobnosti
-  p1 <- NULL
   if (!is.null(probs_long)) {
+    probs_long <- probs_long %>% filter(Hodnota_odozvy %in% present_levels)
+  
     if (predictor_type == "continuous") {
       p1 <- ggplot(probs_long, aes(x = .data[[predictor_name]], y = Pravdepodobnost, color = Hodnota_odozvy)) +
         geom_line(linewidth = 1) +
-        scale_color_manual(values = my_colors) +
+        scale_color_manual(values = setNames(colors_used, present_levels)) +
         labs(
           title = paste0("Pravdepodobnosti predikcie - ", method),
           x = paste0(predictor_name, " (Prediktor)"),
@@ -1656,7 +1657,7 @@ plot_classification_1D_combined <- function(data, response_name, predictor_name,
     } else {
       p1 <- ggplot(probs_long, aes(x = factor(.data[[predictor_name]]), y = Pravdepodobnost, fill = Hodnota_odozvy)) +
         geom_col(position = "dodge") +
-        scale_fill_manual(values = my_colors) +
+        scale_fill_manual(values = setNames(colors_used, present_levels)) +
         labs(
           title = paste0("Pravdepodobnosti predikcie - ", method),
           x = predictor_name,
@@ -1708,8 +1709,14 @@ plot_classification_ridge_1D <- function(data, response_name, predictor_name, mo
   if (!is.factor(data[[response_name]])) {
     data[[response_name]] <- as.factor(data[[response_name]])
   }
-  
-  # Predikcie modelu podla metody
+
+  data[[response_name]] <- factor(data[[response_name]], levels = sort(as.numeric(levels(data[[response_name]]))))
+  classes <- levels(data[[response_name]])
+  n_classes <- length(classes)
+
+  my_colors <- c("#F8766D", "#DAA520", "#00BA38", "#619CFF", "#C77CFF", "#FF61C3")[1:n_classes]
+
+  # Predikcie modelu
   if (method == "logistic") {
     response <- data[[response_name]]
     if (length(levels(response)) == 2) {
@@ -1730,20 +1737,25 @@ plot_classification_ridge_1D <- function(data, response_name, predictor_name, mo
       k = model$k
     )
   } else {
-    stop("Neznama metoda!")
+    stop("Neznáma metóda!")
   }
 
-    data$pred_class <- factor(pred, levels = levels(data[[response_name]]))
-    class_var <- "pred_class"
+  data$pred_class <- factor(pred, levels = classes)
+  class_var <- "pred_class"
 
-  # Ridge plot
+  # Iba prítomné triedy v predikcii
+  present_levels <- levels(droplevels(data[[class_var]]))
+  present_indices <- match(present_levels, classes)
+  colors_used <- my_colors[present_indices]
+
   p <- ggplot(data, aes_string(x = predictor_name, y = class_var, fill = class_var)) +
     geom_density_ridges(alpha = 0.7, scale = 1.2, color = "white") +
+    scale_fill_manual(values = setNames(colors_used, present_levels)) +
     labs(
       title = paste("Ridge Plot -", method, "(Predikcia modelu)"),
       subtitle = paste("Prediktor:", predictor_name, "| Odozva:", response_name),
       x = paste(predictor_name, "(Prediktor)"),
-      y = paste0("Predikovaná trieda")
+      y = "Predikovaná trieda"
     ) +
     theme_minimal() +
     theme(
@@ -2191,7 +2203,7 @@ plot_conditional_densities <- function(data, selected_variables, n_breaks = 5, d
 # Finálne výstupy
 ```{r}
 printVariables(mtcars)
-model_joint_distribution_density(data = mtcars, selected_variables = c("carb", "cyl"), model_type = NULL, bw = NULL, use_copula = FALSE, copula_type = NULL, marginal_density = NULL)
+model_joint_distribution_density(data = mtcars, selected_variables = c("hp", "mpg"), model_type = "kernel", bw = NULL, use_copula = FALSE, copula_type = NULL, marginal_density = NULL)
 ```
 
 ```{r}
