@@ -201,7 +201,7 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
   }
   
   # Modelovanie hustoty ako hustoty normalneho rozdelenia (dnorm)
-  if (model_type == "normal") {
+  if (model_type == "parametric") {
   
     # Konverzia diskretnej premennej na faktor a zoradenie kategorii
     data[[discrete_vars]] <- factor(data[[discrete_vars]])
@@ -545,7 +545,7 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type) {
   }
   
   # Modelovanie zdruzenej hustoty ako hustoty normalneho rozdelenia
-  if (model_type == "normal") {
+  if (model_type == "parametric") {
     # Vypocet zakladnych parametrov (momentov)
     mean_x <- mean(data[[continuous_vars[1]]], na.rm = TRUE)
     sd_x <- sd(data[[continuous_vars[1]]], na.rm = TRUE)
@@ -720,7 +720,7 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type) {
   
 }
 
-continuous_joint_distribution_copula <- function(data, continuous_vars, model_type, copula_type, marginal_density = "dnorm") {
+continuous_joint_distribution_copula <- function(data, continuous_vars, model_type, copula_type, marginal_densities = c("dnorm", "dnorm")) {
 
   # Modelovanie hustoty pomocou jadroveho vyhladzovania a kopuly (rozklad na marginaly)
   if (model_type == "kernel") {
@@ -819,7 +819,7 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
   }
   
   # Modelovanie zdruzenej hustoty ako hustoty normalneho rozdelenia a pomocou kopuly (rozklad na marginaly)
-  if (model_type == "normal") {
+  if (model_type == "parametric") {
     # Vypocet marginalnych parametrov
   mean_x <- mean(data[[continuous_vars[1]]], na.rm = TRUE)
   sd_x <- sd(data[[continuous_vars[1]]], na.rm = TRUE)
@@ -851,13 +851,16 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
   grid <- expand.grid(x = x_vals, y = y_vals)
   
   # Funkcia na vypocet marginalnej hustoty podla vyberu
-    marginal_density_function <- function(value, mean, sd) {
-      if (marginal_density == "dnorm") {
-        return(dnorm(value, mean = mean, sd = sd))
-      } else if (marginal_density == "log_dnorm") {
-        return(exp(dnorm(value, mean = mean, sd = sd, log = TRUE)))
-      }
+  marginal_density_function <- function(value, mean, sd, index) {
+    density_type <- marginal_densities[index]
+    if (density_type == "dnorm") {
+      return(dnorm(value, mean = mean, sd = sd))
+    } else if (density_type == "log_dnorm") {
+      return(exp(dnorm(value, mean = mean, sd = sd, log = TRUE)))
+    } else {
+      stop(paste("Neznáma hustota:", density_type))
     }
+  }
 
   # Vypocet zdruzenej hustoty cez rozklad na marginaly + kopula
   copula_density_function <- function(x, y) {
@@ -866,8 +869,8 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
 
     copula_part <- dCopula(cbind(u1, u2), copula = copula_model_fitted)
 
-    marginal_x <- marginal_density_function(x, mean_x, sd_x)
-    marginal_y <- marginal_density_function(y, mean_y, sd_y)
+    marginal_x <- marginal_density_function(x, mean_x, sd_x, 1)
+    marginal_y <- marginal_density_function(y, mean_y, sd_y, 2)
 
     copula_part * marginal_x * marginal_y
   }
@@ -1157,7 +1160,7 @@ discrete_joint_distribution <- function(data, discrete_vars) {
   return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
 }
 
-model_joint_distribution_density <- function(data, selected_variables, model_type = NULL, bw = NULL, use_copula = FALSE, copula_type = NULL, marginal_density = NULL) {
+model_joint_distribution_density <- function(data, selected_variables, model_type = NULL, bw = NULL, use_copula = FALSE, copula_type = NULL, marginal_densities = NULL) {
   # Identifikacia typov premennych
   variable_types <- identify_variables(data)
   discrete_vars <- intersect(variable_types$Diskretne, selected_variables)
@@ -1197,10 +1200,10 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
         if (!is.null(bw)) {
           stop("Parameter bandwidth ('bw') sa zadava iba pri jadrovom vyhladzovani zmesi.")
         }
-        if (model_type != "normal" && !is.null(marginal_density)){
-          stop("Parameter marginal_density sa zadava iba pri model_type = 'normal' s kopulou")
+        if (model_type != "parametric" && !is.null(marginal_densities)){
+          stop("Parameter marginal_densities sa zadava iba pri model_type = 'parametric' s kopulou")
         }
-        result <- continuous_joint_distribution_copula(data, continuous_vars, model_type, copula_type)
+        result <- continuous_joint_distribution_copula(data, continuous_vars, model_type, copula_type, marginal_densities)
         print(result)
       }
     }
@@ -1704,69 +1707,7 @@ plot_classification_1D_combined <- function(data, response_name, predictor_name,
   }
 }
 
-plot_classification_ridge_1D <- function(data, response_name, predictor_name, model, method) {
-
-  if (!is.factor(data[[response_name]])) {
-    data[[response_name]] <- as.factor(data[[response_name]])
-  }
-
-  data[[response_name]] <- factor(data[[response_name]], levels = sort(as.numeric(levels(data[[response_name]]))))
-  classes <- levels(data[[response_name]])
-  n_classes <- length(classes)
-
-  my_colors <- c("#F8766D", "#DAA520", "#00BA38", "#619CFF", "#C77CFF", "#FF61C3")[1:n_classes]
-
-  # Predikcie modelu
-  if (method == "logistic") {
-    response <- data[[response_name]]
-    if (length(levels(response)) == 2) {
-      probs <- predict(model, newdata = data, type = "response")
-      pred <- ifelse(probs > 0.5, levels(response)[2], levels(response)[1])
-    } else {
-      pred <- predict(model, newdata = data, type = "class")
-    }
-  } else if (method == "lda") {
-    pred <- predict(model, newdata = data)$class
-  } else if (method == "qda") {
-    pred <- predict(model, newdata = data)$class
-  } else if (method == "knn") {
-    pred <- class::knn(
-      train = model$train_data,
-      test = data[, predictor_name, drop = FALSE],
-      cl = model$train_response,
-      k = model$k
-    )
-  } else {
-    stop("Neznáma metóda!")
-  }
-
-  data$pred_class <- factor(pred, levels = classes)
-  class_var <- "pred_class"
-
-  # Iba prítomné triedy v predikcii
-  present_levels <- levels(droplevels(data[[class_var]]))
-  present_indices <- match(present_levels, classes)
-  colors_used <- my_colors[present_indices]
-
-  p <- ggplot(data, aes_string(x = predictor_name, y = class_var, fill = class_var)) +
-    geom_density_ridges(alpha = 0.7, scale = 1.2, color = "white") +
-    scale_fill_manual(values = setNames(colors_used, present_levels)) +
-    labs(
-      title = paste("Ridge Plot -", method, "(Predikcia modelu)"),
-      subtitle = paste("Prediktor:", predictor_name, "| Odozva:", response_name),
-      x = paste(predictor_name, "(Prediktor)"),
-      y = "Predikovaná trieda"
-    ) +
-    theme_minimal() +
-    theme(
-      plot.title = element_text(size = 14, face = "bold"),
-      plot.subtitle = element_text(size = 10)
-    )
-
-  return(p)
-}
-
-classification_model <- function(data, response_name, predictor_names, method = "logistic", k = NULL, ridge = FALSE) {
+classification_model <- function(data, response_name, predictor_names, method = "logistic", k = NULL) {
 
   if (!(response_name %in% colnames(data))) {
     stop(paste("Premenna", response_name, "nie je v datach!"))
@@ -1942,7 +1883,7 @@ classification_model <- function(data, response_name, predictor_names, method = 
 
 # Modelovanie podmienenej hustoty 2D
 ```{r}
-plot_conditional_continuous_densities <- function(df, n_breaks = 5, density_scaling = 2000, mean_curve = TRUE, quantiles = NULL, mean_poly_degree = 1, quantile_poly_degree = 1, normal_density = TRUE, empirical_density = TRUE, bw = NULL) {
+plot_conditional_continuous_densities <- function(df, n_breaks = 5, density_scaling = 2000, mean_curve = TRUE, quantiles = NULL, mean_poly_degree = 1, quantile_poly_degree = 1, normal_density = TRUE, empirical_density = TRUE, bw_scale = NULL) {
   
   response_name <- attr(df, "response_var")
   predictor_name <- attr(df, "predictor_var")
@@ -1966,13 +1907,17 @@ plot_conditional_continuous_densities <- function(df, n_breaks = 5, density_scal
     y_mean <- mean(sub_df$response, na.rm = TRUE)
     x_max <- max(sub_df$predictor, na.rm = TRUE)
     
+    
+    
     # Empiricka hustota
     if (empirical_density) {
-      if (is.null(bw)){
+      if (is.null(bw_scale)){
         emp_density <- density(sub_df$residuals, n = 50, bw = "nrd0")
       }
       else{
-        emp_density <- density(sub_df$residuals, n = 50, bw = bw)
+        local_range <- max(sub_df$response, na.rm = TRUE) - min(sub_df$response, na.rm = TRUE)
+        bw_effective <- bw_scale * local_range
+        emp_density <- density(sub_df$residuals, n = 50, bw = bw_effective)
       }
       
       df_emp <- data.frame(
@@ -2165,7 +2110,7 @@ plot_conditional_discrete_densities <- function(df, n_breaks = 5, density_scalin
   return(p)
 }
 
-plot_conditional_densities <- function(data, selected_variables, n_breaks = 5, density_scaling = 2000, ordinal = FALSE, mean_curve = TRUE, quantiles = NULL, mean_poly_degree = 1, quantile_poly_degree = 1, normal_density = TRUE, empirical_density = TRUE, bw = NULL) {
+plot_conditional_densities <- function(data, selected_variables, n_breaks = 5, density_scaling = 2000, ordinal = FALSE, mean_curve = TRUE, quantiles = NULL, mean_poly_degree = 1, quantile_poly_degree = 1, normal_density = TRUE, empirical_density = TRUE, bw_scale = NULL) {
   
   response_var <- selected_variables[1]
   predictor_var <- selected_variables[2]
@@ -2191,7 +2136,7 @@ plot_conditional_densities <- function(data, selected_variables, n_breaks = 5, d
   } else if (response_var %in% var_types$Spojite) {
     
     message(paste("Odozva", response_var, "bola identifikovana ako spojita."))
-    plot_conditional_continuous_densities(df, n_breaks, density_scaling, mean_curve, quantiles, mean_poly_degree, quantile_poly_degree, normal_density, empirical_density, bw)
+    plot_conditional_continuous_densities(df, n_breaks, density_scaling, mean_curve, quantiles, mean_poly_degree, quantile_poly_degree, normal_density, empirical_density, bw_scale)
     
   } else {
     
@@ -2203,7 +2148,7 @@ plot_conditional_densities <- function(data, selected_variables, n_breaks = 5, d
 # Finálne výstupy
 ```{r}
 printVariables(mtcars)
-model_joint_distribution_density(data = mtcars, selected_variables = c("hp", "mpg"), model_type = "kernel", bw = NULL, use_copula = FALSE, copula_type = NULL, marginal_density = NULL)
+model_joint_distribution_density(data = mtcars, selected_variables = c("hp", "mpg"), model_type = "parametric", bw = NULL, use_copula = TRUE, copula_type = "Frank", marginal_densities = c("dnorm", "log_dnorm"))
 ```
 
 ```{r}
@@ -2224,7 +2169,7 @@ result$combined_plot
 
 ```{r}
 printVariables(mtcars)
-plot_conditional_densities(data = mtcars, selected_variables = c("carb", "hp"), n_breaks = 5, density_scaling = 50, ordinal = TRUE, mean_curve = FALSE, quantiles = NULL, mean_poly_degree = 2, quantile_poly_degree = 3, normal_density = FALSE, empirical_density = TRUE, bw = 1.2)
+plot_conditional_densities(data = mtcars, selected_variables = c("mpg", "hp"), n_breaks = 5, density_scaling = 50, ordinal = TRUE, mean_curve = FALSE, quantiles = NULL, mean_poly_degree = 2, quantile_poly_degree = 3, normal_density = FALSE, empirical_density = TRUE, bw_scale = 0.05)
 ```
 
 
@@ -2249,7 +2194,8 @@ plot_conditional_densities(data = mtcars, selected_variables = c("carb", "hp"), 
   - Joe
   *Jadrove vyhladzovanie ("kernel")*
   - empirical
-- **marginal_density**:
+- **marginal_densities**:
+  - tvar: c("", "")
   - *"log_dnorm"*
   - *"dnorm"*
 
@@ -2312,12 +2258,4 @@ plot_conditional_densities(data = mtcars, selected_variables = c("carb", "hp"), 
 - **density_scaling** -> skalovanie P-funkcii pre lepsi fitting do grafu
 - **normal_density** -> TRUE/FALSE, ne/vykreslit podmienenu hustotu norm. rozdelenia (dnorm())
 - **empirical_density** -> TRUE/FALSE, ne/vykreslit podmienenu empiricku hustotu (density(), beru sa do uvahy rezidualne
-  
-*Pridat*
-Vyriesene:
-  *plot_conditional_densities*
-    - spajat body podm. pravd. fun. pri ordinalnych disk. prem.
-    - pridat na vstup mieru zhladzovania
-  - vrstevnice pre modelovanie hustoty dvoch spojitych premennych
-  - explicitne klasifikacny model pre jeden prediktor
   
