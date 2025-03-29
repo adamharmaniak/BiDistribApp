@@ -21,12 +21,7 @@ ui <- fluidPage(
       div(
         id = "model_outputs",
         style = "border: 1px dashed gray; padding: 10px; margin-bottom: 30px;",
-        
-        # Kombinovaný výstup: najprv plotly, potom plot
-        conditionalPanel("input.plot_type.includes('3D')",
-                         plotlyOutput("model_outputs_plot3d")),
-        conditionalPanel("input.plot_type.includes('2D')",
-                         plotOutput("model_outputs_plot2d"))
+        uiOutput("model_outputs_combined")
       ),
       uiOutput("variable_info_ui")
     )

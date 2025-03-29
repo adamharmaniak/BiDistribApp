@@ -103,21 +103,19 @@ server <- function(input, output, session) {
       )
     } else if (tab == "joint_density") {
       
-      req(loaded_data())  # zobrazi sa len ak su data nacitane
+      req(loaded_data())
       data <- loaded_data()
       var_names <- names(data)
       
       tagList(
         h4("Density model settings"),
         
-        # Vyber premennych
         checkboxGroupInput(
           "density_vars", "Select variables:",
           choices = var_names,
           selected = isolate(input$density_vars)
         ),
         
-        # Typ modelu
         selectInput(
           "density_model_type", "Select model type:",
           choices = c("Parametric" = "parametric",
@@ -126,43 +124,37 @@ server <- function(input, output, session) {
           selected = isolate(input$density_model_type)
         ),
         
-        # Bandwidth – rucne nastavitelny
         checkboxInput(
-          "set_bw", "Set manual bandwidth (bw)", 
-          value = isolate(input$set_bw)
+          "set_bw", "Set manual bandwidth (bw)",
+          value = isolate(input$set_bw) %||% FALSE
         ),
         
         conditionalPanel(
           condition = "input.set_bw == true",
           numericInput(
-            "bw_value", "Bandwidth (0.10 – 6.00):", 
-            value = isolate(ifelse(is.null(input$bw_value), 1.0, input$bw_value)),
+            "bw_value", "Bandwidth (0.10 – 6.00):",
+            value = isolate(input$bw_value) %||% NULL,
             min = 0.10, max = 6.00, step = 0.1
           )
         ),
         
-        # Vyber typu grafu
         checkboxGroupInput(
           "plot_type", "Plot type:",
           choices = c("2D", "3D"),
           selected = isolate(input$plot_type)
         ),
         
-        # Pouzitie kopuly – Yes/No
         radioButtons(
           "use_copula", "Use copula:",
           choices = c("No" = "false", "Yes" = "true"),
           selected = isolate(input$use_copula)
         ),
         
-        # Zobrazenie copula_type a marginal_densities len ak je zapnuta kopula
         conditionalPanel(
           condition = "input.use_copula == 'true'",
           
-          # Vyber typu copuly podla modelu
           uiOutput("copula_type_ui"),
           
-          # Vyber marginalnych hustot len ak model = parametric
           conditionalPanel(
             condition = "input.density_model_type == 'parametric'",
             selectInput(
@@ -177,7 +169,6 @@ server <- function(input, output, session) {
           )
         ),
         
-        # Spustacie tlacidlo
         actionButton("run_density_model", "Model")
       )
       
@@ -194,20 +185,28 @@ server <- function(input, output, session) {
     selected_vars <- input$density_vars
     data <- loaded_data()
     model_type <- input$density_model_type
-    plot_type <- if (length(input$plot_type) > 0) input$plot_type[1] else NULL
+    selected_plot_types <- input$plot_type
     use_copula <- input$use_copula == "true"
     
+    # Bandwidth
     bw_value <- NULL
     if (!is.null(input$set_bw) && input$set_bw) {
       bw_value <- input$bw_value
     }
     
+    # Copula type
     copula_type <- if (use_copula) input$copula_type else NULL
     
+    # Marginal densities
     marginal_densities <- NULL
     if (use_copula && model_type == "parametric") {
       marginal_densities <- strsplit(input$marginal_densities, ",\\s*")[[1]]
     }
+    
+    # Vymazanie predchádzajúcich grafov a tabuliek
+    output$model_outputs_plot2d <- renderPlot({ NULL })
+    output$model_outputs_plot3d <- renderPlotly({ NULL })
+    output$model_outputs_table <- renderTable({ NULL })
     
     tryCatch({
       result <- model_joint_distribution_density(
@@ -218,13 +217,60 @@ server <- function(input, output, session) {
         use_copula = use_copula,
         copula_type = copula_type,
         marginal_densities = marginal_densities,
-        plot_type = plot_type
+        plot_type = if (length(selected_plot_types) > 0) selected_plot_types[1] else NULL
       )
       
-      if (plot_type == "3D") {
-        output$model_outputs_plot3d <- renderPlotly({ result })
+      # Rozhodnutie podľa typu výstupu
+      if (is.data.frame(result)) {
+        output$model_outputs_combined <- renderUI({
+          tagList(
+            h4("Joint distribution table:"),
+            tableOutput("model_outputs_table")
+          )
+        })
+        
+        output$model_outputs_table <- renderTable({
+          result
+        })
+        
       } else {
-        output$model_outputs_plot2d <- renderPlot({ result })
+        rendered_outputs <- list()
+        
+        for (plot_type in selected_plot_types) {
+          if (plot_type == "2D") {
+            result2D <- model_joint_distribution_density(
+              data = data,
+              selected_variables = selected_vars,
+              model_type = model_type,
+              bw = bw_value,
+              use_copula = use_copula,
+              copula_type = copula_type,
+              marginal_densities = marginal_densities,
+              plot_type = "2D"
+            )
+            output$model_outputs_plot2d <- renderPlot({ result2D })
+            rendered_outputs <- append(rendered_outputs, list(plotOutput("model_outputs_plot2d")))
+          }
+          
+          if (plot_type == "3D") {
+            result3D <- model_joint_distribution_density(
+              data = data,
+              selected_variables = selected_vars,
+              model_type = model_type,
+              bw = bw_value,
+              use_copula = use_copula,
+              copula_type = copula_type,
+              marginal_densities = marginal_densities,
+              plot_type = "3D"
+            )
+            output$model_outputs_plot3d <- renderPlotly({ result3D })
+            rendered_outputs <- append(rendered_outputs, list(plotlyOutput("model_outputs_plot3d")))
+          }
+        }
+        
+        output$model_outputs_combined <- renderUI({
+          tagList(rendered_outputs)
+        })
       }
       
     }, error = function(e) {
