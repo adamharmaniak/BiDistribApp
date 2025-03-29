@@ -23,22 +23,20 @@ printVariables <- function(data) {
   
   all_variables <- c(variables$Diskretne, variables$Spojite)
   
-  variable_types <- c(rep("Diskrétna", length(variables$Diskretne)),
-                      rep("Spojitá", length(variables$Spojite)))
+  variable_types <- c(rep("Discrete", length(variables$Diskretne)),
+                      rep("Continuous", length(variables$Spojite)))
   
   counts <- sapply(all_variables, function(var) sum(!is.na(data[[var]])))
   
-  table_result <- tibble(
+  tibble(
     Index = seq_len(num_variables),
     Variable_Name = all_variables,
     Variable_Type = variable_types,
     Pocet_pozorovani = counts
   )
-  
-  print(table_result)
 }
 
-mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, model_type, bw) {
+mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, model_type, bw, plot_type) {
   
   # Modelovanie hustoty pouzitim jadroveho vyhladzovania
   if (model_type == "kernel") {
@@ -108,59 +106,61 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
     
     message("Kontrola normovania zmesi hustoty: Celkovy integral = ", round(total_integral, 4))
     
-    # 3D Vizualizacia
-    fig_3d <- plot_ly(
-      density_data,
-      x = ~Weight, y = ~Category, z = ~Density,
-      type = 'scatter3d', mode = 'lines',
-      color = ~Category, colors = category_colors, line = list(width = 4)
-    ) %>%
-      layout(scene = list(
-        xaxis = list(title = continuous_vars),
-        yaxis = list(title = discrete_vars),
-        zaxis = list(title = 'Hustota')
-      ))
     
-    # 2D Vizualizacia
-    data[[discrete_vars]] <- factor(data[[discrete_vars]], levels = categories)
-    
-    scatter_plot <- ggplot(data, aes_string(x = continuous_vars, y = discrete_vars, color = discrete_vars)) +
-      geom_point(size = 3, alpha = 0.7) +
-      labs(x = continuous_vars, y = discrete_vars) +
-      scale_color_manual(values = category_colors) +
-      theme_minimal() +
-      theme(legend.position = "right")
-    
-    # Prepocet, lebo geom_density() neberie priamo bw
-    reference_bw <- bw.nrd0(data[[continuous_vars]])
-    adjust_factor <- global_bw / reference_bw
-    
-    x_density <- ggplot(data, aes_string(x = continuous_vars, fill = discrete_vars, color = discrete_vars)) +
-      geom_density(alpha = 0.5, adjust = adjust_factor) +
-      scale_fill_manual(values = category_colors) +
-      scale_color_manual(values = category_colors) +
-      labs(x = NULL, y = paste("Hustota (", continuous_vars, ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "right")
-    
-    y_bar <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
-      geom_bar(alpha = 0.7) +
-      coord_flip() +
-      scale_fill_manual(values = category_colors) +
-      labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "right")
-    
-    final_plot_2d <- (x_density + plot_spacer()) /
-      (scatter_plot + y_bar) +
-      plot_layout(widths = c(4, 1), heights = c(1, 4))
-    
-    return(list(
-      fig_3d = fig_3d,
-      final_plot_2d = final_plot_2d,
-      total_integral = total_integral,
-      integral_per_category = integral_check
-    ))
+    if (plot_type == "3D") {
+      # 3D Vizualizacia
+      fig_3d <- plot_ly(
+        density_data,
+        x = ~Weight, y = ~Category, z = ~Density,
+        type = 'scatter3d', mode = 'lines',
+        color = ~Category, colors = category_colors, line = list(width = 4)
+      ) %>%
+        layout(scene = list(
+          xaxis = list(title = continuous_vars),
+          yaxis = list(title = discrete_vars),
+          zaxis = list(title = 'Hustota')
+        ))
+      
+      return(fig_3d)
+      
+    } else if (plot_type == "2D") {
+      # 2D Vizualizacia
+      data[[discrete_vars]] <- factor(data[[discrete_vars]], levels = categories)
+      
+      scatter_plot <- ggplot(data, aes_string(x = continuous_vars, y = discrete_vars, color = discrete_vars)) +
+        geom_point(size = 3, alpha = 0.7) +
+        labs(x = continuous_vars, y = discrete_vars) +
+        scale_color_manual(values = category_colors) +
+        theme_minimal() +
+        theme(legend.position = "right")
+      
+      # Prepocet, lebo geom_density() neberie priamo bw
+      reference_bw <- bw.nrd0(data[[continuous_vars]])
+      adjust_factor <- global_bw / reference_bw
+      
+      x_density <- ggplot(data, aes_string(x = continuous_vars, fill = discrete_vars, color = discrete_vars)) +
+        geom_density(alpha = 0.5, adjust = adjust_factor) +
+        scale_fill_manual(values = category_colors) +
+        scale_color_manual(values = category_colors) +
+        labs(x = NULL, y = paste("Hustota (", continuous_vars, ")", sep = "")) +
+        theme_minimal() +
+        theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "right")
+      
+      y_bar <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
+        geom_bar(alpha = 0.7) +
+        coord_flip() +
+        scale_fill_manual(values = category_colors) +
+        labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
+        theme_minimal() +
+        theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "right")
+      
+      final_plot_2d <- (x_density + plot_spacer()) /
+        (scatter_plot + y_bar) +
+        plot_layout(widths = c(4, 1), heights = c(1, 4))
+      
+      return(final_plot_2d)
+      
+    }
   }
   
   # Modelovanie hustoty ako hustoty normalneho rozdelenia (dnorm)
@@ -223,84 +223,85 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
     
     message("Kontrola normovania zmesi hustoty: Celkovy integral = ", round(total_integral, 4))
     
-    # 3D Vizualizacia
-    fig_3d <- plot_ly(
-      density_data,
-      x = ~Continuous_Var,
-      y = ~Discrete_Var,
-      z = ~Density,
-      type = 'scatter3d',
-      mode = 'lines',
-      color = ~Discrete_Var,
-      colors = category_colors,
-      line = list(width = 4)
-    ) %>%
-      layout(scene = list(
-        xaxis = list(title = continuous_vars),
-        yaxis = list(title = discrete_vars),
-        zaxis = list(title = 'Hustota')
-      ))
-    
-    # 2D Vizualizacia
-    grouped_stats <- data %>%
-      group_by(.data[[discrete_vars]]) %>%
-      summarise(
-        mean_x = mean(.data[[continuous_vars]], na.rm = TRUE),
-        sd_x = sd(.data[[continuous_vars]], na.rm = TRUE),
-        .groups = "drop"
-      )
-    
-    x_vals <- seq(min(data[[continuous_vars]], na.rm = TRUE),
-                  max(data[[continuous_vars]], na.rm = TRUE),
-                  length.out = 100)
-    
-    # Hustoty pre kazdu kategoriu s vazenim pravdepodobnosti
-    density_data_2d <- grouped_stats %>%
-      mutate(prob = category_probs[as.character(.data[[discrete_vars]])]) %>%
-      expand_grid(x = x_vals) %>%
-      mutate(y = dnorm(x, mean = mean_x, sd = sd_x) * prob)
-    
-    scatter_plot <- ggplot(data, aes_string(x = continuous_vars, y = discrete_vars, color = discrete_vars)) +
-      geom_point(size = 3, alpha = 0.7) +
-      labs(x = continuous_vars, y = discrete_vars) +
-      theme_minimal() +
-      theme(legend.position = "right") +
-      scale_color_manual(values = category_colors)
-    
-    x_density <- ggplot(density_data_2d,
-                        aes(x = x, y = y,
-                            color = as.factor(.data[[discrete_vars]]),
-                            group = .data[[discrete_vars]])) +
-      geom_line(size = 1) +
-      scale_color_manual(values = category_colors) +
-      labs(x = NULL,
-           y = paste("Hustota (", continuous_vars, ")", sep = ""),
-           color = discrete_vars) +
-      theme_minimal() +
-      theme(axis.text.x = element_blank(),
-            axis.ticks.x = element_blank(),
-            legend.position = "right")
-    
-    y_bar <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
-      geom_bar(alpha = 0.7) +
-      coord_flip() +
-      scale_fill_manual(values = category_colors) +
-      labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.y = element_blank(),
-            axis.ticks.y = element_blank(),
-            legend.position = "right")
-    
-    final_plot_2d <- (x_density + plot_spacer()) /
-      (scatter_plot + y_bar) +
-      plot_layout(widths = c(4, 1), heights = c(1, 4))
-    
-    return(list(
-      fig_3d = fig_3d,
-      final_plot_2d = final_plot_2d,
-      total_integral = total_integral,
-      integral_per_category = integral_check
-    ))
+    if (plot_type == "3D") {
+      # 3D Vizualizacia
+      fig_3d <- plot_ly(
+        density_data,
+        x = ~Continuous_Var,
+        y = ~Discrete_Var,
+        z = ~Density,
+        type = 'scatter3d',
+        mode = 'lines',
+        color = ~Discrete_Var,
+        colors = category_colors,
+        line = list(width = 4)
+      ) %>%
+        layout(scene = list(
+          xaxis = list(title = continuous_vars),
+          yaxis = list(title = discrete_vars),
+          zaxis = list(title = 'Hustota')
+        ))
+      
+      return(fig_3d)
+      
+    } else if (plot_type == "2D") {
+      # 2D Vizualizacia
+      grouped_stats <- data %>%
+        group_by(.data[[discrete_vars]]) %>%
+        summarise(
+          mean_x = mean(.data[[continuous_vars]], na.rm = TRUE),
+          sd_x = sd(.data[[continuous_vars]], na.rm = TRUE),
+          .groups = "drop"
+        )
+      
+      x_vals <- seq(min(data[[continuous_vars]], na.rm = TRUE),
+                    max(data[[continuous_vars]], na.rm = TRUE),
+                    length.out = 100)
+      
+      # Hustoty pre kazdu kategoriu s vazenim pravdepodobnosti
+      density_data_2d <- grouped_stats %>%
+        mutate(prob = category_probs[as.character(.data[[discrete_vars]])]) %>%
+        expand_grid(x = x_vals) %>%
+        mutate(y = dnorm(x, mean = mean_x, sd = sd_x) * prob)
+      
+      scatter_plot <- ggplot(data, aes_string(x = continuous_vars, y = discrete_vars, color = discrete_vars)) +
+        geom_point(size = 3, alpha = 0.7) +
+        labs(x = continuous_vars, y = discrete_vars) +
+        theme_minimal() +
+        theme(legend.position = "right") +
+        scale_color_manual(values = category_colors)
+      
+      x_density <- ggplot(density_data_2d,
+                          aes(x = x, y = y,
+                              color = as.factor(.data[[discrete_vars]]),
+                              group = .data[[discrete_vars]])) +
+        geom_line(size = 1) +
+        scale_color_manual(values = category_colors) +
+        labs(x = NULL,
+             y = paste("Hustota (", continuous_vars, ")", sep = ""),
+             color = discrete_vars) +
+        theme_minimal() +
+        theme(axis.text.x = element_blank(),
+              axis.ticks.x = element_blank(),
+              legend.position = "right")
+      
+      y_bar <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
+        geom_bar(alpha = 0.7) +
+        coord_flip() +
+        scale_fill_manual(values = category_colors) +
+        labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
+        theme_minimal() +
+        theme(axis.text.y = element_blank(),
+              axis.ticks.y = element_blank(),
+              legend.position = "right")
+      
+      final_plot_2d <- (x_density + plot_spacer()) /
+        (scatter_plot + y_bar) +
+        plot_layout(widths = c(4, 1), heights = c(1, 4))
+      
+      return(final_plot_2d)
+      
+    }
   }
   
   # Modelovanie hustoty ako hustoty Studentovho t-rozdelenia (dt)
@@ -366,89 +367,90 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
     
     message("Kontrola normovania zmesi t-hustoty: Celkovy integral = ", round(total_integral_t, 4))
     
-    # 3D Vizualizacia
-    fig_3d_t <- plot_ly(
-      density_data_t,
-      x = ~Continuous_Var,
-      y = ~Discrete_Var,
-      z = ~Density,
-      type = 'scatter3d',
-      mode = 'lines',
-      color = ~Discrete_Var,
-      colors = category_colors,
-      line = list(width = 4)
-    ) %>%
-      layout(scene = list(
-        xaxis = list(title = continuous_vars),
-        yaxis = list(title = discrete_vars),
-        zaxis = list(title = 'Hustota')
-      ))
     
-    # 2D Vizualizacia
-    grouped_stats_t <- data %>%
-      group_by(.data[[discrete_vars]]) %>%
-      summarise(
-        mean_x = mean(.data[[continuous_vars]], na.rm = TRUE),
-        sd_x = sd(.data[[continuous_vars]], na.rm = TRUE),
-        df_x = n() - 1,
-        .groups = "drop"
-      )
-    
-    x_vals <- seq(min(data[[continuous_vars]], na.rm = TRUE),
-                  max(data[[continuous_vars]], na.rm = TRUE),
-                  length.out = 100)
-    
-    density_data_t_2d <- grouped_stats_t %>%
-      mutate(prob = category_probs[as.character(.data[[discrete_vars]])]) %>%
-      expand_grid(x = x_vals) %>%
-      mutate(y = dt((x - mean_x) / sd_x, df = df_x) / sd_x * prob)
-    
-    scatter_plot_t <- ggplot(data, aes_string(x = continuous_vars, y = discrete_vars, color = discrete_vars)) +
-      geom_point(size = 3, alpha = 0.7) +
-      labs(x = continuous_vars, y = discrete_vars) +
-      theme_minimal() +
-      theme(legend.position = "right") +
-      scale_color_manual(values = category_colors)
-    
-    x_density_t <- ggplot(density_data_t_2d,
-                          aes(x = x, y = y,
-                              color = as.factor(.data[[discrete_vars]]),
-                              group = .data[[discrete_vars]])) +
-      geom_line(size = 1) +
-      scale_color_manual(values = category_colors) +
-      labs(x = NULL,
-           y = paste("Hustota (", continuous_vars, ")", sep = ""),
-           color = discrete_vars) +
-      theme_minimal() +
-      theme(axis.text.x = element_blank(),
-            axis.ticks.x = element_blank(),
-            legend.position = "right")
-    
-    y_bar_t <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
-      geom_bar(alpha = 0.7) +
-      coord_flip() +
-      scale_fill_manual(values = category_colors) +
-      labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.y = element_blank(),
-            axis.ticks.y = element_blank(),
-            legend.position = "right")
-    
-    final_plot_2d_t <- (x_density_t + plot_spacer()) /
-      (scatter_plot_t + y_bar_t) +
-      plot_layout(widths = c(4, 1), heights = c(1, 4))
-    
-    return(list(
-      fig_3d = fig_3d_t,
-      final_plot_2d = final_plot_2d_t,
-      total_integral = total_integral_t,
-      integral_per_category = integral_check_t
-    ))
+    if (plot_type == "3D") {
+      # 3D Vizualizacia
+      fig_3d_t <- plot_ly(
+        density_data_t,
+        x = ~Continuous_Var,
+        y = ~Discrete_Var,
+        z = ~Density,
+        type = 'scatter3d',
+        mode = 'lines',
+        color = ~Discrete_Var,
+        colors = category_colors,
+        line = list(width = 4)
+      ) %>%
+        layout(scene = list(
+          xaxis = list(title = continuous_vars),
+          yaxis = list(title = discrete_vars),
+          zaxis = list(title = 'Hustota')
+        ))
+      
+      return(fig_3d_t)
+      
+    } else if (plot_type == "2D") {
+      # 2D Vizualizacia
+      grouped_stats_t <- data %>%
+        group_by(.data[[discrete_vars]]) %>%
+        summarise(
+          mean_x = mean(.data[[continuous_vars]], na.rm = TRUE),
+          sd_x = sd(.data[[continuous_vars]], na.rm = TRUE),
+          df_x = n() - 1,
+          .groups = "drop"
+        )
+      
+      x_vals <- seq(min(data[[continuous_vars]], na.rm = TRUE),
+                    max(data[[continuous_vars]], na.rm = TRUE),
+                    length.out = 100)
+      
+      density_data_t_2d <- grouped_stats_t %>%
+        mutate(prob = category_probs[as.character(.data[[discrete_vars]])]) %>%
+        expand_grid(x = x_vals) %>%
+        mutate(y = dt((x - mean_x) / sd_x, df = df_x) / sd_x * prob)
+      
+      scatter_plot_t <- ggplot(data, aes_string(x = continuous_vars, y = discrete_vars, color = discrete_vars)) +
+        geom_point(size = 3, alpha = 0.7) +
+        labs(x = continuous_vars, y = discrete_vars) +
+        theme_minimal() +
+        theme(legend.position = "right") +
+        scale_color_manual(values = category_colors)
+      
+      x_density_t <- ggplot(density_data_t_2d,
+                            aes(x = x, y = y,
+                                color = as.factor(.data[[discrete_vars]]),
+                                group = .data[[discrete_vars]])) +
+        geom_line(size = 1) +
+        scale_color_manual(values = category_colors) +
+        labs(x = NULL,
+             y = paste("Hustota (", continuous_vars, ")", sep = ""),
+             color = discrete_vars) +
+        theme_minimal() +
+        theme(axis.text.x = element_blank(),
+              axis.ticks.x = element_blank(),
+              legend.position = "right")
+      
+      y_bar_t <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
+        geom_bar(alpha = 0.7) +
+        coord_flip() +
+        scale_fill_manual(values = category_colors) +
+        labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
+        theme_minimal() +
+        theme(axis.text.y = element_blank(),
+              axis.ticks.y = element_blank(),
+              legend.position = "right")
+      
+      final_plot_2d_t <- (x_density_t + plot_spacer()) /
+        (scatter_plot_t + y_bar_t) +
+        plot_layout(widths = c(4, 1), heights = c(1, 4))
+      
+      return(final_plot_2d_t)
+      
+    }
   }
-  
 }
 
-continuous_joint_distribution <- function(data, continuous_vars, model_type) {
+continuous_joint_distribution <- function(data, continuous_vars, model_type, plot_type) {
   
   # Modelovanie hustoty pomocou jadroveho vyhladzovania
   if (model_type == "kernel"){
@@ -458,53 +460,58 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type) {
       n = 100
     )
     
-    fig_3d <- plot_ly(
-      x = ~kde_result$x, y = ~kde_result$y, z = ~kde_result$z,
-      type = "surface",
-      colors = colorRamp(c("blue", "cyan", "yellow", "red"))
-    ) %>% layout(
-      title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(jadrové   vyhladzovanie)"),
-      scene = list(
-        xaxis = list(title = continuous_vars[1]),
-        yaxis = list(title = continuous_vars[2]),
-        zaxis = list(title = "Hustota")
+    if (plot_type == "3D") {
+      fig_3d <- plot_ly(
+        x = ~kde_result$x, y = ~kde_result$y, z = ~kde_result$z,
+        type = "surface",
+        colors = colorRamp(c("blue", "cyan", "yellow", "red"))
+      ) %>% layout(
+        title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(jadrové   vyhladzovanie)"),
+        scene = list(
+          xaxis = list(title = continuous_vars[1]),
+          yaxis = list(title = continuous_vars[2]),
+          zaxis = list(title = "Hustota")
+        )
       )
-    )
-    
-    kde_df <- data.frame(
-      expand.grid(x = kde_result$x, y = kde_result$y),
-      z = as.vector(kde_result$z)
-    )
-    
-    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
-      geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +  
-      geom_contour(data = kde_df, aes(x = x, y = y, z = z), color = "black") +
-      labs(
-        x = continuous_vars[1],
-        y = continuous_vars[2],
-        title = paste("Scatter plot s vrstevnicami (jadrové vyhladzovanie)")
-      ) +
-      scale_color_gradient(low = "blue", high = "red") +
-      theme_minimal()
-    
-    density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
-      geom_density(fill = "blue", alpha = 0.5) +
-      labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
-    
-    density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
-      geom_density(fill = "red", alpha = 0.5) +
-      coord_flip() +
-      labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-    
-    final_plot_2d <- (density_x + plot_spacer()) /
-      (scatter_plot + density_y) +
-      plot_layout(widths = c(4, 1), heights = c(1, 4))
-    
-    return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d)) 
+      
+      return(fig_3d)
+      
+    } else if (plot_type == "2D") {
+      kde_df <- data.frame(
+        expand.grid(x = kde_result$x, y = kde_result$y),
+        z = as.vector(kde_result$z)
+      )
+      
+      scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
+        geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +  
+        geom_contour(data = kde_df, aes(x = x, y = y, z = z), color = "black") +
+        labs(
+          x = continuous_vars[1],
+          y = continuous_vars[2],
+          title = paste("Scatter plot s vrstevnicami (jadrové vyhladzovanie)")
+        ) +
+        scale_color_gradient(low = "blue", high = "red") +
+        theme_minimal()
+      
+      density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
+        geom_density(fill = "blue", alpha = 0.5) +
+        labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
+        theme_minimal() +
+        theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+      
+      density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
+        geom_density(fill = "red", alpha = 0.5) +
+        coord_flip() +
+        labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
+        theme_minimal() +
+        theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+      
+      final_plot_2d <- (density_x + plot_spacer()) /
+        (scatter_plot + density_y) +
+        plot_layout(widths = c(4, 1), heights = c(1, 4))
+      
+      return(final_plot_2d)
+    }
   }
   
   # Modelovanie zdruzenej hustoty ako hustoty normalneho rozdelenia
@@ -540,52 +547,58 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type) {
     grid$z <- mapply(bivariate_normal_density, grid$x, grid$y)
     z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
     
-    # 3D Vizualizacia
-    fig_3d <- plot_ly(
-      x = ~x_vals, y = ~y_vals, z = ~z_matrix,
-      type = "surface",
-      colors = colorRamp(c("blue", "cyan", "yellow", "red"))
-    ) %>% layout(
-      title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(bivariátne normálne rozdelenie)"),
-      scene = list(
-        xaxis = list(title = continuous_vars[1]),
-        yaxis = list(title = continuous_vars[2]),
-        zaxis = list(title = "Hustota")
+    
+    if (plot_type == "3D") {
+      # 3D Vizualizacia
+      fig_3d <- plot_ly(
+        x = ~x_vals, y = ~y_vals, z = ~z_matrix,
+        type = "surface",
+        colors = colorRamp(c("blue", "cyan", "yellow", "red"))
+      ) %>% layout(
+        title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(bivariátne normálne rozdelenie)"),
+        scene = list(
+          xaxis = list(title = continuous_vars[1]),
+          yaxis = list(title = continuous_vars[2]),
+          zaxis = list(title = "Hustota")
+        )
       )
-    )
-    
-    contour_df <- grid
-    
-    # 2D Vizualizacia
-    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
-      geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
-      geom_contour(data = contour_df, aes(x = x, y = y, z = z), color = "black") +
-      labs(
-        x = continuous_vars[1],
-        y = continuous_vars[2],
-        title = paste("Scatter plot s vrstevnicami (bivariátne normálne)")
-      ) +
-      scale_color_gradient(low = "blue", high = "red") +
-      theme_minimal()
-    
-    density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
-      stat_function(fun = dnorm, args = list(mean = mean_x, sd = sd_x), fill = "blue", geom = "area", alpha = 0.5) +
-      labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
-    
-    density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
-      stat_function(fun = dnorm, args = list(mean = mean_y, sd = sd_y), fill = "red", geom = "area", alpha = 0.5) +
-      coord_flip() +
-      labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-    
-    final_plot_2d <- (density_x + plot_spacer()) /
-      (scatter_plot + density_y) +
-      plot_layout(widths = c(4, 1), heights = c(1, 4))
-    
-    return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
+      
+      return(fig_3d)
+      
+    } else if (plot_type == "2D") {
+      contour_df <- grid
+      
+      # 2D Vizualizacia
+      scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
+        geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
+        geom_contour(data = contour_df, aes(x = x, y = y, z = z), color = "black") +
+        labs(
+          x = continuous_vars[1],
+          y = continuous_vars[2],
+          title = paste("Scatter plot s vrstevnicami (bivariátne normálne)")
+        ) +
+        scale_color_gradient(low = "blue", high = "red") +
+        theme_minimal()
+      
+      density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
+        stat_function(fun = dnorm, args = list(mean = mean_x, sd = sd_x), fill = "blue", geom = "area", alpha = 0.5) +
+        labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
+        theme_minimal() +
+        theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+      
+      density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
+        stat_function(fun = dnorm, args = list(mean = mean_y, sd = sd_y), fill = "red", geom = "area", alpha = 0.5) +
+        coord_flip() +
+        labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
+        theme_minimal() +
+        theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+      
+      final_plot_2d <- (density_x + plot_spacer()) /
+        (scatter_plot + density_y) +
+        plot_layout(widths = c(4, 1), heights = c(1, 4))
+      
+      return(final_plot_2d)
+    }
   }
   
   # Modelovanie zdruzenej hustoty ako hustoty Studentovho t-rozdelenia
@@ -633,57 +646,63 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type) {
     grid$z <- mapply(bivariate_t_density, grid$x, grid$y)
     z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
     
-    # 3D Vizualizacia
-    fig_3d <- plot_ly(
-      x = ~x_vals, y = ~y_vals, z = ~z_matrix,
-      type = "surface",
-      colors = colorRamp(c("blue", "cyan", "yellow", "red"))
-    ) %>% layout(
-      title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(bivariátne t-rozdelenie)"),
-      scene = list(
-        xaxis = list(title = continuous_vars[1]),
-        yaxis = list(title = continuous_vars[2]),
-        zaxis = list(title = "Hustota")
+    
+    if (plot_type == "3D") {
+      # 3D Vizualizacia
+      fig_3d <- plot_ly(
+        x = ~x_vals, y = ~y_vals, z = ~z_matrix,
+        type = "surface",
+        colors = colorRamp(c("blue", "cyan", "yellow", "red"))
+      ) %>% layout(
+        title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(bivariátne t-rozdelenie)"),
+        scene = list(
+          xaxis = list(title = continuous_vars[1]),
+          yaxis = list(title = continuous_vars[2]),
+          zaxis = list(title = "Hustota")
+        )
       )
-    )
-    
-    contour_df <- grid
-    
-    # 2D Vizualizacia
-    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
-      geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
-      geom_contour(data = contour_df, aes(x = x, y = y, z = z), color = "black") +
-      labs(
-        x = continuous_vars[1],
-        y = continuous_vars[2],
-        title = paste("Scatter plot s vrstevnicami (bivariátne t-rozdelenie)")
-      ) +
-      scale_color_gradient(low = "blue", high = "red") +
-      theme_minimal()
-    
-    density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
-      stat_function(fun = function(x) dt((x - mean_x) / sd_x, df = df) / sd_x, fill = "blue", geom = "area", alpha = 0.5) +
-      labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
-    
-    density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
-      stat_function(fun = function(y) dt((y - mean_y) / sd_y, df = df) / sd_y, fill = "red", geom = "area", alpha = 0.5) +
-      coord_flip() +
-      labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-    
-    final_plot_2d <- (density_x + plot_spacer()) /
-      (scatter_plot + density_y) +
-      plot_layout(widths = c(4, 1), heights = c(1, 4))
-    
-    return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
+      
+      return(fig_3d)
+      
+    } else if (plot_type == "2D") {
+      contour_df <- grid
+      
+      # 2D Vizualizacia
+      scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
+        geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
+        geom_contour(data = contour_df, aes(x = x, y = y, z = z), color = "black") +
+        labs(
+          x = continuous_vars[1],
+          y = continuous_vars[2],
+          title = paste("Scatter plot s vrstevnicami (bivariátne t-rozdelenie)")
+        ) +
+        scale_color_gradient(low = "blue", high = "red") +
+        theme_minimal()
+      
+      density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
+        stat_function(fun = function(x) dt((x - mean_x) / sd_x, df = df) / sd_x, fill = "blue", geom = "area", alpha = 0.5) +
+        labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
+        theme_minimal() +
+        theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+      
+      density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
+        stat_function(fun = function(y) dt((y - mean_y) / sd_y, df = df) / sd_y, fill = "red", geom = "area", alpha = 0.5) +
+        coord_flip() +
+        labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
+        theme_minimal() +
+        theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+      
+      final_plot_2d <- (density_x + plot_spacer()) /
+        (scatter_plot + density_y) +
+        plot_layout(widths = c(4, 1), heights = c(1, 4))
+      
+      return(final_plot_2d)
+      
+    }
   }
-  
 }
 
-continuous_joint_distribution_copula <- function(data, continuous_vars, model_type, copula_type, marginal_densities = c("dnorm", "dnorm")) {
+continuous_joint_distribution_copula <- function(data, continuous_vars, model_type, copula_type, marginal_densities = c("dnorm", "dnorm"), plot_type) {
   
   # Modelovanie hustoty pomocou jadroveho vyhladzovania a kopuly (rozklad na marginaly)
   if (model_type == "kernel") {
@@ -733,52 +752,58 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     grid$z <- mapply(copula_density_function, grid$x, grid$y)
     z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
     
-    # 3D Vizualizacia
-    fig_3d <- plot_ly(
-      x = ~x_vals, y = ~y_vals, z = ~z_matrix,
-      type = "surface",
-      colors = colorRamp(c("blue", "cyan", "yellow", "red"))
-    ) %>% layout(
-      title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], paste0(" (KDE + ", copula_type, " kopula)")),
-      scene = list(
-        xaxis = list(title = continuous_vars[1]),
-        yaxis = list(title = continuous_vars[2]),
-        zaxis = list(title = "Hustota")
+    
+    if (plot_type == "3D") {
+      # 3D Vizualizacia
+      fig_3d <- plot_ly(
+        x = ~x_vals, y = ~y_vals, z = ~z_matrix,
+        type = "surface",
+        colors = colorRamp(c("blue", "cyan", "yellow", "red"))
+      ) %>% layout(
+        title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], paste0(" (KDE + ", copula_type, " kopula)")),
+        scene = list(
+          xaxis = list(title = continuous_vars[1]),
+          yaxis = list(title = continuous_vars[2]),
+          zaxis = list(title = "Hustota")
+        )
       )
-    )
-    
-    # 2D Vizualizacia
-    contour_df <- grid
-    
-    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
-      geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
-      geom_contour(data = contour_df, aes(x = x, y = y, z = z), color = "black", size = 0.6) +
-      labs(
-        x = continuous_vars[1],
-        y = continuous_vars[2],
-        title = paste("Scatter + vrstevnice (KDE +", copula_type, "kopula)")
-      ) +
-      scale_color_gradient(low = "blue", high = "red") +
-      theme_minimal()
-    
-    density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
-      geom_density(fill = "blue", alpha = 0.5) +
-      labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
-    
-    density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
-      geom_density(fill = "red", alpha = 0.5) +
-      coord_flip() +
-      labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-    
-    final_plot_2d <- (density_x + plot_spacer()) /
-      (scatter_plot + density_y) +
-      plot_layout(widths = c(4, 1), heights = c(1, 4))
-    
-    return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
+      
+      return(fig_3d)
+      
+    } else if (plot_type == "2D") {
+      # 2D Vizualizacia
+      contour_df <- grid
+      
+      scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
+        geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
+        geom_contour(data = contour_df, aes(x = x, y = y, z = z), color = "black", size = 0.6) +
+        labs(
+          x = continuous_vars[1],
+          y = continuous_vars[2],
+          title = paste("Scatter + vrstevnice (KDE +", copula_type, "kopula)")
+        ) +
+        scale_color_gradient(low = "blue", high = "red") +
+        theme_minimal()
+      
+      density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
+        geom_density(fill = "blue", alpha = 0.5) +
+        labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
+        theme_minimal() +
+        theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+      
+      density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
+        geom_density(fill = "red", alpha = 0.5) +
+        coord_flip() +
+        labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
+        theme_minimal() +
+        theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+      
+      final_plot_2d <- (density_x + plot_spacer()) /
+        (scatter_plot + density_y) +
+        plot_layout(widths = c(4, 1), heights = c(1, 4))
+      
+      return(final_plot_2d)
+    }
   }
   
   # Modelovanie zdruzenej hustoty ako hustoty normalneho rozdelenia a pomocou kopuly (rozklad na marginaly)
@@ -842,56 +867,63 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     grid$z <- mapply(copula_density_function, grid$x, grid$y)
     z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
     
-    # 3D Vizualizacia
-    fig_3d <- plot_ly(
-      x = ~x_vals, y = ~y_vals, z = ~z_matrix,
-      type = "surface",
-      colors = colorRamp(c("blue", "cyan", "yellow", "red"))
-    ) %>% layout(
-      title = paste0("Združená hustota ", continuous_vars[1], " a ", continuous_vars[2], " (dnorm + ", copula_type, " kopula)"),
-      scene = list(
-        xaxis = list(title = continuous_vars[1]),
-        yaxis = list(title = continuous_vars[2]),
-        zaxis = list(title = "Hustota")
+    
+    if (plot_type == "3D") {
+      # 3D Vizualizacia
+      fig_3d <- plot_ly(
+        x = ~x_vals, y = ~y_vals, z = ~z_matrix,
+        type = "surface",
+        colors = colorRamp(c("blue", "cyan", "yellow", "red"))
+      ) %>% layout(
+        title = paste0("Združená hustota ", continuous_vars[1], " a ", continuous_vars[2], " (dnorm + ", copula_type, " kopula)"),
+        scene = list(
+          xaxis = list(title = continuous_vars[1]),
+          yaxis = list(title = continuous_vars[2]),
+          zaxis = list(title = "Hustota")
+        )
       )
-    )
-    
-    # 2D Vizualizacia
-    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
-      geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
-      geom_contour(
-        data = grid,
-        aes(x = x, y = y, z = z),
-        bins = 10,
-        color = "black",
-        size = 0.6
-      ) +
-      labs(
-        x = continuous_vars[1],
-        y = continuous_vars[2],
-        title = paste("Scatter + vrstevnice (dnorm +", copula_type, "kopula)")
-      ) +
-      scale_color_gradient(low = "blue", high = "red") +
-      theme_minimal()
-    
-    density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
-      stat_function(fun = dnorm, args = list(mean = mean_x, sd = sd_x), fill = "blue", geom = "area", alpha = 0.5) +
-      labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
-    
-    density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
-      stat_function(fun = dnorm, args = list(mean = mean_y, sd = sd_y), fill = "red", geom = "area", alpha = 0.5) +
-      coord_flip() +
-      labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-    
-    final_plot_2d <- (density_x + plot_spacer()) /
-      (scatter_plot + density_y) +
-      plot_layout(widths = c(4, 1), heights = c(1, 4))
-    
-    return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
+      
+      return(fig_3d)
+      
+    } else if (plot_type == "2D") {
+      # 2D Vizualizacia
+      scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
+        geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
+        geom_contour(
+          data = grid,
+          aes(x = x, y = y, z = z),
+          bins = 10,
+          color = "black",
+          size = 0.6
+        ) +
+        labs(
+          x = continuous_vars[1],
+          y = continuous_vars[2],
+          title = paste("Scatter + vrstevnice (dnorm +", copula_type, "kopula)")
+        ) +
+        scale_color_gradient(low = "blue", high = "red") +
+        theme_minimal()
+      
+      density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
+        stat_function(fun = dnorm, args = list(mean = mean_x, sd = sd_x), fill = "blue", geom = "area", alpha = 0.5) +
+        labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
+        theme_minimal() +
+        theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+      
+      density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
+        stat_function(fun = dnorm, args = list(mean = mean_y, sd = sd_y), fill = "red", geom = "area", alpha = 0.5) +
+        coord_flip() +
+        labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
+        theme_minimal() +
+        theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+      
+      final_plot_2d <- (density_x + plot_spacer()) /
+        (scatter_plot + density_y) +
+        plot_layout(widths = c(4, 1), heights = c(1, 4))
+      
+      return(final_plot_2d)
+      
+    }
   }
   
   # Modelovanie zdruzenej hustoty ako hustoty Studentovho t-rozdelenia a pomocou kopuly (rozklad na marginaly)
@@ -947,56 +979,62 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     grid$z <- mapply(copula_density_function, grid$x, grid$y)
     z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
     
-    # 3D Vizualizacia
-    fig_3d <- plot_ly(
-      x = ~x_vals, y = ~y_vals, z = ~z_matrix,
-      type = "surface",
-      colors = colorRamp(c("blue", "cyan", "yellow", "red"))
-    ) %>% layout(
-      title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], paste0("(t-rozdelenie + ", copula_type, " kopula)")),
-      scene = list(
-        xaxis = list(title = continuous_vars[1]),
-        yaxis = list(title = continuous_vars[2]),
-        zaxis = list(title = "Hustota")
+    
+    if (plot_type == "3D") {
+      # 3D Vizualizacia
+      fig_3d <- plot_ly(
+        x = ~x_vals, y = ~y_vals, z = ~z_matrix,
+        type = "surface",
+        colors = colorRamp(c("blue", "cyan", "yellow", "red"))
+      ) %>% layout(
+        title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], paste0("(t-rozdelenie + ", copula_type, " kopula)")),
+        scene = list(
+          xaxis = list(title = continuous_vars[1]),
+          yaxis = list(title = continuous_vars[2]),
+          zaxis = list(title = "Hustota")
+        )
       )
-    )
-    
-    # 2D Vizualizacia
-    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
-      geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
-      geom_contour(
-        data = grid,
-        aes(x = x, y = y, z = z),
-        bins = 10,
-        color = "black",
-        size = 0.6
-      ) +
-      labs(
-        x = continuous_vars[1],
-        y = continuous_vars[2],
-        title = paste("Scatter + vrstevnice (t-rozdelenie +", copula_type, "kopula)")
-      ) +
-      scale_color_gradient(low = "blue", high = "red") +
-      theme_minimal()
-    
-    density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
-      stat_function(fun = function(x) dt((x - mean_x) / sd_x, df = df) / sd_x, fill = "blue", geom = "area", alpha = 0.5) +
-      labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
-    
-    density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
-      stat_function(fun = function(y) dt((y - mean_y) / sd_y, df = df) / sd_y, fill = "red", geom = "area", alpha = 0.5) +
-      coord_flip() +
-      labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
-      theme_minimal() +
-      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-    
-    final_plot_2d <- (density_x + plot_spacer()) /
-      (scatter_plot + density_y) +
-      plot_layout(widths = c(4, 1), heights = c(1, 4))
-    
-    return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
+      
+      return(fig_3d)
+      
+    } else if (plot_type == "2D") {
+      # 2D Vizualizacia
+      scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
+        geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
+        geom_contour(
+          data = grid,
+          aes(x = x, y = y, z = z),
+          bins = 10,
+          color = "black",
+          size = 0.6
+        ) +
+        labs(
+          x = continuous_vars[1],
+          y = continuous_vars[2],
+          title = paste("Scatter + vrstevnice (t-rozdelenie +", copula_type, "kopula)")
+        ) +
+        scale_color_gradient(low = "blue", high = "red") +
+        theme_minimal()
+      
+      density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
+        stat_function(fun = function(x) dt((x - mean_x) / sd_x, df = df) / sd_x, fill = "blue", geom = "area", alpha = 0.5) +
+        labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
+        theme_minimal() +
+        theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+      
+      density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
+        stat_function(fun = function(y) dt((y - mean_y) / sd_y, df = df) / sd_y, fill = "red", geom = "area", alpha = 0.5) +
+        coord_flip() +
+        labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
+        theme_minimal() +
+        theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+      
+      final_plot_2d <- (density_x + plot_spacer()) /
+        (scatter_plot + density_y) +
+        plot_layout(widths = c(4, 1), heights = c(1, 4))
+      
+      return(final_plot_2d)
+    }
   }
 }
 
@@ -1050,7 +1088,7 @@ multi_joint_distribution <- function(data, discrete_vars, continuous_vars) {
   return(tab)
 }
 
-discrete_joint_distribution <- function(data, discrete_vars) {
+discrete_joint_distribution <- function(data, discrete_vars, plot_type) {
   
   tab <- as.data.frame(table(data[, discrete_vars]))
   tab$Probability <- tab$Freq / sum(tab$Freq)
@@ -1058,72 +1096,82 @@ discrete_joint_distribution <- function(data, discrete_vars) {
   tab[[discrete_vars[1]]] <- as.numeric(as.character(tab[[discrete_vars[1]]]))
   tab[[discrete_vars[2]]] <- as.numeric(as.character(tab[[discrete_vars[2]]]))
   
-  # 3D Vizualizacia
-  fig_3d <- plot_ly()
-  for (i in 1:nrow(tab)) {
+  
+  if (plot_type == "2D") {
+    marginal_x <- tab %>%
+      group_by(!!sym(discrete_vars[1])) %>%
+      summarise(Prob_X = sum(Probability))
+    
+    marginal_y <- tab %>%
+      group_by(!!sym(discrete_vars[2])) %>%
+      summarise(Prob_Y = sum(Probability))
+    
+    # 2D Vizualizacia
+    scatter_plot <- ggplot(tab, aes_string(x = discrete_vars[1], y = discrete_vars[2], fill =   "Probability")) +
+      geom_tile(color = "white") +
+      scale_fill_gradient(low = "blue", high = "red") +
+      labs(x = discrete_vars[1], y = discrete_vars[2], fill = "Pravdepodobnosť") +
+      theme_minimal()
+    
+    marginal_x_plot <- ggplot(marginal_x, aes_string(x = discrete_vars[1], y = "Prob_X")) +
+      geom_bar(stat = "identity", fill = "blue", alpha = 0.6) +
+      labs(x = NULL, y = "P(X)") +
+      theme_minimal()
+    
+    marginal_y_plot <- ggplot(marginal_y, aes_string(x = discrete_vars[2], y = "Prob_Y")) +
+      geom_bar(stat = "identity", fill = "red", alpha = 0.6) +
+      coord_flip() +
+      labs(x = NULL, y = "P(Y)") +
+      theme_minimal()
+    
+    final_plot_2d <- (marginal_x_plot + plot_spacer()) /
+      (scatter_plot + marginal_y_plot) +
+      plot_layout(widths = c(4, 1), heights = c(1, 4))
+    
+    return(final_plot_2d)
+    
+  } else if (plot_type == "3D") {
+    # 3D Vizualizacia
+    fig_3d <- plot_ly()
+    for (i in 1:nrow(tab)) {
+      fig_3d <- fig_3d %>% add_trace(
+        x = rep(tab[[discrete_vars[1]]][i], 2),
+        y = rep(tab[[discrete_vars[2]]][i], 2),
+        z = c(0, tab$Probability[i]),
+        type = "scatter3d",
+        mode = "lines",
+        line = list(color = "blue"),
+        showlegend = FALSE
+      )
+    }
+    
     fig_3d <- fig_3d %>% add_trace(
-      x = rep(tab[[discrete_vars[1]]][i], 2),
-      y = rep(tab[[discrete_vars[2]]][i], 2),
-      z = c(0, tab$Probability[i]),
+      x = tab[[discrete_vars[1]]],
+      y = tab[[discrete_vars[2]]],
+      z = tab$Probability,
       type = "scatter3d",
-      mode = "lines",
-      line = list(color = "blue"),
-      showlegend = FALSE
+      mode = "markers",
+      marker = list(size = 5, color = "red"),
+      name = "Pravdepodobnosti"
     )
+    
+    fig_3d <- fig_3d %>% layout(
+      scene = list(
+        xaxis = list(title = paste0(discrete_vars[1], " (X)")),
+        yaxis = list(title = paste0(discrete_vars[2], " (Y)")),
+        zaxis = list(title = "P(X, Y)")
+      )
+    )
+    
+    return(fig_3d)
   }
-  
-  fig_3d <- fig_3d %>% add_trace(
-    x = tab[[discrete_vars[1]]],
-    y = tab[[discrete_vars[2]]],
-    z = tab$Probability,
-    type = "scatter3d",
-    mode = "markers",
-    marker = list(size = 5, color = "red"),
-    name = "Pravdepodobnosti"
-  )
-  
-  fig_3d <- fig_3d %>% layout(
-    scene = list(
-      xaxis = list(title = paste0(discrete_vars[1], " (X)")),
-      yaxis = list(title = paste0(discrete_vars[2], " (Y)")),
-      zaxis = list(title = "P(X, Y)")
-    )
-  )
-  
-  marginal_x <- tab %>%
-    group_by(!!sym(discrete_vars[1])) %>%
-    summarise(Prob_X = sum(Probability))
-  
-  marginal_y <- tab %>%
-    group_by(!!sym(discrete_vars[2])) %>%
-    summarise(Prob_Y = sum(Probability))
-  
-  # 2D Vizualizacia
-  scatter_plot <- ggplot(tab, aes_string(x = discrete_vars[1], y = discrete_vars[2], fill =   "Probability")) +
-    geom_tile(color = "white") +
-    scale_fill_gradient(low = "blue", high = "red") +
-    labs(x = discrete_vars[1], y = discrete_vars[2], fill = "Pravdepodobnosť") +
-    theme_minimal()
-  
-  marginal_x_plot <- ggplot(marginal_x, aes_string(x = discrete_vars[1], y = "Prob_X")) +
-    geom_bar(stat = "identity", fill = "blue", alpha = 0.6) +
-    labs(x = NULL, y = "P(X)") +
-    theme_minimal()
-  
-  marginal_y_plot <- ggplot(marginal_y, aes_string(x = discrete_vars[2], y = "Prob_Y")) +
-    geom_bar(stat = "identity", fill = "red", alpha = 0.6) +
-    coord_flip() +
-    labs(x = NULL, y = "P(Y)") +
-    theme_minimal()
-  
-  final_plot_2d <- (marginal_x_plot + plot_spacer()) /
-    (scatter_plot + marginal_y_plot) +
-    plot_layout(widths = c(4, 1), heights = c(1, 4))
-  
-  return(list(fig_3d = fig_3d, final_plot_2d = final_plot_2d))
 }
 
-model_joint_distribution_density <- function(data, selected_variables, model_type = NULL, bw = NULL, use_copula = FALSE, copula_type = NULL, marginal_densities = NULL) {
+model_joint_distribution_density <- function(data, selected_variables, model_type = NULL, bw = NULL, use_copula = FALSE, copula_type = NULL, marginal_densities = NULL, plot_type = NULL) {
+  if (is.null(plot_type)){
+    stop("Musi byt zvoleny typ grafu.")
+  }
+  
   # Identifikacia typov premennych
   variable_types <- identify_variables(data)
   discrete_vars <- intersect(variable_types$Diskretne, selected_variables)
@@ -1134,7 +1182,7 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
     if (!is.null(model_type) || use_copula != FALSE || !is.null(copula_type) || !is.null(bw)) {
       stop("Argumenty model_type, 'use_copula', 'copula_type' a 'bw' sa nepouzivaju pri modelovani dvoch diskretnych premennych.")
     }
-    result <- discrete_joint_distribution(data, discrete_vars)
+    result <- discrete_joint_distribution(data, discrete_vars, plot_type)
     print(result)
   } else if (variables_count > 2) {
     if (!is.null(model_type) || use_copula != FALSE || !is.null(copula_type) || !is.null(bw)) {
@@ -1151,7 +1199,7 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
         if (!is.null(bw)) {
           stop("Parameter bandwidth ('bw') sa zadava iba pri jadrovom vyhladzovani zmesi.")
         }
-        result <- continuous_joint_distribution(data, continuous_vars, model_type)
+        result <- continuous_joint_distribution(data, continuous_vars, model_type, plot_type)
         print(result)
       }
     }
@@ -1166,7 +1214,7 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
         if (model_type != "parametric" && !is.null(marginal_densities)){
           stop("Parameter marginal_densities sa zadava iba pri model_type = 'parametric' s kopulou")
         }
-        result <- continuous_joint_distribution_copula(data, continuous_vars, model_type, copula_type, marginal_densities)
+        result <- continuous_joint_distribution_copula(data, continuous_vars, model_type, copula_type, marginal_densities, plot_type)
         print(result)
       }
     }
@@ -1174,7 +1222,7 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
     if (use_copula != FALSE || !is.null(copula_type)) {
       stop("Argumenty 'copula' a 'copula_type' sa pouzivaju iba pri modelovani dvoch spojitych premennych.")
     }
-    result <- mixture_joint_distribution(data, discrete_vars, continuous_vars, model_type, bw)
+    result <- mixture_joint_distribution(data, discrete_vars, continuous_vars, model_type, bw, plot_type)
     print(result)
   }
 }

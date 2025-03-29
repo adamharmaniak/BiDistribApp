@@ -16,6 +16,7 @@ library(splines)
 library(nnet)
 library(ggridges)
 library(shiny)
+library(shinythemes)
 
 
 # Dokumentacia
