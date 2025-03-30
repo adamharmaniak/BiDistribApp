@@ -1576,6 +1576,8 @@ plot_decision_boundary <- function(data, response_name, predictor_names, model, 
 
 plot_classification_1D_combined <- function(data, response_name, predictor_name, model, method) {
   
+  p1 <- NULL
+  
   if (!is.factor(data[[response_name]])) {
     data[[response_name]] <- as.factor(data[[response_name]])
   }
@@ -1621,11 +1623,11 @@ plot_classification_1D_combined <- function(data, response_name, predictor_name,
   } else if (method == "logistic" && length(classes) == 2) {
     p <- predict(model, newdata = grid, type = "response")
     
-    probs <- data.frame(
-      !!predictor_name := grid_x,
-      !!as.character(classes[1]) := 1 - p,
-      !!as.character(classes[2]) := p
-    )
+    probs <- data.frame(grid_x)
+    colnames(probs) <- predictor_name
+    probs[[as.character(classes[1])]] <- 1 - p
+    probs[[as.character(classes[2])]] <- p
+    
     grid$pred_class <- ifelse(p > 0.5, as.character(classes[2]), as.character(classes[1])) %>%
       factor(levels = classes)
     probs_long <- probs %>%
@@ -1725,6 +1727,10 @@ plot_classification_1D_combined <- function(data, response_name, predictor_name,
 }
 
 classification_model <- function(data, response_name, predictor_names, method = "logistic", k = NULL) {
+  
+  if (length(predictor_names) > 2) {
+    stop("Pocet prediktorov nesmie byt vacsi ako 2.")
+  }
   
   if (!(response_name %in% colnames(data))) {
     stop(paste("Premenna", response_name, "nie je v datach!"))
@@ -1873,17 +1879,9 @@ classification_model <- function(data, response_name, predictor_names, method = 
   )
   
   if (length(predictor_names) == 1) {
-    
-    if (ridge) {
-      result$decision_plot <- plot_classification_ridge_1D(
-        data, response_name, predictor_names[1], model, method
-      )
-    }
-    else{
-      result$decision_plot <- plot_classification_1D_combined(
-        data, response_name, predictor_names[1], model, method
-      )
-    }
+    result$decision_plot <- plot_classification_1D_combined(
+      data, response_name, predictor_names[1], model, method
+    )
     
   } else if (length(predictor_names) == 2) {
     # Ak su 2 prediktory => graf rozhodovacich hranic
@@ -1896,7 +1894,7 @@ classification_model <- function(data, response_name, predictor_names, method = 
   return(result)
 }
 
-plot_conditional_continuous_densities <- function(df, n_breaks = 5, density_scaling = 2000, mean_curve = TRUE, quantiles = NULL, mean_poly_degree = 1, quantile_poly_degree = 1, normal_density = TRUE, empirical_density = TRUE, bw_scale = NULL) {
+plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling, mean_curve, quantiles, mean_poly_degree, quantile_poly_degree, normal_density, empirical_density, bw_scale) {
   
   response_name <- attr(df, "response_var")
   predictor_name <- attr(df, "predictor_var")
@@ -2022,7 +2020,7 @@ plot_conditional_continuous_densities <- function(df, n_breaks = 5, density_scal
   return(p)
 }
 
-plot_conditional_discrete_densities <- function(df, n_breaks = 5, density_scaling = 2000, ordinal = FALSE) {
+plot_conditional_discrete_densities <- function(df, n_breaks, density_scaling, ordinal) {
   
   response_name <- attr(df, "response_var")
   predictor_name <- attr(df, "predictor_var")

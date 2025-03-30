@@ -8,8 +8,9 @@ ui <- fluidPage(
   tabsetPanel(id = "main_tabs",
               tabPanel("Data selection", value = "data"),
               tabPanel("Density model", value = "joint_density"),
-              tabPanel("GAM model", value = "gam"),
-              tabPanel("Random Forest", value = "rf")
+              tabPanel("Regression", value = "regression"),
+              tabPanel("Classification", value = "classification"),
+              tabPanel("Conditional Densities", value = "conditional_densities")
   ),
   
   # Spoločné rozloženie

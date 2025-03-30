@@ -17,6 +17,7 @@ library(nnet)
 library(ggridges)
 library(shiny)
 library(shinythemes)
+library(rlang)
 
 
 # Dokumentacia
@@ -104,3 +105,16 @@ library(shinythemes)
 #- **density_scaling** -> skalovanie P-funkcii pre lepsi fitting do grafu
 #- **normal_density** -> TRUE/FALSE, ne/vykreslit podmienenu hustotu norm. rozdelenia (dnorm())
 #- **empirical_density** -> TRUE/FALSE, ne/vykreslit podmienenu empiricku hustotu (density(), beru sa do uvahy rezidualne
+
+### Co dosadit za parametre do *plot_conditional_densities()*
+#- **data** - dataset
+#- **selected_variables** -> na vstup sa posielaju vzdy dve premenne vo forme c("Odozva", "Prediktor")
+#- **mean_curve** = TRUE/FALSE -> vykreslit strednu hodnotu alebo nie
+#- **quantiles** -> pre ktore kvantily pocitat kvantilove funkcie 
+#- **mean_poly_degree** -> stupen polynomialnej funkcie strednej hodnoty
+#- **quantile_poly_degree** -> stupen polynomialnych kvantilovych funkcii
+#- **n_breaks** -> pocet rozdeleni "okna", v resp. podmienenych hustot
+#- **density_scaling** -> skalovanie hustot pre lepsi fitting do grafu
+#- **normal_density** -> TRUE/FALSE, ne/vykreslit podmienenu hustotu norm. rozdelenia (dnorm())
+#- **empirical_density** -> TRUE/FALSE, ne/vykreslit podmienenu empiricku hustotu (density(), beru sa do uvahy rezidualne hodnoty)
+#- ordinal -> TRUE/FALSE - spoji koncove pravdepodobnostne body v pripade diskretnej odozvy 
