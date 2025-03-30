@@ -6,6 +6,7 @@ server <- function(input, output, session) {
   class_predictors <- reactiveVal(c())
   cond_quantile_inputs <- reactiveVal(list(0.5))
   cond_response_type <- reactiveVal(NULL)
+  loaded_data <- reactiveVal(NULL)
   
   observe({
     if (input$main_tabs == "classification" &&
@@ -52,8 +53,23 @@ server <- function(input, output, session) {
     }
   })
   
-  # Reaktivny objekt na ulozenie dat
-  loaded_data <- reactiveVal(NULL)
+  selected_density_types <- reactive({
+    req(input$density_vars, loaded_data())
+    variable_types <- identify_variables(loaded_data())
+    
+    selected <- input$density_vars
+    types <- sapply(selected, function(var) {
+      if (var %in% variable_types$Diskretne) {
+        "diskretna"
+      } else if (var %in% variable_types$Spojite) {
+        "spojita"
+      } else {
+        "neznamy"
+      }
+    })
+    
+    types
+  })
   
   # Nacitanie dat po kliknuti na tlacidlo
   observeEvent(input$load_data, {
@@ -87,7 +103,6 @@ server <- function(input, output, session) {
     data <- loaded_data()
     if (is.null(data)) return(NULL)
     
-    # Zavolanie printVariables()
     variables <- identify_variables(data)
     all_variables <- c(variables$Diskretne, variables$Spojite)
     
@@ -167,56 +182,66 @@ server <- function(input, output, session) {
           selected = isolate(input$density_vars)
         ),
         
-        selectInput(
-          "density_model_type", "Select model type:",
-          choices = c("Parametric" = "parametric",
-                      "Student-t" = "t",
-                      "Kernel density" = "kernel"),
-          selected = isolate(input$density_model_type)
-        ),
-        
-        checkboxInput(
-          "set_bw", "Set manual bandwidth (bw)",
-          value = isolate(input$set_bw) %||% FALSE
-        ),
-        
         conditionalPanel(
-          condition = "input.set_bw == true",
-          numericInput(
-            "bw_value", "Bandwidth (0.10 – 6.00):",
-            value = isolate(input$bw_value) %||% NULL,
-            min = 0.10, max = 6.00, step = 0.1
+          condition = "output.densityVarConfig == '2_spojite' || output.densityVarConfig == 'zmiesane'",
+          selectInput(
+            "density_model_type", "Select model type:",
+            choices = c("Parametric" = "parametric",
+                        "Student-t" = "t",
+                        "Kernel density" = "kernel"),
+            selected = isolate(input$density_model_type)
           )
         ),
         
-        checkboxGroupInput(
-          "plot_type", "Plot type:",
-          choices = c("2D", "3D"),
-          selected = isolate(input$plot_type)
-        ),
-        
-        radioButtons(
-          "use_copula", "Use copula:",
-          choices = c("No" = "false", "Yes" = "true"),
-          selected = isolate(input$use_copula)
+        conditionalPanel(
+          condition = "output.densityVarConfig == 'zmiesane' && input.density_model_type == 'kernel'",
+          checkboxInput(
+            "set_bw", "Set manual bandwidth (bw)",
+            value = isolate(input$set_bw) %||% FALSE
+          ),
+          conditionalPanel(
+            condition = "input.set_bw == true",
+            numericInput(
+              "bw_value", "Bandwidth (0.10 – 6.00):",
+              value = isolate(input$bw_value) %||% NULL,
+              min = 0.10, max = 6.00, step = 0.1
+            )
+          )
         ),
         
         conditionalPanel(
-          condition = "input.use_copula == 'true'",
-          
-          uiOutput("copula_type_ui"),
+          condition = "output.densityVarConfig == '2_spojite'",
+          radioButtons(
+            "use_copula", "Use copula:",
+            choices = c("No" = "false", "Yes" = "true"),
+            selected = isolate(input$use_copula)
+          ),
           
           conditionalPanel(
-            condition = "input.density_model_type == 'parametric'",
-            selectInput(
-              "marginal_densities", "Marginal densities:",
-              choices = list(
-                "log_dnorm & dnorm" = "log_dnorm, dnorm",
-                "dnorm & dnorm" = "dnorm, dnorm",
-                "log_dnorm & log_dnorm" = "log_dnorm, log_dnorm"
-              ),
-              selected = isolate(input$marginal_densities)
+            condition = "input.use_copula == 'true'",
+            uiOutput("copula_type_ui"),
+            
+            conditionalPanel(
+              condition = "input.density_model_type == 'parametric'",
+              selectInput(
+                "marginal_densities", "Marginal densities:",
+                choices = list(
+                  "log_dnorm & dnorm" = "log_dnorm, dnorm",
+                  "dnorm & dnorm" = "dnorm, dnorm",
+                  "log_dnorm & log_dnorm" = "log_dnorm, log_dnorm"
+                ),
+                selected = isolate(input$marginal_densities)
+              )
             )
+          )
+        ),
+        
+        conditionalPanel(
+          condition = "output.densityVarConfig != 'none'",
+          checkboxGroupInput(
+            "plot_type", "Plot type:",
+            choices = c("2D", "3D"),
+            selected = isolate(input$plot_type)
           )
         ),
         
@@ -229,7 +254,7 @@ server <- function(input, output, session) {
       var_names <- names(data)
       selected_response <- input$reg_response
       
-      # Vyber len spojité premenne (prediktory)
+      # Vyber len spojite premenne (prediktory)
       variable_types <- identify_variables(data)
       continuous_vars <- variable_types$Spojite
       
@@ -411,13 +436,11 @@ server <- function(input, output, session) {
     selected_plot_types <- input$plot_type
     use_copula <- input$use_copula == "true"
     
-    # Bandwidth
     bw_value <- NULL
     if (!is.null(input$set_bw) && input$set_bw) {
       bw_value <- input$bw_value
     }
     
-    # Copula type
     copula_type <- if (use_copula) input$copula_type else NULL
     
     # Marginal densities
@@ -426,7 +449,7 @@ server <- function(input, output, session) {
       marginal_densities <- strsplit(input$marginal_densities, ",\\s*")[[1]]
     }
     
-    # Vymazanie predchádzajúcich grafov a tabuliek
+    # Vymazanie predchadzajucich grafov a tabuliek
     output$model_outputs_plot2d <- renderPlot({ NULL })
     output$model_outputs_plot3d <- renderPlotly({ NULL })
     output$model_outputs_table <- renderTable({ NULL })
@@ -443,7 +466,7 @@ server <- function(input, output, session) {
         plot_type = if (length(selected_plot_types) > 0) selected_plot_types[1] else NULL
       )
       
-      # Rozhodnutie podľa typu výstupu
+      # Rozhodnutie podla typu vystupu
       if (is.data.frame(result)) {
         output$model_outputs_combined <- renderUI({
           tagList(
@@ -499,6 +522,29 @@ server <- function(input, output, session) {
     }, error = function(e) {
       showNotification(paste("Chyba:", e$message), type = "error")
     })
+  })
+  
+  densityVarConfig <- reactive({
+    types <- selected_density_types()
+    
+    if (length(types) != 2) return("none")
+    
+    n_spojite <- sum(types == "spojita")
+    n_diskretne <- sum(types == "diskretna")
+    
+    if (n_spojite == 2) return("2_spojite")
+    if (n_diskretne == 2) return("2_diskretne")
+    if (n_spojite == 1 && n_diskretne == 1) return("zmiesane")
+    
+    return("none")
+  })
+  output$densityVarConfig <- densityVarConfig
+  outputOptions(output, "densityVarConfig", suspendWhenHidden = FALSE)
+  
+  observe({
+    if (input$density_model_type != "kernel" || !isTRUE(input$set_bw) || densityVarConfig() != "zmiesane") {
+      updateNumericInput(session, "bw_value", value = NULL)
+    }
   })
   
   # Regresia
@@ -648,7 +694,7 @@ server <- function(input, output, session) {
     data <- loaded_data()
     response <- input$class_response
     
-    # Získaj aktuálny zoznam prediktorov zo vstupov
+    # Aktualny zoznam prediktorov zo vstupov
     predictor_ids <- class_predictors()
     predictor_names <- sapply(seq_along(predictor_ids), function(i) {
       input[[paste0("class_predictor_", i)]]
@@ -666,7 +712,7 @@ server <- function(input, output, session) {
       k_val <- input$k_value
     }
     
-    # Vymazanie výstupu
+    # Vymazanie vystupu
     output$model_outputs_combined <- renderUI({ NULL })
     output$model_outputs_classification <- renderPlot({ NULL })
     
@@ -796,7 +842,5 @@ server <- function(input, output, session) {
       showNotification(paste("Chyba:", e$message), type = "error")
     })
   })
-  
-  
   
 }

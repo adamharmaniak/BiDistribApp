@@ -2,9 +2,11 @@ source("global.R")
 
 ui <- fluidPage(
   theme = shinytheme("slate"),
-  titlePanel("Joint probability distribution modelling"),
+  tags$head(
+    tags$link(rel = "stylesheet", type = "text/css", href = "styles.css")
+  ),
   
-  # Horné menu (prepína len sidebar, výstup ostáva rovnaký)
+  # Horne menu (prepina len sidebar, vystup ostava rovnaky)
   tabsetPanel(id = "main_tabs",
               tabPanel("Data selection", value = "data"),
               tabPanel("Density model", value = "joint_density"),
@@ -13,7 +15,7 @@ ui <- fluidPage(
               tabPanel("Conditional Densities", value = "conditional_densities")
   ),
   
-  # Spoločné rozloženie
+  # Spolocne rozlozenie
   sidebarLayout(
     sidebarPanel(
       uiOutput("tools_sidebar")
@@ -21,7 +23,7 @@ ui <- fluidPage(
     mainPanel(
       div(
         id = "model_outputs",
-        style = "border: 1px dashed gray; padding: 10px; margin-bottom: 30px;",
+        style = "padding: 10px; margin-bottom: 30px;",
         uiOutput("model_outputs_combined")
       ),
       uiOutput("variable_info_ui")

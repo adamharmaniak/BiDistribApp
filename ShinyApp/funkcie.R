@@ -702,7 +702,7 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
   }
 }
 
-continuous_joint_distribution_copula <- function(data, continuous_vars, model_type, copula_type, marginal_densities = c("dnorm", "dnorm"), plot_type) {
+continuous_joint_distribution_copula <- function(data, continuous_vars, model_type, copula_type, marginal_densities, plot_type) {
   
   # Modelovanie hustoty pomocou jadroveho vyhladzovania a kopuly (rozklad na marginaly)
   if (model_type == "kernel") {
@@ -1167,7 +1167,7 @@ discrete_joint_distribution <- function(data, discrete_vars, plot_type) {
   }
 }
 
-model_joint_distribution_density <- function(data, selected_variables, model_type = NULL, bw = NULL, use_copula = FALSE, copula_type = NULL, marginal_densities = NULL, plot_type = NULL) {
+model_joint_distribution_density <- function(data, selected_variables, model_type = NULL, bw = NULL, use_copula = FALSE, copula_type = NULL, marginal_densities = c("dnorm", "dnorm"), plot_type = NULL) {
   # Identifikacia typov premennych
   variable_types <- identify_variables(data)
   discrete_vars <- intersect(variable_types$Diskretne, selected_variables)
@@ -1199,9 +1199,6 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
         stop("Argument 'copula_type' mozno pouzit len ked 'use_copula' = 'TRUE'.")
       }
       else {
-        if (!is.null(bw)) {
-          stop("Parameter bandwidth ('bw') sa zadava iba pri jadrovom vyhladzovani zmesi.")
-        }
         if (is.null(plot_type)){
           stop("Nebol zadany typ grafu na vykreslenie.")
         }
@@ -1214,9 +1211,6 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
         stop("Ak je 'use_copula' = 'TRUE', musi byt specifikovany aj parameter 'copula_type'.")
       }
       else {
-        if (!is.null(bw)) {
-          stop("Parameter bandwidth ('bw') sa zadava iba pri jadrovom vyhladzovani zmesi.")
-        }
         if (model_type != "parametric" && !is.null(marginal_densities)){
           stop("Parameter marginal_densities sa zadava iba pri model_type = 'parametric' s kopulou")
         }
