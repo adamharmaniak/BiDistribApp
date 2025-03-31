@@ -1175,45 +1175,27 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
   variables_count <- length(discrete_vars) + length(continuous_vars)
   
   if (length(selected_variables) == 2 && length(continuous_vars) == 0) {
-    if (!is.null(model_type) || use_copula != FALSE || !is.null(copula_type) || !is.null(bw)) {
-      stop("Argumenty model_type, 'use_copula', 'copula_type' a 'bw' sa nepouzivaju pri modelovani dvoch diskretnych premennych.")
-    }
     if (is.null(plot_type)){
       stop("Nebol zadany typ grafu na vykreslenie.")
     }
     result <- discrete_joint_distribution(data, discrete_vars, plot_type)
     print(result)
   } else if (variables_count > 2) {
-    if (!is.null(model_type) || use_copula != FALSE || !is.null(copula_type) || !is.null(bw)) {
-      message("Argumenty model_type, 'use_copula', 'copula_type' a 'bw' sa nepouzivaju pri modelovani vacsieho poctu premennych ako 2.")
-      
-      result <- multi_joint_distribution(data, discrete_vars, continuous_vars)
-      print(result)
-    }
-    
     result <- multi_joint_distribution(data, discrete_vars, continuous_vars)
     print(result)
   } else if (length(selected_variables) == 2 && length(discrete_vars) == 0) {
     if (use_copula == FALSE) {
-      if (!is.null(copula_type)) {
-        stop("Argument 'copula_type' mozno pouzit len ked 'use_copula' = 'TRUE'.")
+      if (is.null(plot_type)){
+        stop("Nebol zadany typ grafu na vykreslenie.")
       }
-      else {
-        if (is.null(plot_type)){
-          stop("Nebol zadany typ grafu na vykreslenie.")
-        }
-        result <- continuous_joint_distribution(data, continuous_vars, model_type, plot_type)
-        print(result)
-      }
+      result <- continuous_joint_distribution(data, continuous_vars, model_type, plot_type)
+      print(result)
     }
     else {
       if (is.null(copula_type)) {
         stop("Ak je 'use_copula' = 'TRUE', musi byt specifikovany aj parameter 'copula_type'.")
       }
       else {
-        if (model_type != "parametric" && !is.null(marginal_densities)){
-          stop("Parameter marginal_densities sa zadava iba pri model_type = 'parametric' s kopulou")
-        }
         if (is.null(plot_type)){
           stop("Nebol zadany typ grafu na vykreslenie.")
         }
@@ -1222,9 +1204,6 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
       }
     }
   } else if (length(selected_variables) == 2 && length(discrete_vars) == 1) {
-    if (use_copula != FALSE || !is.null(copula_type)) {
-      stop("Argumenty 'copula' a 'copula_type' sa pouzivaju iba pri modelovani dvoch spojitych premennych.")
-    }
     if (is.null(plot_type)){
       stop("Nebol zadany typ grafu na vykreslenie.")
     }

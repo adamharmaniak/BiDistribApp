@@ -202,9 +202,9 @@ server <- function(input, output, session) {
           conditionalPanel(
             condition = "input.set_bw == true",
             numericInput(
-              "bw_value", "Bandwidth (0.10 – 6.00):",
+              "bw_value", "Bandwidth (0.10 – 100.00):",
               value = isolate(input$bw_value) %||% NULL,
-              min = 0.10, max = 6.00, step = 0.1
+              min = 0.10, max = 100.00, step = 0.1
             )
           )
         ),
@@ -227,6 +227,7 @@ server <- function(input, output, session) {
                 "marginal_densities", "Marginal densities:",
                 choices = list(
                   "log_dnorm & dnorm" = "log_dnorm, dnorm",
+                  "dnorm & log_dnorm" = "dnorm, log_dnorm",
                   "dnorm & dnorm" = "dnorm, dnorm",
                   "log_dnorm & log_dnorm" = "log_dnorm, log_dnorm"
                 ),
