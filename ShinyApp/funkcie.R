@@ -1045,56 +1045,6 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
   }
 }
 
-multi_joint_distribution <- function(data, discrete_vars, continuous_vars, abort_signal) {
-  
-  # Vytvorenie tabulky s frekvenciami pre diskretne premenne
-  tab <- as.data.frame(table(data[, discrete_vars]))
-  
-  # Pre kazdu spojitu premennu vypocitame priemerne hodnoty pre kombinacie diskretnych premennych
-  for (cont_var in continuous_vars) {
-    mean_values <- data %>%
-      group_by(across(all_of(discrete_vars))) %>%
-      summarise(Mean_Value = mean(.data[[cont_var]], na.rm = TRUE), .groups = "drop")
-    
-    # mean_values neobsahuje ziadne riadky => preskocime tuto premennu
-    if (nrow(mean_values) == 0) {
-      warning(paste("Žiadne dáta na výpočet priemeru pre premennú:", cont_var))
-      next
-    }
-    
-    # Overenie, ktore diskretne premenne existuju v tab a mean_values
-    common_vars <- intersect(names(tab), discrete_vars)
-    common_vars_mv <- intersect(names(mean_values), discrete_vars)
-    
-    # Existuju spolocne premenne => prevedenie na character
-    if (length(common_vars) > 0) {
-      tab <- tab %>%
-        mutate(across(all_of(common_vars), as.character))
-    }
-    if (length(common_vars_mv) > 0) {
-      mean_values <- mean_values %>%
-        mutate(across(all_of(common_vars_mv), as.character))
-    }
-    
-    # Spojenie priemernych hodnot so zakladnou tabulkou
-    tab <- full_join(tab, mean_values, by = common_vars)
-    
-    # Premenovanie stlpca Mean_Value na nazov spojitej premennej
-    colnames(tab)[which(colnames(tab) == "Mean_Value")] <- cont_var
-  }
-  
-  # Náhrada NA vo Frequency nulami
-  tab$Freq[is.na(tab$Freq)] <- 0
-  
-  # Vypocet pravdepodobnosti
-  tab$Probability <- tab$Freq / sum(tab$Freq)
-  
-  # Odstranenie riadkov s nulovou frekvenciou
-  tab <- tab[tab$Freq > 0, ]
-  
-  return(tab)
-}
-
 discrete_joint_distribution <- function(data, discrete_vars, plot_type, abort_signal) {
   
   tab <- as.data.frame(table(data[, discrete_vars]))
@@ -1191,9 +1141,6 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
     }
     result <- discrete_joint_distribution(data, discrete_vars, plot_type, abort_signal)
     print(result)
-  } else if (variables_count > 2) {
-    result <- multi_joint_distribution(data, discrete_vars, continuous_vars, abort_signal)
-    print(result)
   } else if (length(selected_variables) == 2 && length(discrete_vars) == 0) {
     if (use_copula == FALSE) {
       if (is.null(plot_type)){
@@ -1237,16 +1184,30 @@ model_conditional_mean <- function(data, selected_variables, mean_method = "line
   # Fitovanie modelu pre E[Y|X]
   if (mean_method == "loess") {
     fit <- loess(response ~ predictor, span = 0.75)
+    fitted_values <- predict(fit)
+    # R^2 pre loess – manuálne
+    ss_res <- sum((response - fitted_values)^2)
+    ss_tot <- sum((response - mean(response))^2)
+    r_squared <- 1 - ss_res / ss_tot
   } else if (mean_method == "gam") {
     fit <- gam(response ~ s(predictor))
+    r_squared <- summary(fit)$r.sq
   } else if (mean_method == "spline") {
     fit <- lm(response ~ bs(predictor, df = 5))
+    r_squared <- summary(fit)$r.squared
   } else if (mean_method == "linear") {
     fit <- lm(response ~ predictor)
+    r_squared <- summary(fit)$r.squared
   } else if (mean_method == "poly") {
     fit <- lm(response ~ poly(predictor, degree = poly_mean_degree, raw = TRUE))
+    r_squared <- summary(fit)$r.squared
   } else if (mean_method == "exp") {
     fit <- nls(response ~ a * exp(b * predictor), start = list(a = 1, b = 0.01))
+    fitted_values <- predict(fit)
+    # R^2 manuálne
+    ss_res <- sum((response - fitted_values)^2)
+    ss_tot <- sum((response - mean(response))^2)
+    r_squared <- 1 - ss_res / ss_tot
   } else {
     stop("Neplatný mean_method!")
   }
@@ -1268,7 +1229,7 @@ model_conditional_mean <- function(data, selected_variables, mean_method = "line
              label = paste0("E[Y|X=", round(specific_x, 2), "]=", round(specific_mean, 2)),
              hjust = -0.1, color = "blue") +
     labs(
-      title = "Podmienená stredná hodnota",
+      title = paste0("Podmienená stredná hodnota (R² = ", round(r_squared, 3), ")"),
       x = paste0(predictor_name, " (Prediktor)"),
       y = paste0(response_name, " (Odozva)")
     ) +
@@ -1278,7 +1239,8 @@ model_conditional_mean <- function(data, selected_variables, mean_method = "line
     plot = p,
     conditional_mean = data.frame(X = x_seq, E_Y_given_X = mean_pred),
     specific_x = specific_x,
-    specific_mean = specific_mean
+    specific_mean = specific_mean,
+    r_squared = r_squared
   ))
 }
 
@@ -1497,12 +1459,26 @@ plot_decision_boundary <- function(data, response_name, predictor_names, model, 
     data[[response_name]] <- as.factor(data[[response_name]])
   }
   
-  # Grid pre vizualizaciu rozhodovacich hranic
-  x_seq <- seq(min(data[[predictor_names[1]]]), max(data[[predictor_names[1]]]), length.out = 200)
-  y_seq <- seq(min(data[[predictor_names[2]]]), max(data[[predictor_names[2]]]), length.out = 200)
+  # Automaticke vytvorenie gridu podla typu prediktorov
+  grid_list <- list()
   
-  grid <- expand.grid(X1 = x_seq, X2 = y_seq)
-  names(grid) <- predictor_names
+  for (pred in predictor_names) {
+    var <- data[[pred]]
+    if (is.factor(var)) {
+      grid_list[[pred]] <- levels(var)
+    } else {
+      grid_list[[pred]] <- seq(min(var, na.rm = TRUE), max(var, na.rm = TRUE), length.out = 200)
+    }
+  }
+  
+  grid <- expand.grid(grid_list)
+  
+  # Ak niektore premenne maju byt faktor v gride, zabezpec spravne urovne
+  for (pred in predictor_names) {
+    if (is.factor(data[[pred]])) {
+      grid[[pred]] <- factor(grid[[pred]], levels = levels(data[[pred]]))
+    }
+  }
   
   # Predikcia modelu na grid
   if (method == "logistic") {
@@ -1744,6 +1720,18 @@ classification_model <- function(data, response_name, predictor_names, method = 
     data[[response_name]] <- response
   }
   
+  # Konverzia diskretnych prediktorov na faktor
+  for (pred in predictor_names) {
+    if (!is.numeric(data[[pred]]) && !is.factor(data[[pred]])) {
+      data[[pred]] <- as.factor(data[[pred]])
+    }
+    
+    # Ak je prediktor čiselny ale ma malo unikatnych hodnot
+    if (is.numeric(data[[pred]]) && length(unique(data[[pred]])) <= 10) {
+      data[[pred]] <- as.factor(data[[pred]])
+    }
+  }
+  
   # Osetrenie kategorii s malym poctom pozorovani pre QDA
   if (method == "qda") {
     class_sizes <- table(response)
@@ -1852,7 +1840,7 @@ classification_model <- function(data, response_name, predictor_names, method = 
   }
   
   # Vypocet presnosti
-  accuracy <- mean(preds == response)
+  accuracy <- sum(preds == response) / length(preds)
   confusion_mat <- table(Predikovane = preds, Skutocne = response)
   
   result <- list(
@@ -1893,25 +1881,24 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
   
   # Hustoty pre kazdu sekciu
   density_data <- do.call(rbind, lapply(split(df, df$section), function(sub_df) {
-    
     if (nrow(sub_df) < 3) return(NULL)
     
     output <- list()
     
-    # Priemer odozvy v sekcii a posun pre vykreslenie hustoty
     y_mean <- mean(sub_df$response, na.rm = TRUE)
     x_max <- max(sub_df$predictor, na.rm = TRUE)
     
-    
-    
-    # Empiricka hustota
     if (empirical_density) {
-      if (is.null(bw_scale)){
+      if (is.null(bw_scale)) {
         emp_density <- density(sub_df$residuals, n = 50, bw = "nrd0")
-      }
-      else{
-        local_range <- max(sub_df$response, na.rm = TRUE) - min(sub_df$response, na.rm = TRUE)
+      } else {
+        local_range <- abs(max(sub_df$response, na.rm = TRUE) - min(sub_df$response, na.rm = TRUE))
         bw_effective <- bw_scale * local_range
+        
+        if (is.na(bw_effective) || bw_effective <= 0) {
+          return(NULL)
+        }
+        
         emp_density <- density(sub_df$residuals, n = 50, bw = bw_effective)
       }
       
@@ -1924,7 +1911,6 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
       output[[length(output) + 1]] <- df_emp
     }
     
-    # Hustota normalneho rozdelenia
     if (normal_density) {
       xs <- seq(min(sub_df$residuals), max(sub_df$residuals), length.out = 50)
       norm_density <- dnorm(xs, mean = 0, sd = sd(sub_df$residuals, na.rm = TRUE))
@@ -1967,34 +1953,34 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
     warning("Nebolo mozne vypocitat hustoty pre ziadnu sekciu!")
   }
   
+  # Vygenerovanie rovnomernej sekvencie pre plynulé vykreslenie
+  x_seq <- seq(min(df$predictor, na.rm = TRUE), max(df$predictor, na.rm = TRUE), length.out = 200)
+  new_data <- data.frame(predictor = x_seq)
+  
   # Stredna hodnota regresie
   if (mean_curve) {
     mean_formula <- as.formula(paste("response ~ poly(predictor, ", mean_poly_degree, ", raw = TRUE)"))
-    
     mean_model <- lm(mean_formula, data = df)
-    mean_pred <- predict(mean_model, newdata = df)
+    mean_pred <- predict(mean_model, newdata = new_data)
     
-    df$mean_pred <- mean_pred
-    
-    p <- p + geom_line(data = df, aes(x = predictor, y = mean_pred), color = "blue", size = 1.2)
+    p <- p + geom_line(
+      data = data.frame(predictor = x_seq, mean_pred = mean_pred),
+      aes(x = predictor, y = mean_pred),
+      color = "blue", size = 1.2
+    )
   }
   
   # Kvantilove krivky
   if (!is.null(quantiles)) {
     for (q in quantiles) {
       quantile_formula <- as.formula(paste("response ~ poly(predictor, ", quantile_poly_degree, ", raw = TRUE)"))
-      
       rq_fit <- quantreg::rq(quantile_formula, tau = q, data = df)
-      
-      quantile_pred <- predict(rq_fit, newdata = df)
-      
-      df$quantile_pred <- quantile_pred
+      quantile_pred <- predict(rq_fit, newdata = new_data)
       
       p <- p + geom_line(
-        data = df,
+        data = data.frame(predictor = x_seq, quantile_pred = quantile_pred),
         aes(x = predictor, y = quantile_pred),
-        color = "purple",
-        linetype = "dashed"
+        color = "purple", linetype = "dashed"
       )
     }
     

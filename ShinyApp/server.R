@@ -1,6 +1,8 @@
 source("global.R")
 source("funkcie.R")
 
+options(shiny.maxRequestSize = 100 * 1024^2)
+
 server <- function(input, output, session) {
   quantile_inputs <- reactiveVal()
   class_predictors <- reactiveVal(c())
@@ -426,7 +428,18 @@ server <- function(input, output, session) {
           numericInput("n_breaks", "Number of subwindows (n_breaks):",
                        value = 5, min = 1, max = 10, step = 1),
           numericInput("density_scaling", "Density scaling:",
-                       value = 2000, min = 1, max = 5000, step = 100)
+                       value = 100, min = 0.1, max = 100000, step = 100),
+          checkboxInput("manual_bw_scale", "Manual Scaling of bw", value = FALSE),
+          
+          conditionalPanel(
+            condition = "input.manual_bw_scale == true",
+            tagList(
+              numericInput("bw_scale", "Bandwidth scaling (bw_scale):",
+                           value = 1, min = 0.1, max = 50, step = 0.1),
+              helpText("Scaling factor for bandwidth used in estimating empirical density. 
+              Higher values increase smoothing; lower values make the density curve sharper.")
+            )
+          )
         ),
         
         conditionalPanel(
@@ -451,6 +464,7 @@ server <- function(input, output, session) {
   })
   outputOptions(output, "condResponseType", suspendWhenHidden = FALSE)
   
+  # Zdruzena hustota
   observeEvent(input$run_density_model, {
     abort_requested(FALSE)
     req(input$density_vars)
@@ -550,6 +564,20 @@ server <- function(input, output, session) {
     }, error = function(e) {
       showNotification(paste("Chyba:", e$message), type = "error")
     })
+  })
+  
+  observeEvent(input$density_vars, {
+    if (!is.null(input$density_vars) && length(input$density_vars) > 2) {
+      updateCheckboxGroupInput(
+        session,
+        inputId = "density_vars",
+        selected = head(input$density_vars, 2)
+      )
+      showNotification(
+        "Please select at most two variables. This model supports visualization of two variables only.",
+        type = "error"
+      )
+    }
   })
   
   densityVarConfig <- reactive({
@@ -662,7 +690,8 @@ server <- function(input, output, session) {
       output$model_outputs_combined <- renderUI({
         tagList(
           h4("Regression Plot:"),
-          plotOutput("model_outputs_regression")
+          plotOutput("model_outputs_regression"),
+          h5(paste("Presnosť modelu (R²):", round(result$mean_result$r_squared * 100, 2), "%"))
         )
       })
       
@@ -837,6 +866,10 @@ server <- function(input, output, session) {
     normal_density <- input$normal_density
     empirical_density <- input$empirical_density
     ordinal <- input$ordinal
+    bw_scale <- NULL
+    if (isTRUE(input$manual_bw_scale)) {
+      bw_scale <- input$bw_scale
+    }
     
     if (!normal_density && !empirical_density && cond_response_type() == "spojita") {
       showNotification("At least one density type (normal or empirical) must be selected.", type = "error")
@@ -855,7 +888,8 @@ server <- function(input, output, session) {
         mean_poly_degree = mean_poly_degree,
         quantile_poly_degree = quant_poly_degree,
         normal_density = normal_density,
-        empirical_density = empirical_density
+        empirical_density = empirical_density,
+        bw_scale = bw_scale
       )
       
       output$model_outputs_conditional <- renderPlot({ plot })
