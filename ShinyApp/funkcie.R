@@ -36,7 +36,7 @@ printVariables <- function(data) {
   )
 }
 
-mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, model_type, bw, plot_type) {
+mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, model_type, bw, plot_type, abort_signal) {
   
   # Modelovanie hustoty pouzitim jadroveho vyhladzovania
   if (model_type == "kernel") {
@@ -450,7 +450,7 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
   }
 }
 
-continuous_joint_distribution <- function(data, continuous_vars, model_type, plot_type) {
+continuous_joint_distribution <- function(data, continuous_vars, model_type, plot_type, abort_signal) {
   
   # Modelovanie hustoty pomocou jadroveho vyhladzovania
   if (model_type == "kernel"){
@@ -702,7 +702,8 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
   }
 }
 
-continuous_joint_distribution_copula <- function(data, continuous_vars, model_type, copula_type, marginal_densities, plot_type) {
+continuous_joint_distribution_copula <- function(data, continuous_vars, model_type, copula_type, marginal_densities, plot_type, abort_signal) {
+  if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
   
   # Modelovanie hustoty pomocou jadroveho vyhladzovania a kopuly (rozklad na marginaly)
   if (model_type == "kernel") {
@@ -716,6 +717,8 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     kde_y_density <- approxfun(kde_y$x, kde_y$y, rule = 2)
     kde_y_cdf <- approxfun(kde_y$x, cumsum(kde_y$y) / sum(kde_y$y), rule = 2)
     
+    if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
+    
     # Transformacia dat na jednotkovy interval
     u1 <- kde_x_cdf(data[[continuous_vars[1]]])
     u2 <- kde_y_cdf(data[[continuous_vars[2]]])
@@ -728,6 +731,8 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
       stop("Zadaný 'copula_type' nie je podporovaný. Použi: 'empirical'.")
     }
     
+    if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
+    
     # Vytvorenie siete pre vypocet hustoty
     x_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
     y_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
@@ -736,6 +741,7 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     
     # Funkcia pre vypocet zdruzenej hustoty KDE + kopula
     copula_density_function <- function(x, y) {
+      if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
       u1 <- kde_x_cdf(x)
       u2 <- kde_y_cdf(y)
       
@@ -752,6 +758,7 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     grid$z <- mapply(copula_density_function, grid$x, grid$y)
     z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
     
+    if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
     
     if (plot_type == "3D") {
       # 3D Vizualizacia
@@ -1038,7 +1045,7 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
   }
 }
 
-multi_joint_distribution <- function(data, discrete_vars, continuous_vars) {
+multi_joint_distribution <- function(data, discrete_vars, continuous_vars, abort_signal) {
   
   # Vytvorenie tabulky s frekvenciami pre diskretne premenne
   tab <- as.data.frame(table(data[, discrete_vars]))
@@ -1088,7 +1095,7 @@ multi_joint_distribution <- function(data, discrete_vars, continuous_vars) {
   return(tab)
 }
 
-discrete_joint_distribution <- function(data, discrete_vars, plot_type) {
+discrete_joint_distribution <- function(data, discrete_vars, plot_type, abort_signal) {
   
   tab <- as.data.frame(table(data[, discrete_vars]))
   tab$Probability <- tab$Freq / sum(tab$Freq)
@@ -1167,7 +1174,11 @@ discrete_joint_distribution <- function(data, discrete_vars, plot_type) {
   }
 }
 
-model_joint_distribution_density <- function(data, selected_variables, model_type = NULL, bw = NULL, use_copula = FALSE, copula_type = NULL, marginal_densities = c("dnorm", "dnorm"), plot_type = NULL) {
+model_joint_distribution_density <- function(data, selected_variables, model_type = NULL, bw = NULL, use_copula = FALSE, copula_type = NULL, marginal_densities = c("dnorm", "dnorm"), plot_type = NULL, abort_signal = NULL) {
+  if (!is.null(abort_signal) && isTRUE(abort_signal())) {
+    stop("Aborted by user.")
+  }
+  
   # Identifikacia typov premennych
   variable_types <- identify_variables(data)
   discrete_vars <- intersect(variable_types$Diskretne, selected_variables)
@@ -1178,17 +1189,17 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
     if (is.null(plot_type)){
       stop("Nebol zadany typ grafu na vykreslenie.")
     }
-    result <- discrete_joint_distribution(data, discrete_vars, plot_type)
+    result <- discrete_joint_distribution(data, discrete_vars, plot_type, abort_signal)
     print(result)
   } else if (variables_count > 2) {
-    result <- multi_joint_distribution(data, discrete_vars, continuous_vars)
+    result <- multi_joint_distribution(data, discrete_vars, continuous_vars, abort_signal)
     print(result)
   } else if (length(selected_variables) == 2 && length(discrete_vars) == 0) {
     if (use_copula == FALSE) {
       if (is.null(plot_type)){
         stop("Nebol zadany typ grafu na vykreslenie.")
       }
-      result <- continuous_joint_distribution(data, continuous_vars, model_type, plot_type)
+      result <- continuous_joint_distribution(data, continuous_vars, model_type, plot_type, abort_signal)
       print(result)
     }
     else {
@@ -1199,7 +1210,7 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
         if (is.null(plot_type)){
           stop("Nebol zadany typ grafu na vykreslenie.")
         }
-        result <- continuous_joint_distribution_copula(data, continuous_vars, model_type, copula_type, marginal_densities, plot_type)
+        result <- continuous_joint_distribution_copula(data, continuous_vars, model_type, copula_type, marginal_densities, plot_type, abort_signal)
         print(result)
       }
     }
@@ -1207,7 +1218,7 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
     if (is.null(plot_type)){
       stop("Nebol zadany typ grafu na vykreslenie.")
     }
-    result <- mixture_joint_distribution(data, discrete_vars, continuous_vars, model_type, bw, plot_type)
+    result <- mixture_joint_distribution(data, discrete_vars, continuous_vars, model_type, bw, plot_type, abort_signal)
     print(result)
   }
 }

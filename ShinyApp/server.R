@@ -7,6 +7,7 @@ server <- function(input, output, session) {
   cond_quantile_inputs <- reactiveVal(list(0.5))
   cond_response_type <- reactiveVal(NULL)
   loaded_data <- reactiveVal(NULL)
+  abort_requested <- reactiveVal(FALSE)
   
   observe({
     if (input$main_tabs == "classification" &&
@@ -69,6 +70,11 @@ server <- function(input, output, session) {
     })
     
     types
+  })
+  
+  observeEvent(input$abort_density_model, {
+    abort_requested(TRUE)
+    showNotification("Aborting model evaluation...", type = "warning")
   })
   
   # Nacitanie dat po kliknuti na tlacidlo
@@ -246,7 +252,11 @@ server <- function(input, output, session) {
           )
         ),
         
-        actionButton("run_density_model", "Model")
+        div(
+          style = "display: flex; gap: 10px;",
+          actionButton("run_density_model", "Model"),
+          actionButton("abort_density_model", "Abort")
+        )
       )
       
     } else if (tab == "regression") {
@@ -304,7 +314,11 @@ server <- function(input, output, session) {
         
         uiOutput("specific_x_ui"),
         
-        actionButton("run_regression_model", "Model")
+        div(
+          style = "display: flex; gap: 10px;",
+          actionButton("run_regression_model", "Model"),
+          actionButton("abort_regression_model", "Abort")
+        )
       )
       
     } else if (tab == "classification") {
@@ -359,8 +373,12 @@ server <- function(input, output, session) {
           )
         ),
         
-        # Spustenie modelu
-        actionButton("run_classification_model", "Model")
+        div(
+          style = "display: flex; gap: 10px;",
+          actionButton("run_classification_model", "Model"),
+          actionButton("abort_classification_model", "Abort")
+        )
+        
       )
     } else if (tab == "conditional_densities") {
       req(loaded_data())
@@ -416,7 +434,12 @@ server <- function(input, output, session) {
           checkboxInput("ordinal", "Ordinal (for discrete responses)", value = FALSE)
         ),
         
-        actionButton("run_conditional_density", "Model")
+        div(
+          style = "display: flex; gap: 10px;",
+          actionButton("run_conditional_density", "Model"),
+          actionButton("abort_conditional_density", "Abort")
+        )
+        
       )
     }
   })
@@ -429,6 +452,7 @@ server <- function(input, output, session) {
   outputOptions(output, "condResponseType", suspendWhenHidden = FALSE)
   
   observeEvent(input$run_density_model, {
+    abort_requested(FALSE)
     req(input$density_vars)
     
     selected_vars <- input$density_vars
@@ -464,7 +488,8 @@ server <- function(input, output, session) {
         use_copula = use_copula,
         copula_type = copula_type,
         marginal_densities = marginal_densities,
-        plot_type = if (length(selected_plot_types) > 0) selected_plot_types[1] else NULL
+        plot_type = if (length(selected_plot_types) > 0) selected_plot_types[1] else NULL,
+        abort_signal = abort_requested
       )
       
       # Rozhodnutie podla typu vystupu
@@ -493,7 +518,8 @@ server <- function(input, output, session) {
               use_copula = use_copula,
               copula_type = copula_type,
               marginal_densities = marginal_densities,
-              plot_type = "2D"
+              plot_type = "2D",
+              abort_signal = abort_requested
             )
             output$model_outputs_plot2d <- renderPlot({ result2D })
             rendered_outputs <- append(rendered_outputs, list(plotOutput("model_outputs_plot2d")))
@@ -508,7 +534,8 @@ server <- function(input, output, session) {
               use_copula = use_copula,
               copula_type = copula_type,
               marginal_densities = marginal_densities,
-              plot_type = "3D"
+              plot_type = "3D",
+              abort_signal = abort_requested
             )
             output$model_outputs_plot3d <- renderPlotly({ result3D })
             rendered_outputs <- append(rendered_outputs, list(plotlyOutput("model_outputs_plot3d")))
