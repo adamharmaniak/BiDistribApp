@@ -460,11 +460,19 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
       n = 100
     )
     
+    x_vals <- kde_result$x
+    y_vals <- kde_result$y
+    z_matrix <- kde_result$z
+    z_matrix <- t(z_matrix)
+    
     if (plot_type == "3D") {
       fig_3d <- plot_ly(
-        x = ~kde_result$x, y = ~kde_result$y, z = ~kde_result$z,
+        x = x_vals, y = y_vals, z = z_matrix,
         type = "surface",
-        colors = colorRamp(c("blue", "cyan", "yellow", "red"))
+        colors = colorRamp(c("blue", "cyan", "yellow", "red")),
+        opacity = 0.7,
+        showscale = TRUE,
+        source = "A"
       ) %>% layout(
         title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(jadrové   vyhladzovanie)"),
         scene = list(
@@ -474,7 +482,14 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
         )
       )
       
-      return(fig_3d)
+      fig_3d <- fig_3d %>% event_register("plotly_click")
+      
+      return(list(
+        plot = fig_3d,
+        x_vals = x_vals,
+        y_vals = y_vals,
+        z_matrix = z_matrix
+      ))
       
     } else if (plot_type == "2D") {
       kde_df <- data.frame(
@@ -546,14 +561,17 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
     # Vypocet hustoty na sieti
     grid$z <- mapply(bivariate_normal_density, grid$x, grid$y)
     z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
-    
+    z_matrix <- t(z_matrix)
     
     if (plot_type == "3D") {
       # 3D Vizualizacia
       fig_3d <- plot_ly(
         x = ~x_vals, y = ~y_vals, z = ~z_matrix,
         type = "surface",
-        colors = colorRamp(c("blue", "cyan", "yellow", "red"))
+        colors = colorRamp(c("blue", "cyan", "yellow", "red")),
+        opacity = 0.7,
+        showscale = TRUE,
+        source = "A"
       ) %>% layout(
         title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(bivariátne normálne rozdelenie)"),
         scene = list(
@@ -563,7 +581,14 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
         )
       )
       
-      return(fig_3d)
+      fig_3d <- fig_3d %>% event_register("plotly_click")
+      
+      return(list(
+        plot = fig_3d,
+        x_vals = x_vals,
+        y_vals = y_vals,
+        z_matrix = z_matrix
+      ))
       
     } else if (plot_type == "2D") {
       contour_df <- grid
@@ -645,14 +670,17 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
     # Vypocet hustoty na sieti
     grid$z <- mapply(bivariate_t_density, grid$x, grid$y)
     z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
-    
+    z_matrix <- t(z_matrix)
     
     if (plot_type == "3D") {
       # 3D Vizualizacia
       fig_3d <- plot_ly(
         x = ~x_vals, y = ~y_vals, z = ~z_matrix,
         type = "surface",
-        colors = colorRamp(c("blue", "cyan", "yellow", "red"))
+        colors = colorRamp(c("blue", "cyan", "yellow", "red")),
+        opacity = 0.7,
+        showscale = TRUE,
+        source = "A"
       ) %>% layout(
         title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(bivariátne t-rozdelenie)"),
         scene = list(
@@ -662,7 +690,14 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
         )
       )
       
-      return(fig_3d)
+      fig_3d <- fig_3d %>% event_register("plotly_click")
+      
+      return(list(
+        plot = fig_3d,
+        x_vals = x_vals,
+        y_vals = y_vals,
+        z_matrix = z_matrix
+      ))
       
     } else if (plot_type == "2D") {
       contour_df <- grid
@@ -1147,7 +1182,7 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
         stop("Nebol zadany typ grafu na vykreslenie.")
       }
       result <- continuous_joint_distribution(data, continuous_vars, model_type, plot_type, abort_signal)
-      print(result)
+      return(result)
     }
     else {
       if (is.null(copula_type)) {
@@ -1875,22 +1910,16 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
   breaks <- seq(min(df$predictor, na.rm = TRUE), max(df$predictor, na.rm = TRUE), length.out = n_breaks + 1)
   df$section <- cut(df$predictor, breaks = breaks, include.lowest = TRUE)
   
-  # Rezidua zo zakladneho modelu
-  lm_fit <- lm(response ~ predictor, data = df)
-  df$residuals <- residuals(lm_fit)
-  
   # Hustoty pre kazdu sekciu
   density_data <- do.call(rbind, lapply(split(df, df$section), function(sub_df) {
     if (nrow(sub_df) < 3) return(NULL)
     
     output <- list()
-    
-    y_mean <- mean(sub_df$response, na.rm = TRUE)
     x_max <- max(sub_df$predictor, na.rm = TRUE)
     
     if (empirical_density) {
       if (is.null(bw_scale)) {
-        emp_density <- density(sub_df$residuals, n = 50, bw = "nrd0")
+        emp_density <- density(sub_df$response, n = 50, bw = "nrd0")
       } else {
         local_range <- abs(max(sub_df$response, na.rm = TRUE) - min(sub_df$response, na.rm = TRUE))
         bw_effective <- bw_scale * local_range
@@ -1899,12 +1928,12 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
           return(NULL)
         }
         
-        emp_density <- density(sub_df$residuals, n = 50, bw = bw_effective)
+        emp_density <- density(sub_df$response, n = 50, bw = bw_effective)
       }
       
       df_emp <- data.frame(
         x = x_max - emp_density$y * density_scaling,
-        y = emp_density$x + y_mean,
+        y = emp_density$x,
         section = unique(sub_df$section),
         type = "empirical"
       )
@@ -1912,12 +1941,17 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
     }
     
     if (normal_density) {
-      xs <- seq(min(sub_df$residuals), max(sub_df$residuals), length.out = 50)
-      norm_density <- dnorm(xs, mean = 0, sd = sd(sub_df$residuals, na.rm = TRUE))
+      y_vals <- sub_df$response
+      y_mean <- mean(y_vals, na.rm = TRUE)
+      sd_y <- sd(y_vals, na.rm = TRUE)
+      if (sd_y < 1e-6) sd_y <- 1e-6
+      
+      xs <- seq(y_mean - 3 * sd_y, y_mean + 3 * sd_y, length.out = 50)
+      norm_density <- dnorm(xs, mean = y_mean, sd = sd_y)
       
       df_theo <- data.frame(
         x = x_max - norm_density * density_scaling,
-        y = xs + y_mean,
+        y = xs,
         section = unique(sub_df$section),
         type = "normal"
       )
@@ -1995,6 +2029,10 @@ plot_conditional_discrete_densities <- function(df, n_breaks, density_scaling, o
   response_name <- attr(df, "response_var")
   predictor_name <- attr(df, "predictor_var")
   
+  if (is.factor(df$response)) {
+    df$response <- as.numeric(as.character(df$response))
+  }
+  
   # Rozdelenie prediktora na sekcie
   breaks <- seq(min(df$predictor, na.rm = TRUE),
                 max(df$predictor, na.rm = TRUE),
@@ -2011,7 +2049,7 @@ plot_conditional_discrete_densities <- function(df, n_breaks, density_scaling, o
     prob_table <- prop.table(table(sub_df$response))
     
     # Y su hodnoty odozvy, X su dlzky ciar podla pravdepodobnosti
-    y_vals <- as.numeric(names(prob_table))
+    y_vals <- as.numeric(levels(factor(names(prob_table))))
     
     x_start <- max(sub_df$predictor, na.rm = TRUE)
     x_end <- x_start + (as.numeric(prob_table) * density_scaling)

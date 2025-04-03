@@ -10,6 +10,7 @@ server <- function(input, output, session) {
   cond_response_type <- reactiveVal(NULL)
   loaded_data <- reactiveVal(NULL)
   abort_requested <- reactiveVal(FALSE)
+  clicked_points <- reactiveVal(data.frame(x = numeric(), y = numeric()))
   
   observe({
     if (input$main_tabs == "classification" &&
@@ -254,6 +255,12 @@ server <- function(input, output, session) {
           )
         ),
         
+        checkboxInput("density_cut", "Density Cut", value = FALSE),
+        conditionalPanel(
+          condition = "input.density_cut == true",
+          numericInput("num_cuts", "Number of Cuts (1–3):", value = 1, min = 1, max = 3)
+        ),
+        
         div(
           style = "display: flex; gap: 10px;",
           actionButton("run_density_model", "Model"),
@@ -312,7 +319,11 @@ server <- function(input, output, session) {
         
         h5("Quantiles:"),
         uiOutput("quantiles_ui"),
-        actionButton("add_quantile", "Add Quantile"),
+        div(
+          style = "margin-top: 10px;",
+          actionButton("add_quantile", "Add Quantile", width = "49%"),
+          actionButton("remove_quantile", "Delete Quantile", width = "49%")
+        ),
         
         uiOutput("specific_x_ui"),
         
@@ -403,7 +414,7 @@ server <- function(input, output, session) {
         
         conditionalPanel(
           condition = "output.condResponseType == 'spojita'",
-          checkboxInput("mean_curve", "Visualize Mean Curve", value = TRUE),
+          checkboxInput("mean_curve", "Visualize Mean Curve", value = FALSE),
           checkboxInput("quantile_curve", "Show Quantile Curves", value = FALSE),
           
           conditionalPanel(
@@ -420,15 +431,7 @@ server <- function(input, output, session) {
                       selected = isolate(input$cond_quantile_poly_degree) %||% 1),
           
           checkboxInput("normal_density", "Show normal conditional density", value = TRUE),
-          checkboxInput("empirical_density", "Show empirical conditional density", value = TRUE)
-        ),
-        
-        conditionalPanel(
-          condition = "output.condResponseType != null",
-          numericInput("n_breaks", "Number of subwindows (n_breaks):",
-                       value = 5, min = 1, max = 10, step = 1),
-          numericInput("density_scaling", "Density scaling:",
-                       value = 100, min = 0.1, max = 100000, step = 100),
+          checkboxInput("empirical_density", "Show empirical conditional density", value = TRUE),
           checkboxInput("manual_bw_scale", "Manual Scaling of bw", value = FALSE),
           
           conditionalPanel(
@@ -440,6 +443,14 @@ server <- function(input, output, session) {
               Higher values increase smoothing; lower values make the density curve sharper.")
             )
           )
+        ),
+        
+        conditionalPanel(
+          condition = "output.condResponseType != null",
+          numericInput("n_breaks", "Number of subwindows (n_breaks):",
+                       value = 5, min = 1, max = 10, step = 1),
+          numericInput("density_scaling", "Density scaling:",
+                       value = 100, min = 0.1, max = 100000, step = 100)
         ),
         
         conditionalPanel(
@@ -493,6 +504,7 @@ server <- function(input, output, session) {
     output$model_outputs_plot3d <- renderPlotly({ NULL })
     output$model_outputs_table <- renderTable({ NULL })
     
+    clicked_points(data.frame(x = numeric(), y = numeric()))
     tryCatch({
       result <- model_joint_distribution_density(
         data = data,
@@ -551,13 +563,79 @@ server <- function(input, output, session) {
               plot_type = "3D",
               abort_signal = abort_requested
             )
-            output$model_outputs_plot3d <- renderPlotly({ result3D })
-            rendered_outputs <- append(rendered_outputs, list(plotlyOutput("model_outputs_plot3d")))
+            
+            if (isTRUE(input$density_cut) && is.list(result3D)) {
+              assign("last_density_result", list(
+                x_vals = result3D$x_vals,
+                y_vals = result3D$y_vals,
+                z_matrix = result3D$z_matrix
+              ), envir = .GlobalEnv)
+              
+              output$model_outputs_plot3d <- renderPlotly({
+                base_plot <- result3D$plot
+                
+                # Prierezove krivky
+                if (isTRUE(input$density_cut)) {
+                  cuts <- clicked_points()
+                  if (nrow(cuts) > 0) {
+                    for (i in seq_len(nrow(cuts))) {
+                      x_idx <- which.min(abs(result3D$x_vals - cuts$x[i]))
+                      y_idx <- which.min(abs(result3D$y_vals - cuts$y[i]))
+                      
+                      # Slice pri fixnom x
+                      base_plot <- base_plot %>% add_trace(
+                        x = rep(result3D$x_vals[x_idx], length(result3D$y_vals)),
+                        y = result3D$y_vals,
+                        z = result3D$z_matrix[, x_idx],
+                        type = "scatter3d",
+                        mode = "lines",
+                        line = list(color = "black", width = 4),
+                        name = paste0("Slice x = ", round(result3D$x_vals[x_idx], 2))
+                      )
+                      
+                      # Slice pri fixnom y
+                      base_plot <- base_plot %>% add_trace(
+                        x = result3D$x_vals,
+                        y = rep(result3D$y_vals[y_idx], length(result3D$x_vals)),
+                        z = result3D$z_matrix[y_idx, ],
+                        type = "scatter3d",
+                        mode = "lines",
+                        line = list(color = "snow", width = 4),
+                        name = paste0("Slice y = ", round(result3D$y_vals[y_idx], 2))
+                      )
+                      
+                      base_plot <- base_plot %>% add_trace(
+                        x = result3D$x_vals[x_idx],
+                        y = result3D$y_vals[y_idx],
+                        z = result3D$z_matrix[y_idx, x_idx],
+                        type = "scatter3d",
+                        mode = "markers",
+                        marker = list(size = 6, color = "magenta"),
+                        hoverinfo = "text",
+                        text = paste("x =", round(result3D$x_vals[x_idx], 2),
+                                     "<br>y =", round(result3D$y_vals[y_idx], 2),
+                                     "<br>z =", signif(result3D$z_matrix[x_idx, y_idx], 3)),
+                        name = paste0("Intersection ", i)
+                      )
+                    }
+                  }
+                }
+                
+                base_plot
+              })
+              rendered_outputs <- append(rendered_outputs, list(plotlyOutput("model_outputs_plot3d")))
+            } else {
+              output$model_outputs_plot3d <- renderPlotly({ result3D$plot })
+              rendered_outputs <- append(rendered_outputs, list(plotlyOutput("model_outputs_plot3d")))
+            }
           }
         }
         
         output$model_outputs_combined <- renderUI({
-          tagList(rendered_outputs)
+          tagList(
+            rendered_outputs,
+            uiOutput("model_outputs_cuts")
+            )
         })
       }
       
@@ -578,6 +656,59 @@ server <- function(input, output, session) {
         type = "error"
       )
     }
+  })
+  
+  observeEvent(event_data("plotly_click"), {
+    if (isTRUE(input$density_cut)) {
+      click <- event_data("plotly_click")
+      if (!is.null(click)) {
+        new_point <- data.frame(x = click$x, y = click$y)
+        current <- clicked_points()
+        if (nrow(current) < input$num_cuts) {
+          clicked_points(rbind(current, new_point))
+        } else {
+          showNotification("Maximum number of cuts reached", type = "warning")
+        }
+      }
+    }
+  })
+  
+  output$cut_slices_table <- renderTable({
+    req(isTRUE(input$density_cut))
+    points <- clicked_points()
+    if (nrow(points) == 0) return(NULL)
+    req(exists("last_density_result", envir = .GlobalEnv))
+    
+    density_data <- get("last_density_result", envir = .GlobalEnv)
+    
+    slices <- lapply(seq_len(nrow(points)), function(i) {
+      x_idx <- which.min(abs(density_data$x_vals - points$x[i]))
+      y_idx <- which.min(abs(density_data$y_vals - points$y[i]))
+      
+      data.frame(
+        Cut = i,
+        Direction = c("x = fixed", "y = fixed"),
+        Position = c(points$x[i], points$y[i]),
+        Grid = c(
+          paste(round(density_data$y_vals, 2), collapse = "; "),
+          paste(round(density_data$x_vals, 2), collapse = "; ")
+        ),
+        Density = c(
+          paste(round(density_data$z_matrix[x_idx, ], 6), collapse = "; "),
+          paste(round(density_data$z_matrix[, y_idx], 6), collapse = "; ")
+        )
+      )
+    })
+    
+    do.call(rbind, slices)
+  })
+  
+  output$model_outputs_cuts <- renderUI({
+    req(isTRUE(input$density_cut), exists("last_density_result", envir = .GlobalEnv))
+    tagList(
+      h4("Density Cuts Table"),
+      tableOutput("cut_slices_table")
+    )
   })
   
   densityVarConfig <- reactive({
@@ -626,6 +757,13 @@ server <- function(input, output, session) {
     current <- quantile_inputs()
     new <- c(current, 0.5)
     quantile_inputs(new)
+  })
+  
+  observeEvent(input$remove_quantile, {
+    current <- quantile_inputs()
+    if (length(current) > 1) {
+      quantile_inputs(current[-length(current)])
+    }
   })
   
   output$quantiles_ui <- renderUI({
