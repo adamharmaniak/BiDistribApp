@@ -18,7 +18,7 @@ Modelovanie jednorozmerného rozdelenia pravdepodobnosti je základným krokom v
 X: \Omega \to \mathbb{R} 
 \end{equation*}
 
-Rozdelenie pravdepodobnosti náhodnej premennej $X$ je priraďovanie pravdepodobností jednotlivým hodnotám alebo množinám hodnôt, ktoré táto premenná môže nadobudnúť.
+Rozdelenie pravdepodobnosti (skrátene rozdelenie) náhodnej premennej $X$ je priraďovanie pravdepodobností jednotlivým hodnotám alebo množinám hodnôt, ktoré táto premenná môže nadobudnúť.
 
 \subsection{Distribučná funkcia}
 
@@ -118,7 +118,7 @@ Rozptyl, alternatívne disperzia, je centrálny moment druhého rádu, definovan
 
 Spolu so \textbf{smerodajnou odchýlkou} hovoria o tom, ako veľmi sú hodnoty daného rozdelenia rozptýlené okolo jeho \textbf{strednej hodnoty}.
 
-\subsection{Parametrické modelovanie rozdelení}
+\subsection{Parametrické modelovanie rozdelenia}
 
 Pri parametrickom modelovaní by sme mali predpokladať, že rozdelenie má známy tvar (napr. normálne, exponenciálne, atď.) pričom jeho parametre odhadujeme na základe poskytnutých dát:
 
@@ -129,9 +129,9 @@ Pri parametrickom modelovaní by sme mali predpokladať, že rozdelenie má zná
 
 Tieto modely je možné analyticky presne definovať a odporúča sa používať ich tam, kde vieme do istej miery predpokladať tvar rozdelenia.
 
-\subsection{Neparametrické modelovanie}
+\subsection{Neparametrické modelovanie rozdelenia}
 
-Neparametrické prístupy nepredpokladajú konkrétny tvar rozdelenia.
+Neparametrické prístupy modelovania sú typické tým, že nepredpokladajú konkrétny tvar rozdelenia.
 
 \subsubsection{Odhad jadrovej hustoty (angl. Kernel Density Estimation)}
 
@@ -140,6 +140,14 @@ Ide o neparametrický prístup, pri ktorom sa pre každé pozorovanie počíta h
 \hat{f}_{bw}(x) = \frac{1}{n*bw} \sum_{i=1}^n K\left( \frac{x - x_i}{bw} \right)
 \]
 kde $K$ je jadrová funkcia (napr. Gaussovská) a $bw$ je šírka pásma (bandwidth).
+
+Ďalším takýmto neparametrickým prístupom by mohlo byť napríklad modelovanie pomocou \textbf{histogramov}. 
+
+\subsubsection{Histogramy}
+
+Histogramy predstavujú jednoduchý neparametrický nástroj na odhad hustoty pravdepodobnosti, založený na zoskupovaní pozorovaných hodnôt do disjunktných podintervalov. V každom intervale sa spočíta počet výskytov (frekvencia), ktorá sa následne normuje podľa šírky intervalu a celkového počtu pozorovaní. Očakávaným výsledkom tu je stupňovitý odhad hustoty pravdepodobnosti.
+
+Histogram je vhodný najmä pre hrubý, vizuálny odhad hustoty bez nutnosti predpokladu konkrétneho analytického tvaru rozdelenia. Na rozdiel od jadrového odhadu hustoty je však výsledný tvar závislý od zvoleného počtu a šírky intervalov.
 
 \section{Regresia}\label{sec:regresia}
 
