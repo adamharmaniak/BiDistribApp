@@ -14,9 +14,9 @@ V tejto kapitole popíšeme základné úlohy a metódy štatistického modelova
 
 Modelovanie jednorozmerného rozdelenia pravdepodobnosti je základným krokom v štatistickej analýze náhodných premenných. Slúži na opis správania sa jedinej náhodnej veličiny, ktorej hodnoty môžu byť spojité alebo diskrétne. Pravdepodobnostné rozdelenie poskytuje informácie o tom, s akou pravdepodobnosťou nadobúda náhodná premenná konkrétne hodnoty, tzv. realizácie. Náhodnú premennú teda chápeme ako zobrazenie 
 
-\begin{equation*} 
+\begin{equation}
 X: \Omega \to \mathbb{R} 
-\end{equation*}
+\end{equation}
 
 Rozdelenie pravdepodobnosti (skrátene rozdelenie) náhodnej premennej $X$ je priraďovanie pravdepodobností jednotlivým hodnotám alebo množinám hodnôt, ktoré táto premenná môže nadobudnúť.
 
@@ -24,47 +24,45 @@ Rozdelenie pravdepodobnosti (skrátene rozdelenie) náhodnej premennej $X$ je pr
 
 Základným nástrojom na popis rozdelenia je distribučná funkcia $F_X(x)$, ktorá každému reálnemu číslu $x$ priraďuje pravdepodobnosť, že náhodná premenná nadobudne hodnotu menšiu alebo rovnú $x$: 
 
-\begin{equation*} 
+\begin{equation} 
 F_X(x) = P(X \leq x) 
-\end{equation*}
-
-Distribučná funkcia úplne charakterizuje rozdelenie pravdepodobnosti náhodnej premennej. 
+\end{equation} 
 
 \subsection{Pravdepodobnostná hmotnostná funkcia a hustota pravdepodobnosti}
 
 V prípade diskrétnej náhodnej premennej je rozdelenie určené jej pravdepodobnostnou hmotnostnou funkciou 
 
-\begin{equation*} 
+\begin{equation} 
 p_X(x) = P(X = x) 
-\end{equation*} 
+\end{equation} 
 
 ktorá priraďuje pravdepodobnosť každej jednotlivej hodnote náhodnej premennej $X$.
 
 Narozdiel od diskrétnej náhodnej premennej je rozdelenie spojitej náhodnej premennej popísané jej hustotou pravdepodobnosti, pričom pravdepodobnosť, že náhodná premenná $X$ nadobudne hodnotu z intervalu $\langle a, b \rangle$, sa vypočíta ako: 
 
-\begin{equation*}
-P(a \leq X \leq b) = \int_{a}^{b} f_X(x)dx 
-\end{equation*}
+\begin{equation}
+P(a \leq X \leq b) = \int_{a}^{b} f_X(x) \, dx 
+\end{equation}
 
 Hustota pravdepodobnosti $f_X(x)$ je deriváciou distribučnej funkcie $F_X(x)$, ak táto derivácia existuje: 
 
-\begin{equation*} 
+\begin{equation} 
 f_X(x) = \frac{d}{dx} F_X(x) 
-\end{equation*}
+\end{equation}
 
 \subsection{Kvantilová funkcia}
 
 Kvantilová funkcia rádu $q \in (0, 1)$ je inverznou funkciou distribučnej funkcie
 
-\[
+\begin{equation} 
 F_X(x_q) = P(X \leq x_q) \geq q
-\]
+\end{equation} 
 
 a určuje hodnotu $x_q$ náhodnej premennej $X$, pre ktorú platí:
 
-\[
+\begin{equation}
 F_X(x_q) = P(X < x_q) \leq q.
-\]
+\end{equation}
 
 Znamená to teda, že pravdepodobnosť, že náhodná premenná $X$ nadobudne hodnotu menšiu alebo rovnú $x_q$ je rovná $q$. Kvantilové funkcie sú dôležité pri popise správania premenných vo vybraných kvantiloch rozdelenia, čomu sa taktiež budeme venovať v nasledujúcich kapitolách. Špeciálnymi prípadmi kvantilov sú napríklad \textbf{kvartily}.
 
@@ -79,27 +77,27 @@ kde \textbf{percentil} $p$ predstavuje kvantil zodpovedajúci hodnote $q = \frac
 
 \subsection{Základné momentové charakteristiky rozdelenia}
 
-\subsubsection{Stredná hodnota ($\mathbb{E}[X]$)}
+\subsubsection{Stredná hodnota ($\mathbb{E}[X]$ alebo $\mu$)}
 
 Stredná hodnota je začiatočný moment prvého rádu, ktorý definujeme:
 
 \begin{itemize}
   \item Pre diskrétnu náhodnú premennú ako:
-  \[
-  \mathbb{E}[X] = \sum_{x \in H} x \cdot p(x)
-  \]
+  \begin{equation}
+    \mathbb{E}[X] = \mu = \sum_{x \in H} x \cdot p(x)
+  \end{equation}
   \item Pre spojitú náhodnú premennú ako:
-  \[
-  \mathbb{E}[X] = \int_{-\infty}^{\infty} x \cdot f(x) \, dx
-  \]
+  \begin{equation}
+    \mathbb{E}[X] = \mu = \int_{-\infty}^{\infty} x \cdot f(x) \, dx
+  \end{equation}
 \end{itemize}
 
 \subsubsection{Smerodajná odchýlka ($\sigma(X)$)}
 
 Smerodajná odchýlka je definovaná ako druhá odmocnina z rozptylu:
-\[
+\begin{equation}
 \sigma(X) = \sqrt{\mathrm{Var}(X)}
-\]
+\end{equation}
 
 \subsubsection{Rozptyl ($\mathbb{D}[X]$ alebo $\mathrm{Var}(X)$ alebo $\sigma^2(X)$)}
 
@@ -107,13 +105,13 @@ Rozptyl, alternatívne disperzia, je centrálny moment druhého rádu, definovan
 
 \begin{itemize}
   \item Pre diskrétne premenné ako:
-  \[
+  \begin{equation}
   \mathrm{Var}(X) = \sigma^2(X) = \sum_{x \in H} (x - \mathbb{E}[X])^2 \cdot p(x)
-  \]
+  \end{equation}
   \item Pre spojité premenné ako:
-  \[
+  \begin{equation}
   \mathrm{Var}(X) = \sigma^2(X) = \int_{-\infty}^{\infty} (x - \mathbb{E}[X])^2 \cdot f(x) \, dx
-  \]
+  \end{equation}
 \end{itemize}
 
 Spolu so \textbf{smerodajnou odchýlkou} hovoria o tom, ako veľmi sú hodnoty daného rozdelenia rozptýlené okolo jeho \textbf{strednej hodnoty}.
@@ -136,9 +134,9 @@ Neparametrické prístupy modelovania sú typické tým, že nepredpokladajú ko
 \subsubsection{Odhad jadrovej hustoty (angl. Kernel Density Estimation)}
 
 Ide o neparametrický prístup, pri ktorom sa pre každé pozorovanie počíta hladká funkcia (jadro). Jej typický tvar je:
-\[
+\begin{equation}
 \hat{f}_{bw}(x) = \frac{1}{n*bw} \sum_{i=1}^n K\left( \frac{x - x_i}{bw} \right)
-\]
+\end{equation}
 kde $K$ je jadrová funkcia (napr. Gaussovská) a $bw$ je šírka pásma (bandwidth).
 
 Ďalším takýmto neparametrickým prístupom by mohlo byť napríklad modelovanie pomocou \textbf{histogramov}. 
@@ -151,4 +149,238 @@ Histogram je vhodný najmä pre hrubý, vizuálny odhad hustoty bez nutnosti pre
 
 \section{Regresia}\label{sec:regresia}
 
-\section{Klasifikačné metódy}\label{sec:klas_metody}
+Regresná analýza predstavuje jednu zo základných metód štatistického modelovania, ktorej cieľom je opísať a kvantifikovať vzťah medzi premennými. Zameriava sa na modelovanie funkčného vzťahu medzi závislou premennou (odozvou) a nezávislými premennými (prediktormi). Hlavným cieľom regresie je predikcia hodnoty jednej (závislej) premennej na základe hodnôt jednej alebo viacerých vysvetľujúcich (nezávislých) premenných.
+
+V štatistickej praxi má regresia široké uplatnenie: od odhadu ekonomických ukazovateľov, cez medicínske modely, až po výpočtové systémy strojového učenia. Okrem predikcie však umožňuje aj odhaľovanie vzťahov, identifikáciu dôležitých premenných a interpretáciu dopadu jednotlivých faktorov.
+
+Podľa toho ako je vzťah medzi prediktormi a odozvou definovaný možno rozlišovať rôzne druhy regresných modelov, ako napríklad:
+\begin{itemize}
+  \item \textbf{Lineárna regresia}
+  \item \textbf{Všeobecná polynomiálna regresia n-tého stupňa}
+  \item \textbf{Exponenciálna regresia}
+\end{itemize}
+
+V tejto podkapitole sa zameriame najmä na lineárny regresný model, jeho teoretické východiská, predpoklady, odhad parametrov pomocou metódy najmenších štvorcov, ako aj na praktické aspekty ako diagnostika modelu, interpretácia koeficientov a potenciálne problémy ako multikolinearita alebo výskyt odľahlých hodnôt. Na tento základ nadviažu v ďalších častiach aj nelineárne a generalizované regresné prístupy.
+
+\subsection{Lineárny regresný model}
+\label{subsec:linear_regression}
+
+Lineárna regresia predstavuje základný a zároveň veľmi užitočný prístup v štatistickom modelovaní. Napriek svojej jednoduchosti si zachováva vysokú interpretovateľnosť, robustnosť a je východiskovým bodom pre zložitejšie modely, ktoré ju často zovšeobecňujú.
+
+V prípade \textbf{jednoduchej lineárnej regresie}, kde máme len jeden vysvetľujúci (nezávislý) prediktor $X$, model predpokladá lineárny vzťah so závislou premennou $Y$ v tvare:
+
+\begin{equation}
+Y = \beta_0 + \beta_1 X + \varepsilon
+\end{equation}
+
+kde $\beta_0$ je intercept (priesečník s osou $Y$), $\beta_1$ je smernica regresnej priamky (sklon) a $\varepsilon$ je náhodná zložka – chybový člen so strednou hodnotou nula a konštantným rozptylom $\sigma^2$, nezávislá od $X$.
+
+\subsubsection{Odhad parametrov}
+
+Odhady parametrov $\hat{\beta}_0$ a $\hat{\beta}_1$ získame pomocou \textbf{metódy najmenších štvorcov (OLS)} minimalizáciou súčtu štvorcov rezíduí:
+
+\begin{equation}
+RSS = \sum_{i=1}^{n} \left( y_i - \hat{y}_i \right)^2 = \sum_{i=1}^{n} \left( y_i - \hat{\beta}_0 - \hat{\beta}_1 x_i \right)^2
+\end{equation}
+
+Kde rezíduá predstavujú rozdiel medzi skutočnými a predikovanými hodnotami: $\hat{\varepsilon}_i = y_i - \hat{y}_i$.
+
+Optimálne odhady parametrov sú:
+
+\begin{align}
+\hat{\beta}_1 &= \frac{\sum_{i=1}^{n}(x_i - \bar{x})(y_i - \bar{y})}{\sum_{i=1}^{n}(x_i - \bar{x})^2} \\
+\hat{\beta}_0 &= \bar{y} - \hat{\beta}_1 \bar{x}
+\end{align}
+
+kde $\bar{x}$ a $\bar{y}$ sú výberové priemery vysvetľujúcej a závislej premennej.
+
+\subsubsection{Odhad rozptylu a intervaly spoľahlivosti}
+
+Rozptyl chybového člena $\sigma^2$ odhadujeme ako:
+
+\begin{equation}
+\hat{\sigma}^2 = \frac{RSS}{n - 2}
+\end{equation}
+
+Na základe toho možno odvodiť \textbf{štandardné chyby} pre odhady parametrov a konštruovať intervaly spoľahlivosti:
+
+\begin{equation}
+\hat{\beta}_j \pm t_{1 - \alpha/2}(n - 2) \cdot SE(\hat{\beta}_j)
+\end{equation}
+
+Tieto intervaly poskytujú rozsah hodnôt, ktoré by parameter mohol nadobúdať s danou úrovňou istoty (napr. 95\%).
+
+\subsubsection{Vyhodnotenie presnosti modelu}
+
+Presnosť regresného modelu možno hodnotiť pomocou \textbf{reziduálneho rozptylu} alebo pomocou \textbf{koeficientu determinácie} $R^2$, ktorý vyjadruje podiel vysvetlenej variability modelom:
+
+\begin{equation}
+R^2 = 1 - \frac{RSS}{TSS}
+\end{equation}
+
+kde $TSS = \sum_{i=1}^{n}(y_i - \bar{y})^2$ je celková suma štvorcov. Hodnota $R^2 \in [0, 1]$ vyjadruje, ako dobre model vystihuje pozorované dáta. Zároveň sa $R^2$ zhoduje s druhou mocninou Pearsonovho korelačného koeficientu medzi $X$ a $Y$.
+
+\subsection{Všeobecná polynomiálna regresia n-tého stupňa}
+\label{subsec:polynomial_regression}
+
+Polynomiálna regresia predstavuje rozšírenie lineárnej regresie, ktoré umožňuje modelovať nelineárne vzťahy medzi premennými. Namiesto priameho vzťahu medzi $X$ a $Y$ sa tu predpokladá, že závislá premenná $Y$ je nejakou polynomiálnou funkciou nezávislej premennej $X$.
+
+Model polynomiálnej regresie $n$-tého stupňa má tvar:
+
+\begin{equation}
+Y = \beta_0 + \beta_1 X + \beta_2 X^2 + \dots + \beta_n X^n + \varepsilon
+\end{equation}
+
+kde $\beta_0, \beta_1, \dots, \beta_n$ sú regresné koeficienty a $\varepsilon$ je náhodná chyba.
+
+Aj keď model obsahuje mocniny premennej $X$, ide stále o lineárny model vo vzťahu k parametrom $\beta_i$. Preto je možné odhadnúť tieto parametre pomocou metódy najmenších štvorcov podobne ako pri klasickej lineárnej regresii.
+
+Polynomiálna regresia je užitočná v situáciách, keď pozorované dáta vykazujú zakrivenie, ktoré nie je možné zachytiť štandardne pomocou priamky. Výber vhodného stupňa $n$ je kľúčový – príliš nízky stupeň nemusí vystihnúť závislosť, zatiaľ čo príliš vysoký môže viesť k tzv. pretečeniu (angl. overfitting).
+
+\subsection{Exponenciálna regresia}
+\label{subsec:exponential_regression}
+
+Exponenciálna regresia je nelineárny regresný model, ktorý sa používa na opis vzťahu, pri ktorom sa hodnota závislej premennej $Y$ mení exponenciálne v závislosti od nezávislej premennej $X$. Takýto model je vhodný najmä v prípadoch, keď sa údaje vyznačujú rastom alebo poklesom, ktorý sa zrýchľuje alebo spomaľuje.
+
+Základná forma exponenciálneho modelu je:
+
+\begin{equation}
+Y = \alpha \cdot e^{\beta X} + \varepsilon
+\end{equation}
+
+kde:
+\begin{itemize}
+  \item $\alpha$ je základný koeficient (úroveň pri $X=0$),
+  \item $\beta$ určuje rýchlosť rastu alebo poklesu,
+  \item $e$ je Eulerovo číslo ($\approx 2.718$),
+  \item $\varepsilon$ je náhodná chyba.
+\end{itemize}
+
+Na odhad parametrov je bežným prístupom \textbf{logaritmická transformácia}, ktorou sa model linearizuje:
+
+\begin{equation}
+\ln(Y) = \ln(\alpha) + \beta X + \varepsilon'
+\end{equation}
+
+Po tejto transformácii je možné použiť metódu najmenších štvorcov podobne ako pri lineárnej regresii.
+
+Exponenciálna regresia sa uplatňuje najmä v oblasti prírodných vied, epidemiológie, finančného modelovania a všade tam, kde procesy prebiehajú s exponenciálnym charakterom (napr. populačný rast, rádioaktívny rozpad, úrokovanie, šírenie infekcie a pod.).
+
+\section{Klasifikačné metódy}\label{sec:classification}
+
+Klasifikácia je oblasť štatistického modelovania, ktorá sa zaoberá predikciou kvalitatívnych (kategoriálnych) náhodných premenných. 
+
+Pri modelovaní kvalitatívnej premennej nie je vhodné aplikovať priamo metódy lineárnej regresie, pretože ich výstup nie je ohraničený a nepopisuje úplne správne pravdepodobnostný charakter úlohy. Preto sa používajú špecifické metódy klasifikácie, ktoré rešpektujú povahu výstupnej premennej a umožňujú modelovať pravdepodobnosti tried pomocou diskriminatívnych alebo generatívnych prístupov.
+
+\subsection*{Typy klasifikačných metód}
+
+Z pohľadu modelovania rozdelenia pravdepodobnosti rozdeľujeme klasifikačné metódy na dve hlavné skupiny:
+
+\begin{itemize}
+  \item \textbf{Diskriminatívne metódy} – modelujú priamo podmienenú pravdepodobnosť triedy vzhľadom na pozorovanie. Medzi tieto metódy patria:
+  \begin{itemize}
+    \item \textit{Logistická regresia} – pre binárnu klasifikáciu (dve triedy),
+    \item \textit{Multinomická logistická regresia} – pre viac ako dve triedy bez poradia,
+    \item \textit{Ordinálna logistická regresia} – pre usporiadané triedy,
+    \item \textit{k-najbližších susedov (k-NN)} – neparametrická metóda založená na podobnosti vstupov.
+  \end{itemize}
+  
+  \item \textbf{Generatívne metódy} – modelujú združené rozdelenie prediktorov a odozvy a využívajú Bayesovu vetu. Patria sem:
+  \begin{itemize}
+    \item \textit{Lineárna diskriminačná analýza (LDA)},
+    \item \textit{Kvadratická diskriminačná analýza (QDA)},
+    \item \textit{Naivný Bayesovský klasifikátor}.
+  \end{itemize}
+\end{itemize}
+
+Každá z týchto metód má svoje výhody a nevýhody, ako aj predpoklady na aplikáciu – napríklad LDA predpokladá rovnaké kovariančné matice pre všetky triedy, čo je napríklad lepšie pre menšie datasety, zatiaľ čo QDA naopak pripúšťa rôznorodosť kovariančných matíc, no potrebuje mať k dispozícii viacej údajov.
+
+V nasledujúcich podkapitolách budú podrobnejšie rozobrané tieto vybrané klasifikačné prístupy vrátane ich matematického základu.
+
+\subsection{Diskriminatívne metódy}
+\label{subsec:disc_methods}
+
+\subsubsection{Logistická regresia}
+\label{subsubsec:log_regression}
+
+Logistická regresia patrí medzi základné diskriminatívne klasifikačné metódy a používa sa v prípade, že cieľová (závislá) premenná $Y$ nadobúda dve možné hodnoty (binárna klasifikácia). Cieľom je modelovať pravdepodobnosť, že $Y$ nadobudne jednu z dvoch hodnôt $c_1$ alebo $c_2$, vzhľadom na hodnoty vysvetľujúcich premenných $X_1, X_2, ..., X_n$, pre $n \in N$.
+
+Namiesto priameho modelovania pravdepodobnosti pomocou lineárnej funkcie, ktorá by mohla produkovať neinterpretovateľné hodnoty, teda mimo intervalu $(0,1)$, sa v logistickej regresii lineárna funkcia transformuje pomocou tzv. \textit{logit transformácie}, ktorá modeluje logaritmus šance (odds), že $Y = c_1$:
+
+\begin{equation}
+\log\left( \frac{p(x)}{1 - p(x)} \right) = b_0 + b_1 x
+\end{equation}
+
+kde $p(x) = \mathrm{Pr}(Y = c_1 \mid X = x)$ je hľadaná pravdepodobnosť a $b_0$, $b_1$ sú regresné koeficienty.
+
+\textbf{Logistická funkcia}
+
+Po úprave môžeme pravdepodobnosť $p(x)$ vyjadriť pomocou tzv. logistickej funkcie:
+
+\begin{equation}
+p(x) = \frac{e^{b_0 + b_1 x}}{1 + e^{b_0 + b_1 x}}
+\end{equation}
+
+Táto funkcia zabezpečuje, že výsledná pravdepodobnosť sa vždy nachádza v intervale $(0,1)$. Klasifikačné rozhodnutie je potom založené na prahu – obvykle platí, že ak $p(x) > 0.5$, potom pozorovanie priraďujeme do triedy $c_1$.
+
+\textbf{Šanca a interpretácia parametrov}
+
+Podiel pravdepodobnosti a jej doplnku sa nazýva \textit{šanca (odds)}:
+
+\begin{equation}
+\text{odds}(x) = \frac{p(x)}{1 - p(x)} = e^{b_0 + b_1 x}
+\end{equation}
+
+Z toho vyplýva, že jednotkový nárast $x$ spôsobí, že šanca sa násobí o $e^{b_1}$. Ak $b_1 > 0$, pravdepodobnosť triedy $c_1$ rastie so zvyšujúcou sa hodnotou $x$.
+
+\textbf{Odhad parametrov}
+
+Parametre modelu $b_0$, $b_1$ sa zvyčajne odhadujú pomocou \textit{metódy maximálnej vierohodnosti}, ktorá maximalizuje pravdepodobnosť pozorovaných výstupov vzhľadom na zvolený model. Vierohodnostná funkcia, ktorá vychádza z hustoty Bernoulliho rozdelenia (špeciálny prípad binomického, pre jediný pokus) je definovaná ako:
+
+\begin{equation}
+L(b_0, b_1) = \prod_{i=1}^{n} p(x_i)^{y_i} (1 - p(x_i))^{1 - y_i}
+\end{equation}
+
+Pre jednoduchšiu manipuláciu sa často používa log-vierohodnostná funkcia. Vzhľadom na jej nelineárny tvar sa parametre hľadajú pomocou iteratívnych numerických metód, napr. Newtonovho postupu alebo váženej metódy najmenších štvorcov (IRLS).
+
+\subsubsection{Multinomická logistická regresia}
+\label{subsubsec:multinom_log_reg}
+
+Multinomická logistická regresia (MLR) je rozšírením binárnej logistickej regresie na prípady, keď cieľová premenná $Y$ nadobúda viac ako dve nezávislé kategoriálne hodnoty. Používa sa najmä v situáciách, kde neexistuje prirodzené poradie medzi triedami (napr. typ vozidla: SUV, sedan, combi, hedgeback).
+
+Model predpokladá, že pravdepodobnosť prislúchajúca každej triede $c_k$ je daná:
+
+\begin{equation}
+\mathrm{Pr}(Y = c_k \mid X = x) = \frac{e^{b_{k0} + b_{k1} x}}{1 + \sum\limits_{l=1}^{K-1} e^{b_{l0} + b_{l1} x}}, \quad \text{pre } k = 1, \dots, K-1
+\end{equation}
+
+a pre referenčnú triedu $c_K$ platí:
+
+\begin{equation}
+\mathrm{Pr}(Y = c_K \mid X = x) = \frac{1}{1 + \sum\limits_{l=1}^{K-1} e^{b_{l0} + b_{l1} x}}
+\end{equation}
+
+Každá trieda, okrem referenčnej, má svoj vlastný vektor parametrov, pričom výber referenčnej triedy ovplyvňuje interpretáciu koeficientov, avšak nie výsledné predikcie.
+
+Model sa opiera o rovnaké princípy ako binárna logistická regresia, vrátane použitia maximálnej vierohodnosti a iteratívneho odhadu parametrov. Výhodou je jeho schopnosť pracovať s viacnásobnými triedami bez nutnosti binárnej dekompozície, no zároveň vyžaduje väčšie množstvo údajov a interpretácia jej výsledkov nie je taká priamočiara ako v binárnom prípade.
+
+\subsubsection{Metóda k-najbližších susedov (nearest neighbor)}
+\label{subsubsec:knn}
+
+Metóda $k$-najbližších susedov (k-NN) patrí medzi neparametrické klasifikačné metódy a predstavuje jednoduchú, intuitívnu alternatívu ku logistickej regresii. V princípe je jej logika založená na predpoklade, že podobné vstupy vedú k podobným výstupom.
+
+Pre nové pozorovanie $x$ sa nájde množina $N_k$ indexov $k$ najbližších pozorovaní z trénovacej vzorky – najčastejšie podľa euklidovskej vzdialenosti. Následne sa odhadne pravdepodobnosť, že $x$ patrí do triedy $c_j$ ako podiel počtu susedov patriacich do tejto triedy:
+
+\begin{equation}
+\mathrm{Pr}(Y = c_j \mid X = x) = \frac{1}{k} \sum_{i \in N_k} I(y_i = c_j)
+\end{equation}
+
+Zatriedenie do triedy sa vykoná na základe najvyššej odhadnutej pravdepodobnosti.
+
+Pretože sa vzdialenosti počítajú v metrickom priestore, je dôležité, aby boli prediktory (najmä pri $p \geq 2$) \textit{štandardizované} – centrované na nulový priemer a so smerodajnou odchýlkou 1. Výber vhodného počtu susedov $k$ ovplyvňuje flexibilitu modelu – malé $k$ vedie k nízkej chybe na trénovacích dátach, ale zvyšuje riziko pre \textit{overfitting}, zatiaľ čo veľké $k$ model zhladzuje a môže podnecovať \textit{underfitting}.
+
+Voľba optimálneho $k$ sa často realizuje pomocou metód resamplingu, ako je napríklad \textit{krížová validácia}. Jednoduchým pravidlom pre výber je $k \approx \sqrt{n}$, kde $n$ je počet pozorovaní.
+
+\subsection{Generatívne metódy}
+\label{subsec:gener_methods}
+
