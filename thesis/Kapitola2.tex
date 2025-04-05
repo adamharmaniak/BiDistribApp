@@ -2,15 +2,15 @@
 
 Štatistické modelovanie je neoddeliteľnou súčasťou analýzy údajov, ktorá umožňuje pochopiť a kvantifikovať vzťahy medzi rôznymi premennými. Tento prístup sa využíva naprieč rôznymi disciplínami od ekonomiky a medicíny až po moderné strojové učenie, pričom jeho cieľom je nielen predikcia budúcich hodnôt, ale aj interpretácia vzťahov medzi premennými.
 
-Základnou úlohou štatistického modelovania je konštrukcia modelov, ktoré opisujú správanie sa systému na základe dostupných údajov. Tieto modely môžu byť deterministické alebo stochastické, pričom v praxi sa často pracuje so stochastickými modelmi, ktoré berú do úvahy náhodnosť a neistotu v údajoch. Efektívne štatistické modely umožňujú analyzovať závislosti, identifikovať vzory a optimalizovať rozhodovacie procesy.
+Základnou úlohou štatistického modelovania je konštrukcia modelov, ktoré opisujú správanie sa systému premenných na základe dostupných údajov. Tieto modely môžu byť deterministické alebo stochastické, pričom v praxi sa často pracuje so stochastickými modelmi, ktoré berú do úvahy náhodnosť a neistotu v údajoch. Efektívne štatistické modely umožňujú analyzovať závislosti, identifikovať na prvý pohľad skryté vzorce a optimalizovať rozhodovacie procesy.
 
-Dôležitým aspektom štatistického modelovania je výber vhodných metód na analýzu údajov. Pred takýmto výberom je však dôležité porozumieť pojmu modelovania rozdelenia pravdepodobnosti náhodných premenných, ktoré predstavuje východisko pre pochopenie správania sa jednotlivých premenných a ich charakteristík. Štúdium rozdelení pravdepodobnosti je kľúčové pre kvantifikáciu pravdepodobnostných vlastností údajov, napr. tzv. momentov, ako sú stredná hodnota, smerodajná odchýlka alebo rozptyl, či funkcií bližšie popisujúcich takéto rozdelenia ako sú kvantilové funkcie alebo pravdepodobnostné hustoty. Rozdelenia môžu byť modelované rôznymi spôsobmi, ktoré si bližšie popíšeme v prvej podkapitole tejto kapitoly. Porozumenie jednorozmerným rozdeleniam pravdepodobnosti tvorí základ pre pokročilejšie modelovacie techniky a umožňuje presnejšie opisovať a predpovedať náhodné javy.
+Dôležitým aspektom štatistického modelovania je výber vhodných metód na analýzu údajov. Pred takýmto výberom je však dôležité porozumieť pojmu modelovania rozdelenia pravdepodobnosti náhodných premenných, ktoré predstavuje východisko pre pochopenie správania sa jednotlivých premenných a ich charakteristík. Štúdium rozdelení pravdepodobnosti je kľúčové pre kvantifikáciu pravdepodobnostných vlastností údajov, napr. tzv. momentov, ako sú stredná hodnota, smerodajná odchýlka alebo rozptyl, či funkcií bližšie popisujúcich takéto rozdelenia ako sú kvantilové funkcie alebo hustoty pravdepodobnosti. Rozdelenia pravdepodobnosti môžu byť modelované rôznymi spôsobmi, ktoré si bližšie popíšeme v prvej podkapitole tejto kapitoly. Porozumenie jednorozmerným rozdeleniam pravdepodobnosti tvorí základ pre pokročilejšie modelovacie techniky a umožňuje presnejšie opisovať a predpovedať náhodné javy.
 
 Na tento základ nadväzujú ďalšie kľúčové prístupy štatistického modelovania, akými sú regresia a klasifikácia. Regresia sa zameriava na kvantitatívne predikcie, pričom jej cieľom je odhadovať spojitú výstupnú premennú na základe vstupných údajov, tzv. prediktorov. Klasifikácia sa naopak snaží predikovať správanie kvalitatívnej premennej.
 
 V tejto kapitole popíšeme základné úlohy a metódy štatistického modelovania so zameraním sa na tri hlavné oblasti: modelovanie jednorozmerného rozdelenia pravdepodobnosti, regresné a klasifikačné techniky. Najprv bude predstavený koncept rozdelenia pravdepodobnosti, jeho charakteristiky a spôsoby modelovania. Následne sa kapitola venuje regresii, jej rôznym variantom a metódam odhadu parametrov modelu. Napokon budú popísané aj klasifikačné metódy ako nástroje na rozpoznávanie vzorov a predikovanie správania sa kategoriálnych premenných. Cieľom tejto kapitoly je teda poskytnúť prehľad o troch hlavných konceptoch štatistického modelovania, ktoré zohrávajú kľúčovú úlohu v analýze dát a v aplikáciách, ako sú predikčné modely a z nich odvíjajúce sa automatizované rozhodovacie systémy.
 
-\section{Jednorozmerné modelovanie rozdelenia pravdepodobnosti}\label{sec:1D_modelovanie}
+\section{Modelovanie jednorozmerného rozdelenia pravdepodobnosti}\label{sec:1D_modelovanie}
 
 Modelovanie jednorozmerného rozdelenia pravdepodobnosti je základným krokom v štatistickej analýze náhodných premenných. Slúži na opis správania sa jedinej náhodnej veličiny, ktorej hodnoty môžu byť spojité alebo diskrétne. Pravdepodobnostné rozdelenie poskytuje informácie o tom, s akou pravdepodobnosťou nadobúda náhodná premenná konkrétne hodnoty, tzv. realizácie. Náhodnú premennú teda chápeme ako zobrazenie 
 
@@ -18,13 +18,21 @@ Modelovanie jednorozmerného rozdelenia pravdepodobnosti je základným krokom v
 X: \Omega \to \mathbb{R} 
 \end{equation*}
 
-Rozdelenie pravdepodobnosti náhodnej premennej $X$ je priraďovanie pravdepodobností jednotlivým hodnotám alebo množinám hodnôt, ktoré táto premenná môže nadobudnúť. Základným nástrojom na popis rozdelenia je distribučná funkcia $F_X(x)$, ktorá každému reálnemu číslu $x$ priraďuje pravdepodobnosť, že náhodná premenná nadobudne hodnotu menšiu alebo rovnú $x$: 
+Rozdelenie pravdepodobnosti náhodnej premennej $X$ je priraďovanie pravdepodobností jednotlivým hodnotám alebo množinám hodnôt, ktoré táto premenná môže nadobudnúť.
+
+\subsection{Distribučná funkcia}
+
+Základným nástrojom na popis rozdelenia je distribučná funkcia $F_X(x)$, ktorá každému reálnemu číslu $x$ priraďuje pravdepodobnosť, že náhodná premenná nadobudne hodnotu menšiu alebo rovnú $x$: 
 
 \begin{equation*} 
 F_X(x) = P(X \leq x) 
 \end{equation*}
 
-Distribučná funkcia úplne charakterizuje rozdelenie pravdepodobnosti náhodnej premennej. V prípade diskrétnej náhodnej premennej je rozdelenie určené jej pravdepodobnostnou hmotnostnou funkciou 
+Distribučná funkcia úplne charakterizuje rozdelenie pravdepodobnosti náhodnej premennej. 
+
+\subsection{Pravdepodobnostná hmotnostná funkcia a hustota pravdepodobnosti}
+
+V prípade diskrétnej náhodnej premennej je rozdelenie určené jej pravdepodobnostnou hmotnostnou funkciou 
 
 \begin{equation*} 
 p_X(x) = P(X = x) 
@@ -35,7 +43,7 @@ ktorá priraďuje pravdepodobnosť každej jednotlivej hodnote náhodnej premenn
 Narozdiel od diskrétnej náhodnej premennej je rozdelenie spojitej náhodnej premennej popísané jej hustotou pravdepodobnosti, pričom pravdepodobnosť, že náhodná premenná $X$ nadobudne hodnotu z intervalu $\langle a, b \rangle$, sa vypočíta ako: 
 
 \begin{equation*}
-P(a \leq X \leq b) = \int_{a}^{b} f_X(x) , dx 
+P(a \leq X \leq b) = \int_{a}^{b} f_X(x)dx 
 \end{equation*}
 
 Hustota pravdepodobnosti $f_X(x)$ je deriváciou distribučnej funkcie $F_X(x)$, ak táto derivácia existuje: 
@@ -43,6 +51,95 @@ Hustota pravdepodobnosti $f_X(x)$ je deriváciou distribučnej funkcie $F_X(x)$,
 \begin{equation*} 
 f_X(x) = \frac{d}{dx} F_X(x) 
 \end{equation*}
+
+\subsection{Kvantilová funkcia}
+
+Kvantilová funkcia rádu $q \in (0, 1)$ je inverznou funkciou distribučnej funkcie
+
+\[
+F_X(x_q) = P(X \leq x_q) \geq q
+\]
+
+a určuje hodnotu $x_q$ náhodnej premennej $X$, pre ktorú platí:
+
+\[
+F_X(x_q) = P(X < x_q) \leq q.
+\]
+
+Znamená to teda, že pravdepodobnosť, že náhodná premenná $X$ nadobudne hodnotu menšiu alebo rovnú $x_q$ je rovná $q$. Kvantilové funkcie sú dôležité pri popise správania premenných vo vybraných kvantiloch rozdelenia, čomu sa taktiež budeme venovať v nasledujúcich kapitolách. Špeciálnymi prípadmi kvantilov sú napríklad \textbf{kvartily}.
+
+Kvartily môžeme chápať ako špecifické prípady percentilov:
+\begin{itemize}
+  \item Prvý kvartil $Q_1$ – 25. percentil ($F_X(Q_1) = 0.25$),
+  \item Druhý kvartil $Q_2$ – medián ($F_X(Q_2) = 0.5$),
+  \item Tretí kvartil $Q_3$ – 75. percentil ($F_X(Q_3) = 0.75$),
+\end{itemize}
+
+kde \textbf{percentil} $p$ predstavuje kvantil zodpovedajúci hodnote $q = \frac{p}{100}$. \\
+
+\subsection{Základné momentové charakteristiky rozdelenia}
+
+\subsubsection{Stredná hodnota ($\mathbb{E}[X]$)}
+
+Stredná hodnota je začiatočný moment prvého rádu, ktorý definujeme:
+
+\begin{itemize}
+  \item Pre diskrétnu náhodnú premennú ako:
+  \[
+  \mathbb{E}[X] = \sum_{x \in H} x \cdot p(x)
+  \]
+  \item Pre spojitú náhodnú premennú ako:
+  \[
+  \mathbb{E}[X] = \int_{-\infty}^{\infty} x \cdot f(x) \, dx
+  \]
+\end{itemize}
+
+\subsubsection{Smerodajná odchýlka ($\sigma(X)$)}
+
+Smerodajná odchýlka je definovaná ako druhá odmocnina z rozptylu:
+\[
+\sigma(X) = \sqrt{\mathrm{Var}(X)}
+\]
+
+\subsubsection{Rozptyl ($\mathbb{D}[X]$ alebo $\mathrm{Var}(X)$ alebo $\sigma^2(X)$)}
+
+Rozptyl, alternatívne disperzia, je centrálny moment druhého rádu, definovaný:
+
+\begin{itemize}
+  \item Pre diskrétne premenné ako:
+  \[
+  \mathrm{Var}(X) = \sigma^2(X) = \sum_{x \in H} (x - \mathbb{E}[X])^2 \cdot p(x)
+  \]
+  \item Pre spojité premenné ako:
+  \[
+  \mathrm{Var}(X) = \sigma^2(X) = \int_{-\infty}^{\infty} (x - \mathbb{E}[X])^2 \cdot f(x) \, dx
+  \]
+\end{itemize}
+
+Spolu so \textbf{smerodajnou odchýlkou} hovoria o tom, ako veľmi sú hodnoty daného rozdelenia rozptýlené okolo jeho \textbf{strednej hodnoty}.
+
+\subsection{Parametrické modelovanie rozdelení}
+
+Pri parametrickom modelovaní by sme mali predpokladať, že rozdelenie má známy tvar (napr. normálne, exponenciálne, atď.) pričom jeho parametre odhadujeme na základe poskytnutých dát:
+
+\begin{itemize}
+  \item Normálne rozdelenie $\mathcal{N}(\mu, \sigma^2)$
+  \item Exponenciálne rozdelenie $\text{Exp}(\lambda)$
+\end{itemize}
+
+Tieto modely je možné analyticky presne definovať a odporúča sa používať ich tam, kde vieme do istej miery predpokladať tvar rozdelenia.
+
+\subsection{Neparametrické modelovanie}
+
+Neparametrické prístupy nepredpokladajú konkrétny tvar rozdelenia.
+
+\subsubsection{Odhad jadrovej hustoty (angl. Kernel Density Estimation)}
+
+Ide o neparametrický prístup, pri ktorom sa pre každé pozorovanie počíta hladká funkcia (jadro). Jej typický tvar je:
+\[
+\hat{f}_{bw}(x) = \frac{1}{n*bw} \sum_{i=1}^n K\left( \frac{x - x_i}{bw} \right)
+\]
+kde $K$ je jadrová funkcia (napr. Gaussovská) a $bw$ je šírka pásma (bandwidth).
 
 \section{Regresia}\label{sec:regresia}
 
