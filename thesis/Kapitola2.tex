@@ -377,10 +377,73 @@ Pre nové pozorovanie $x$ sa nájde množina $N_k$ indexov $k$ najbližších po
 
 Zatriedenie do triedy sa vykoná na základe najvyššej odhadnutej pravdepodobnosti.
 
-Pretože sa vzdialenosti počítajú v metrickom priestore, je dôležité, aby boli prediktory (najmä pri $p \geq 2$) \textit{štandardizované} – centrované na nulový priemer a so smerodajnou odchýlkou 1. Výber vhodného počtu susedov $k$ ovplyvňuje flexibilitu modelu – malé $k$ vedie k nízkej chybe na trénovacích dátach, ale zvyšuje riziko pre \textit{overfitting}, zatiaľ čo veľké $k$ model zhladzuje a môže podnecovať \textit{underfitting}.
+Pretože sa vzdialenosti počítajú v metrickom priestore, je dôležité, aby boli prediktory (najmä pri $p \geq 2$) \textit{štandardizované} – centrované na nulový priemer a so smerodajnou odchýlkou 1. Výber vhodného počtu susedov $k$ ovplyvňuje flexibilitu modelu – malé $k$ vedie k nízkej chybe na trénovacích dátach, ale zvyšuje riziko pre \textit{overfitting}\footnote{%
+\textbf{overfitting} označuje situáciu, keď model príliš presne napasuje tréningové dáta, vrátane šumu, a preto zlyháva pri predikcii na nových dátach.}, zatiaľ čo veľké $k$ model zhladzuje a môže podnecovať \textit{underfitting}\footnote{\textbf{underfitting} je opačný jav – model je príliš jednoduchý na to, aby vystihol štruktúru údajov.}.
 
-Voľba optimálneho $k$ sa často realizuje pomocou metód resamplingu, ako je napríklad \textit{krížová validácia}. Jednoduchým pravidlom pre výber je $k \approx \sqrt{n}$, kde $n$ je počet pozorovaní.
+Voľba optimálneho $k$ sa často realizuje pomocou metód resamplingu\footnote{\textbf{resampling} sú techniky ako napr. krížová validácia, ktoré opakovane rozdeľujú dáta na trénovacie a testovacie časti, aby spoľahlivo odhadli výkon modelu a zabránili overfittingu.}, ako je napríklad \textit{krížová validácia}. Jednoduchým pravidlom pre výber je $k \approx \sqrt{n}$, kde $n$ je počet pozorovaní.
+
+
 
 \subsection{Generatívne metódy}
 \label{subsec:gener_methods}
+
+\subsubsection{Lineárna diskriminačná analýza (LDA)}
+\label{subsubsec:lda}
+
+Lineárna diskriminačná analýza (LDA) je generatívna klasifikačná metóda, ktorá predpokladá, že podmienené rozdelenie vysvetľujúcich premenných $X$ vzhľadom na triedu $Y = c_k$ má normálne rozdelenie so strednou hodnotou $\mu_k$ a spoločnou kovariančnou maticou $\Sigma$ pre všetky triedy.
+
+V prípade jedného prediktora sa predpokladá, že pre každú triedu $k$ platí:
+
+\begin{equation}
+f_k(x) = \frac{1}{\sqrt{2\pi} \, \sigma} \exp\left( -\frac{(x - \mu_k)^2}{2\sigma^2} \right)
+\end{equation}
+
+Pomocou Bayesovej vety potom vyjadríme pravdepodobnosť priradenia triedy:
+
+\begin{equation}
+\mathrm{Pr}(Y = c_k \mid X = x) = \frac{\pi_k \, f_k(x)}{\sum\limits_{\ell = 1}^{K} \pi_\ell \, f_\ell(x)}
+\end{equation}
+
+kde $\pi_k$ je apriórna pravdepodobnosť triedy $k$.
+
+Pre praktickú klasifikáciu sa využíva diskriminačná funkcia:
+
+\begin{equation}
+\delta_k(x) = \frac{x \mu_k}{\sigma^2} - \frac{\mu_k^2}{2\sigma^2} + \ln(\pi_k)
+\end{equation}
+
+Pozorovanie $x$ priradíme do triedy s najväčšou hodnotou $\delta_k(x)$. Z lineárneho tvaru tejto funkcie vzhľadom na $x$ má táto metóda názov „lineárna“.
+
+Ak je počet prediktorov $p \geq 2$, LDA predpokladá, že podmienené rozdelenie vektorovej premennej $\vec{X} = (X_1, \dots, X_p)$ má viacrozmerné normálne rozdelenie:
+
+\begin{equation}
+\vec{X} \mid Y = c_k \sim \mathcal{N}(\vec{\mu}_k, \Sigma)
+\end{equation}
+
+kde $\vec{\mu}_k$ je vektor stredných hodnôt a $\Sigma$ spoločná kovariančná matica. Diskriminačné funkcie majú aj v tomto prípade lineárnu podobu a hranice medzi triedami sú lineárne hyperroviny.
+
+LDA je efektívna, ak sú predpoklady o normálnom rozdelení a rovnosti kovariančných matíc splnené. V opačnom prípade je vhodnejšie použiť kvadratickú diskriminačnú analýzu (QDA), ktorá od týchto predpokladov upúšťa.
+
+\subsubsection{Kvadratická diskriminačná analýza (QDA)}
+\label{subsubsec:qda}
+
+Kvadratická diskriminačná analýza (QDA) je rozšírením lineárnej diskriminačnej analýzy (LDA), ktoré upúšťa od predpokladu o spoločnej kovariančnej matici pre všetky triedy. V QDA sa predpokladá, že každá trieda $c_k$ má vlastnú kovariančnú maticu $\Sigma_k$, takže:
+
+\begin{equation}
+\vec{X} \mid Y = c_k \sim \mathcal{N}(\vec{\mu}_k, \Sigma_k)
+\end{equation}
+
+kde $\vec{\mu}_k$ je vektor stredných hodnôt pre triedu $k$ a $\Sigma_k$ je jej vlastná kovariančná matica.
+
+Diskriminačná funkcia pre triedu $k$ potom nadobúda tvar:
+
+\begin{equation}
+\delta_k(x) = -\frac{1}{2} (x - \mu_k)^T \Sigma_k^{-1} (x - \mu_k) - \frac{1}{2} \ln|\Sigma_k| + \ln(\pi_k)
+\end{equation}
+
+Po algebraickej úprave možno funkciu prepísať do kvadratickej formy vzhľadom na $x$, čo opäť vysvetľuje názov metódy.
+
+QDA poskytuje väčšiu flexibilitu pri modelovaní, keďže umožňuje rôznu tvarovú orientáciu tried v priestore vysvetľujúcich premenných. Cena za túto flexibilitu je požadovaná vyššia početnosť odhadovaných parametrov – QDA vyžaduje odhad až $Kp(p+1)/2$ parametrov, kým LDA iba $Kp$.
+
+Voľba medzi LDA a QDA závisí od kompromisu medzi zaujatosťou (bias) a rozptylom (variance). LDA je vhodnejšia pri menších dátových súboroch, kde hrozí vysoký rozptyl odhadov. QDA sa odporúča, ak máme veľký objem dát alebo ak existuje dôvod domnievať sa, že kovariančné matice medzi triedami sa výrazne líšia.
 
