@@ -52,19 +52,19 @@ f_X(x) = \frac{d}{dx} F_X(x)
 
 \subsection{Kvantilová funkcia}
 
-Kvantilová funkcia rádu $q \in (0, 1)$ je inverznou funkciou distribučnej funkcie
-
-\begin{equation} 
-F_X(x_q) = P(X \leq x_q) \geq q
-\end{equation} 
-
-a určuje hodnotu $x_q$ náhodnej premennej $X$, pre ktorú platí:
+Kvantilová funkcia rádu $q \in (0, 1)$ predstavuje inverznú funkciu distribučnej funkcie $F_X(x)$ v zmysle:
 
 \begin{equation}
-F_X(x_q) = P(X < x_q) \leq q.
+x_q = F_X^{-1}(q) = \inf \left\{ x \in \mathbb{R} : F_X(x) \geq q \right\}
 \end{equation}
 
-Znamená to teda, že pravdepodobnosť, že náhodná premenná $X$ nadobudne hodnotu menšiu alebo rovnú $x_q$ je rovná $q$. Kvantilové funkcie sú dôležité pri popise správania premenných vo vybraných kvantiloch rozdelenia, čomu sa taktiež budeme venovať v nasledujúcich kapitolách. Špeciálnymi prípadmi kvantilov sú napríklad \textbf{kvartily}.
+Kvantil $x_q$ je teda najmenšia hodnota, pri ktorej kumulatívna pravdepodobnosť dosahuje alebo presahuje úroveň $q$. Inými slovami, pravdepodobnosť, že náhodná premenná $X$ nadobudne hodnotu menšiu alebo rovnú $x_q$, je aspoň $q$:
+
+\begin{equation}
+P(X \leq x_q) \geq q
+\end{equation}
+
+Kvantilové funkcie sú dôležité pri popise správania premenných vo vybraných kvantiloch rozdelenia, čomu sa taktiež budeme venovať v nasledujúcich kapitolách. Špeciálnymi prípadmi kvantilov sú napríklad \textbf{kvartily}.
 
 Kvartily môžeme chápať ako špecifické prípady percentilov:
 \begin{itemize}
@@ -165,7 +165,7 @@ V tejto podkapitole sa zameriame najmä na lineárny regresný model, jeho teore
 \subsection{Lineárny regresný model}
 \label{subsec:linear_regression}
 
-Lineárna regresia predstavuje základný a zároveň veľmi užitočný prístup v štatistickom modelovaní. Napriek svojej jednoduchosti si zachováva vysokú interpretovateľnosť, robustnosť a je východiskovým bodom pre zložitejšie modely, ktoré ju často zovšeobecňujú.
+Lineárna regresia predstavuje základný a zároveň veľmi užitočný prístup v štatistickom modelovaní. Napriek svojej jednoduchosti si zachováva vysokú interpretovateľnosť, robustnosť a je východiskom pre zložitejšie modely, ktoré ju častokrát zovšeobecňujú.
 
 V prípade \textbf{jednoduchej lineárnej regresie}, kde máme len jeden vysvetľujúci (nezávislý) prediktor $X$, model predpokladá lineárny vzťah so závislou premennou $Y$ v tvare:
 
@@ -311,7 +311,7 @@ Namiesto priameho modelovania pravdepodobnosti pomocou lineárnej funkcie, ktor�
 \log\left( \frac{p(x)}{1 - p(x)} \right) = b_0 + b_1 x
 \end{equation}
 
-kde $p(x) = \mathrm{Pr}(Y = c_1 \mid X = x)$ je hľadaná pravdepodobnosť a $b_0$, $b_1$ sú regresné koeficienty.
+kde $p(x) = \mathrm{Pr}(Y=c_1\mid X=x)$ je hľadaná pravdepodobnosť a $b_0$, $b_1$ sú regresné koeficienty.
 
 \textbf{Logistická funkcia}
 
