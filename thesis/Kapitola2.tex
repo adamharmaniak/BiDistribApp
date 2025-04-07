@@ -1,36 +1,66 @@
 \chapter{Úlohy a metódy štatistického modelovania}\label{sec:ulohy_metody}
 
-Štatistické modelovanie je neoddeliteľnou súčasťou analýzy údajov, ktorá umožňuje pochopiť a kvantifikovať vzťahy medzi rôznymi premennými. Tento prístup sa využíva naprieč rôznymi disciplínami od ekonomiky a medicíny až po moderné strojové učenie, pričom jeho cieľom je nielen predikcia budúcich hodnôt, ale aj interpretácia vzťahov medzi premennými.
+Štatistické modelovanie je neoddeliteľnou súčasťou analýzy údajov, ktorá umožňuje pochopiť a kvantifikovať vzťahy medzi rôznymi premennými. Tento prístup sa využíva naprieč mnohými disciplínami od ekonomiky a medicíny až po moderné strojové učenie, pričom jeho cieľom je nielen predikcia budúcich hodnôt, ale aj interpretácia vzťahov medzi premennými.
 
-Základnou úlohou štatistického modelovania je konštrukcia modelov, ktoré opisujú správanie sa systému premenných na základe dostupných údajov. Tieto modely môžu byť deterministické alebo stochastické, pričom v praxi sa často pracuje so stochastickými modelmi, ktoré berú do úvahy náhodnosť a neistotu v údajoch. Efektívne štatistické modely umožňujú analyzovať závislosti, identifikovať na prvý pohľad skryté vzorce a optimalizovať rozhodovacie procesy.
+Základnou úlohou štatistického modelovania je konštrukcia modelov, ktoré opisujú správanie sa systému premenných na základe dostupných údajov. Tieto modely môžu byť deterministické alebo stochastické, pričom v praxi sa často pracuje so stochastickými modelmi, ktoré berú do úvahy náhodnosť a neistotu v údajoch. Efektívne štatistické modely nám umožňujú analyzovať na prvý pohľad skryté závislosti a optimalizovať tak rozhodovacie procesy.
 
-Dôležitým aspektom štatistického modelovania je výber vhodných metód na analýzu údajov. Pred takýmto výberom je však dôležité porozumieť pojmu modelovania rozdelenia pravdepodobnosti náhodných premenných, ktoré predstavuje východisko pre pochopenie správania sa jednotlivých premenných a ich charakteristík. Štúdium rozdelení pravdepodobnosti je kľúčové pre kvantifikáciu pravdepodobnostných vlastností údajov, napr. tzv. momentov, ako sú stredná hodnota, smerodajná odchýlka alebo rozptyl, či funkcií bližšie popisujúcich takéto rozdelenia ako sú kvantilové funkcie alebo hustoty pravdepodobnosti. Rozdelenia pravdepodobnosti môžu byť modelované rôznymi spôsobmi, ktoré si bližšie popíšeme v prvej podkapitole tejto kapitoly. Porozumenie jednorozmerným rozdeleniam pravdepodobnosti tvorí základ pre pokročilejšie modelovacie techniky a umožňuje presnejšie opisovať a predpovedať náhodné javy.
+Dôležitým aspektom štatistického modelovania je výber vhodných metód na analýzu údajov. Pred takýmto výberom je však dôležité porozumieť pojmu modelovania rozdelenia pravdepodobnosti náhodných premenných, ktoré predstavuje východisko pre pochopenie správania sa jednotlivých premenných a ich charakteristík. Štúdium rozdelení pravdepodobnosti je kľúčové pre kvantifikáciu pravdepodobnostných vlastností údajov, napr. tzv. momentov, ako sú stredná hodnota, smerodajná odchýlka alebo rozptyl, či funkcií bližšie popisujúcich takéto rozdelenia ako je kvantilová funkcia alebo hustota pravdepodobnosti. Rozdelenie pravdepodobnosti môže byť modelované rôznymi spôsobmi, ktoré si bližšie popíšeme v prvej podkapitole tejto kapitoly. Porozumenie jednorozmerným rozdeleniam pravdepodobnosti tvorí základ pre pokročilejšie modelovacie techniky a umožňuje presnejšie opisovať a predpovedať náhodné javy.
 
-Na tento základ nadväzujú ďalšie kľúčové prístupy štatistického modelovania, akými sú regresia a klasifikácia. Regresia sa zameriava na kvantitatívne predikcie, pričom jej cieľom je odhadovať spojitú výstupnú premennú na základe vstupných údajov, tzv. prediktorov. Klasifikácia sa naopak snaží predikovať správanie kvalitatívnej premennej.
+Na tento základ nadväzujú ďalšie kľúčové prístupy štatistického modelovania, akými sú regresia a klasifikácia. Regresia sa zameriava na kvantitatívne predikcie, pričom jej cieľom je odhadnúť rozdelenie spojitej náhodnej premennej pomocou hodnôt vysvetľujúcich premenných, tzv. prediktorov. Klasifikácia sa naopak snaží predikovať správanie kvalitatívnej premennej.
 
 V tejto kapitole popíšeme základné úlohy a metódy štatistického modelovania so zameraním sa na tri hlavné oblasti: modelovanie jednorozmerného rozdelenia pravdepodobnosti, regresné a klasifikačné techniky. Najprv bude predstavený koncept rozdelenia pravdepodobnosti, jeho charakteristiky a spôsoby modelovania. Následne sa kapitola venuje regresii, jej rôznym variantom a metódam odhadu parametrov modelu. Napokon budú popísané aj klasifikačné metódy ako nástroje na rozpoznávanie vzorov a predikovanie správania sa kategoriálnych premenných. Cieľom tejto kapitoly je teda poskytnúť prehľad o troch hlavných konceptoch štatistického modelovania, ktoré zohrávajú kľúčovú úlohu v analýze dát a v aplikáciách, ako sú predikčné modely a z nich odvíjajúce sa automatizované rozhodovacie systémy.
 
 \section{Modelovanie jednorozmerného rozdelenia pravdepodobnosti}\label{sec:1D_modelovanie}
 
-Modelovanie jednorozmerného rozdelenia pravdepodobnosti je základným krokom v štatistickej analýze náhodných premenných. Slúži na opis správania sa jedinej náhodnej veličiny, ktorej hodnoty môžu byť spojité alebo diskrétne. Pravdepodobnostné rozdelenie poskytuje informácie o tom, s akou pravdepodobnosťou nadobúda náhodná premenná konkrétne hodnoty, tzv. realizácie. Náhodnú premennú teda chápeme ako zobrazenie 
+Modelovanie jednorozmerného rozdelenia pravdepodobnosti je základným krokom v štatistickej analýze náhodných premenných. Slúži na opis správania sa jednej náhodnej veličiny, ktorej hodnoty môžu byť číselné alebo kategoriálne. Pravdepodobnostné rozdelenie poskytuje informácie o tom, s akou pravdepodobnosťou nadobúda náhodná premenná konkrétne hodnoty – tzv. realizácie.
+
+Náhodnú premennú formálne chápeme ako merateľné zobrazenie:
 
 \begin{equation}
-X: \Omega \to \mathbb{R} 
+X : \Omega \to E,
 \end{equation}
+
+kde:
+\begin{itemize}
+  \item $\Omega$ je tzv. \textbf{priestor elementárnych javov} (vzorkový priestor), ktorý reprezentuje množinu všetkých možných výsledkov náhodného experimentu,
+  \item $E$ je \textbf{merateľný priestor hodnôt}, ktorý závisí od typu premennej:
+  \begin{itemize}
+    \item pre kvantitatívne premenné zvyčajne $E = \mathbb{R}$ (alebo podmnožina $\mathbb{R}$),
+    \item pre kategoriálne premenné $E$ býva konečná alebo spočítateľná množina kategórií.
+  \end{itemize}
+\end{itemize}
+
+To, o aký typ náhodnej premennej ide, výrazne ovplyvňuje spôsob jej modelovania. Z tohto hľadiska rozlišujeme premenné podľa typu hodnôt, ktoré môžu nadobúdať, nasledovne:
+
+\begin{itemize}
+  \item \textbf{Kvantitatívne (číselné) premenné} – vyjadrujú veľkosť, množstvo alebo intenzitu a delíme ich na:
+  \begin{itemize}
+    \item \textit{Diskrétne} – nadobúdajú spočítateľný počet hodnôt (napr. počet detí v rodine),
+    \item \textit{Spojité (intervalové)} – nadobúdajú akúkoľvek hodnotu z intervalu reálnych čísel (napr. výška osoby).
+  \end{itemize}
+
+  \item \textbf{Kvalitatívne (kategoriálne) premenné} – vyjadrujú kategórie alebo skupiny bez nutnej numerickej interpretácie. Patria sem premenné:
+  \begin{itemize}
+    \item \textit{Nominálne} – kategórie bez poradia (napr. farba očí, pohlavie),
+    \item \textit{Ordinálne} – kategórie s prirodzeným poradím, ale bez jednoznačnej metrickej vzdialenosti (napr. známky v škole).
+  \end{itemize}
+\end{itemize}
 
 Rozdelenie pravdepodobnosti (skrátene rozdelenie) náhodnej premennej $X$ je priraďovanie pravdepodobností jednotlivým hodnotám alebo množinám hodnôt, ktoré táto premenná môže nadobudnúť.
 
-\subsection{Distribučná funkcia}
+\subsection{Funkčná reprezentácia}
 
-Základným nástrojom na popis rozdelenia je distribučná funkcia $F_X(x)$, ktorá každému reálnemu číslu $x$ priraďuje pravdepodobnosť, že náhodná premenná nadobudne hodnotu menšiu alebo rovnú $x$: 
+\subsubsection{Distribučná funkcia}
+
+Základným nástrojom na popis rozdelenia je distribučná funkcia $F_X(x)$, ktorá každému prvku množiny $x$ priraďuje pravdepodobnosť, že náhodná premenná nadobudne hodnotu menšiu alebo rovnú $x$: 
 
 \begin{equation} 
 F_X(x) = P(X \leq x) 
 \end{equation} 
 
-\subsection{Pravdepodobnostná hmotnostná funkcia a hustota pravdepodobnosti}
+\subsubsection{Pravdepodobnostná funkcia a hustota pravdepodobnosti}
 
-V prípade diskrétnej náhodnej premennej je rozdelenie určené jej pravdepodobnostnou hmotnostnou funkciou 
+V prípade diskrétnej náhodnej premennej je rozdelenie určené jej pravdepodobnostnou funkciou 
 
 \begin{equation} 
 p_X(x) = P(X = x) 
@@ -50,9 +80,9 @@ Hustota pravdepodobnosti $f_X(x)$ je deriváciou distribučnej funkcie $F_X(x)$,
 f_X(x) = \frac{d}{dx} F_X(x) 
 \end{equation}
 
-\subsection{Kvantilová funkcia}
+\subsubsection{Kvantilová funkcia}
 
-Kvantilová funkcia rádu $q \in (0, 1)$ predstavuje inverznú funkciu distribučnej funkcie $F_X(x)$ v zmysle:
+Kvantilová funkcia rádu $q \in (0, 1)$ predstavuje inverznú funkciu k distribučnej funkcie $F_X(x)$ v zmysle:
 
 \begin{equation}
 x_q = F_X^{-1}(q) = \inf \left\{ x \in \mathbb{R} : F_X(x) \geq q \right\}
@@ -64,94 +94,150 @@ Kvantil $x_q$ je teda najmenšia hodnota, pri ktorej kumulatívna pravdepodobnos
 P(X \leq x_q) \geq q
 \end{equation}
 
-Kvantilové funkcie sú dôležité pri popise správania premenných vo vybraných kvantiloch rozdelenia, čomu sa taktiež budeme venovať v nasledujúcich kapitolách. Špeciálnymi prípadmi kvantilov sú napríklad \textbf{kvartily}.
+Kvantilové funkcie sú dôležité pri popise správania premenných vo vybraných kvantiloch rozdelenia, čomu sa taktiež budeme venovať v nasledujúcich kapitolách.
 
-Kvartily môžeme chápať ako špecifické prípady percentilov:
-\begin{itemize}
-  \item Prvý kvartil $Q_1$ – 25. percentil ($F_X(Q_1) = 0.25$),
-  \item Druhý kvartil $Q_2$ – medián ($F_X(Q_2) = 0.5$),
-  \item Tretí kvartil $Q_3$ – 75. percentil ($F_X(Q_3) = 0.75$),
-\end{itemize}
+\subsection{Bodové charakteristiky}\label{subsec:bodove_charakteristiky}
 
-kde \textbf{percentil} $p$ predstavuje kvantil zodpovedajúci hodnote $q = \frac{p}{100}$. \\
+\subsubsection{Momenty}\label{subsubsection:momenty}
 
-\subsection{Základné momentové charakteristiky rozdelenia}
+\textbf{Stredná hodnota ($\mathbb{E}[X]$ alebo $\mu(X)$)}
 
-\subsubsection{Stredná hodnota ($\mathbb{E}[X]$ alebo $\mu(X)$)}
-
-Stredná hodnota je začiatočný moment prvého rádu, ktorý definujeme:
+Stredná hodnota je začiatočný moment prvého rádu a poskytuje informáciu o priemernej hodnote náhodnej premennej:
 
 \begin{itemize}
-  \item Pre diskrétnu náhodnú premennú ako:
+  \item Pre diskrétnu náhodnú premennú:
   \begin{equation}
     \mathbb{E}[X] = \mu(X) = \sum_{x \in H} x \cdot p(x), \quad H = \{ x \in \mathbb{R} \mid p(x) > 0 \}
   \end{equation}
-  \item Pre spojitú náhodnú premennú ako:
+  \item Pre spojitú náhodnú premennú:
   \begin{equation}
     \mathbb{E}[X] = \mu(X) = \int_{-\infty}^{\infty} x \cdot f(x) \, dx
   \end{equation}
 \end{itemize}
 
-\subsubsection{Smerodajná odchýlka ($\sigma(X)$)}
+\textbf{Rozptyl ($\mathbb{D}[X]$, $\mathrm{Var}(X)$ alebo $\sigma^2(X)$)}
+
+Rozptyl, nazývaný aj disperzia, je centrálny moment druhého rádu a vyjadruje priemernú kvadratickú vzdialenosť hodnôt od ich strednej hodnoty:
+
+\begin{itemize}
+  \item Pre diskrétne premenné:
+  \begin{equation}
+    \mathrm{Var}(X) = \sigma^2(X) = \sum_{x \in H} (x - \mathbb{E}[X])^2 \cdot p(x)
+  \end{equation}
+  \item Pre spojité premenné:
+  \begin{equation}
+    \mathrm{Var}(X) = \sigma^2(X) = \int_{-\infty}^{\infty} (x - \mathbb{E}[X])^2 \cdot f(x) \, dx
+  \end{equation}
+\end{itemize}
+
+\textbf{Smerodajná odchýlka ($\sigma(X)$)}
 
 Smerodajná odchýlka je definovaná ako druhá odmocnina z rozptylu:
 \begin{equation}
 \sigma(X) = \sqrt{\mathrm{Var}(X)}
 \end{equation}
 
-\subsubsection{Rozptyl ($\mathbb{D}[X]$ alebo $\mathrm{Var}(X)$ alebo $\sigma^2(X)$)}
+\subsubsection{Kvantil}\label{subsubsection:kvantil}
 
-Rozptyl, alternatívne disperzia, je centrálny moment druhého rádu, definovaný:
+Kvantil je bodová charakteristika rozdelenia pravdepodobnosti, ktorá určuje hodnotu náhodnej premennej, pod ktorou sa nachádza daná časť rozdelenia. Kvantil rádu $q \in (0,1)$ je reálne číslo $x_q$, pre ktoré platí:
 
+\begin{equation}
+P(X \leq x_q) = q.
+\end{equation}
+
+Inými slovami, kvantil $x_q$ je hodnota, ktorú náhodná premenná neprekročí s pravdepodobnosťou $q$. Kvantily sa častokrát používajú na opis rozdelenia údajov a ich koncentrácie.
+
+Špeciálne prípady kvantilov sú:
 \begin{itemize}
-  \item Pre diskrétne premenné ako:
-  \begin{equation}
-  \mathrm{Var}(X) = \sigma^2(X) = \sum_{x \in H} (x - \mathbb{E}[X])^2 \cdot p(x), \quad H = \{ x \in \mathbb{R} \mid p(x) > 0 \}
-  \end{equation}
-  \item Pre spojité premenné ako:
-  \begin{equation}
-  \mathrm{Var}(X) = \sigma^2(X) = \int_{-\infty}^{\infty} (x - \mathbb{E}[X])^2 \cdot f(x) \, dx
-  \end{equation}
+  \item \textbf{Medián} ($q = 0{,}5$): rozdeľuje rozdelenie na dve rovnaké časti,
+  \item \textbf{Kvartily} ($q = 0{,}25$, $0{,}5$, $0{,}75$): rozdeľujú rozdelenie na štyri rovnaké časti,
+  \item \textbf{Percentily} ($q = \frac{p}{100}$, $p = 1, 2, \dots, 99$): rozdeľujú rozdelenie na 100 rovnakých častí.
 \end{itemize}
 
-Spolu so \textbf{smerodajnou odchýlkou} hovoria o tom, ako veľmi sú hodnoty daného rozdelenia rozptýlené okolo jeho \textbf{strednej hodnoty}.
+Kvantil je mimoriadne užitočná charakteristika v prípadoch, keď je rozdelenie asymetrické alebo obsahuje odľahlé hodnoty.
 
-\subsection{Parametrické modelovanie rozdelenia}
+\subsubsection{Modus}\label{subsubsection:modus}
 
-Pri parametrickom modelovaní by sme mali predpokladať, že rozdelenie má známy tvar (napr. normálne, exponenciálne, atď.) pričom jeho parametre odhadujeme na základe poskytnutých dát:
+Modus je bodová charakteristika, ktorá predstavuje najčastejšie sa vyskytujúcu hodnotu náhodnej premennej. Inými slovami, ide o hodnotu, ktorá má najväčšiu frekvenciu výskytu v pozorovaných dátach.
 
 \begin{itemize}
-  \item Normálne rozdelenie $\mathcal{N}(\mu, \sigma^2)$
-  \item Exponenciálne rozdelenie $\text{Exp}(\lambda)$
+  \item V \textbf{diskrétnom prípade} (napr. pri počtoch alebo kategóriách) je modus definovaný ako hodnota $x$, ktorá sa v súbore údajov vyskytuje najčastejšie.
+  \item V \textbf{spojitom prípade} (napr. pri meraniach) ide o hodnotu, pri ktorej hustota pravdepodobnosti $f(x)$ dosahuje svoje maximum.
 \end{itemize}
 
-Tieto modely je možné analyticky presne definovať a odporúča sa používať ich tam, kde vieme do istej miery predpokladať tvar rozdelenia.
+Na rozdiel od strednej hodnoty alebo mediánu môže byť modus:
+\begin{itemize}
+  \item nejednoznačný (ak existuje viacero hodnôt s rovnakou najvyššou frekvenciou),
+  \item nevhodný pre hladké rozdelenia bez výrazného vrcholu (napr. rovnomerné rozdelenie).
+\end{itemize}
 
-\subsection{Neparametrické modelovanie rozdelenia}
+\subsection{Modelovanie}
+
+\subsubsection{Neparametrické modelovanie rozdelenia}\label{subsubsection:nonparametric_models}
 
 Neparametrické prístupy modelovania sú typické tým, že nepredpokladajú konkrétny tvar rozdelenia.
 
-\subsubsection{Odhad jadrovej hustoty (angl. Kernel Density Estimation)}
+\textbf{Vyhladené (angl. Kernel Smoothing)}
 
 Ide o neparametrický prístup, pri ktorom sa pre každé pozorovanie počíta hladká funkcia (jadro). Jej typický tvar je:
 \begin{equation}
 \hat{f}_{bw}(x) = \frac{1}{n*bw} \sum_{i=1}^n K\left( \frac{x - x_i}{bw} \right)
 \end{equation}
-kde $K$ je jadrová funkcia (napr. Gaussovská) a $bw$ je šírka pásma (bandwidth).
+kde $K$ je jadrová funkcia (napr. Gaussovská) a $bw$ je rozsah vyhladenia (bandwidth).
 
-Ďalším takýmto neparametrickým prístupom by mohlo byť napríklad modelovanie pomocou \textbf{histogramov}. 
+\textbf{Empirické}
 
-\subsubsection{Histogramy}
+\begin{itemize}
+  \item \textbf{Histogram ako odhad PDF} - predstavuje jednoduchý neparametrický nástroj na odhad hustoty pravdepodobnosti, založený na zoskupovaní pozorovaných hodnôt do disjunktných podintervalov. V každom intervale sa spočíta počet výskytov (frekvencia), ktorá sa následne normuje podľa šírky intervalu a celkového počtu pozorovaní. Očakávaným výsledkom tu je stupňovitý odhad hustoty pravdepodobnosti. Histogram je vhodný najmä pre hrubý, vizuálny odhad hustoty bez nutnosti predpokladu konkrétneho analytického tvaru rozdelenia. Na rozdiel od jadrového odhadu hustoty je však výsledný tvar závislý od zvoleného počtu a šírky intervalov.
+  \item \textbf{Empirická CDF} - je neparametrickým odhadom distribučnej funkcie náhodnej premennej, ktorá vzniká priamo z pozorovaných údajov bez predpokladu konkrétneho rozdelenia. Empirická distribučná funkcia $F_n(x)$ sa definuje ako podiel počtu pozorovaní menších alebo rovných hodnote $x$ ku celkovému počtu pozorovaní $n$:
+  
+  \begin{equation}
+  F_n(x) = \frac{1}{n} \sum_{i=1}^{n} \mathbf{1}_{\{x_i \leq x\}},
+  \end{equation}
 
-Histogramy predstavujú jednoduchý neparametrický nástroj na odhad hustoty pravdepodobnosti, založený na zoskupovaní pozorovaných hodnôt do disjunktných podintervalov. V každom intervale sa spočíta počet výskytov (frekvencia), ktorá sa následne normuje podľa šírky intervalu a celkového počtu pozorovaní. Očakávaným výsledkom tu je stupňovitý odhad hustoty pravdepodobnosti.
+  kde $\mathbf{1}_{\{x_i \leq x\}}$ je indikačná funkcia, ktorá nadobúda hodnotu 1, ak $x_i \leq x$, inak 0. Výsledkom je stupňovitá funkcia, ktorá sa v každom pozorovaní skokovo zvýši o $\frac{1}{n}$. Tento odhad je používaný v mnohých štatistických testoch ako napríklad Kolmogorov–Smirnovov test, kde sa porovnáva reálne rozdelenie s teoretickým modelom.
+\end{itemize}
 
-Histogram je vhodný najmä pre hrubý, vizuálny odhad hustoty bez nutnosti predpokladu konkrétneho analytického tvaru rozdelenia. Na rozdiel od jadrového odhadu hustoty je však výsledný tvar závislý od zvoleného počtu a šírky intervalov.
+\subsubsection{Parametrické modelovanie rozdelenia}
+
+Pri parametrickom modelovaní predpokladáme, že rozdelenie náhodnej premennej patrí do známej parametrickej triedy rozdelení, určenej konkrétnym analytickým tvarom. Takéto modely sú definované pomocou konečného počtu parametrov, ktoré je možné odhadnúť na základe dostupných údajov.
+
+Typickými príkladmi sú:
+\begin{itemize}
+  \item Normálne rozdelenie $\mathcal{N}(\mu, \sigma^2)$
+  \item Exponenciálne rozdelenie $\text{Exp}(\lambda)$
+\end{itemize}
+
+Postup výstavby takéhoto parametrického modelu má spravidla dve základné fázy:
+\begin{enumerate}
+  \item \textbf{Identifikácia modelu} – výber vhodnej triedy rozdelení, ktorá vystihuje tvar a vlastnosti pozorovaných údajov (napr. symetria, šikmosť, variabilita). V tomto kroku je dobré vychádzať z výstupov grafických nástrojov ako je napríklad histogram alebo QQ-graf.
+  
+  \item \textbf{Odhad parametrov} – po zvolení triedy rozdelení sa pomocou štatistických metód (napr. metóda momentov, metóda maximálnej vierohodnosti) odhadujú hodnoty parametrov tak, aby model čo najlepšie zodpovedal pozorovaným dátam.
+\end{enumerate}
+
+Tieto modely sú výhodné v situáciách, keď máme odôvodnené predpoklady o analytickom tvare rozdelenia alebo v prípadoch, keď máme k dispozícii len obmedzené množstvo pozorovaní – pretože zavedenie štrukturálnych predpokladov redukuje potrebu dát. To je v kontraste s neparametrickými modelmi, ktoré síce nevyžadujú špecifikáciu konkrétneho tvaru rozdelenia, ale na druhej strane potrebujú viac údajov a častokrát majú vyššie výpočtové nároky.
 
 \section{Regresia}\label{sec:regresia}
 
-Regresná analýza predstavuje jednu zo základných metód štatistického modelovania, ktorej cieľom je opísať a kvantifikovať vzťah medzi premennými. Zameriava sa na modelovanie funkčného vzťahu medzi závislou premennou (odozvou) a nezávislými premennými (prediktormi). Hlavným cieľom regresie je predikcia hodnoty jednej (závislej) premennej na základe hodnôt jednej alebo viacerých vysvetľujúcich (nezávislých) premenných.
+Regresná analýza predstavuje jednu zo základných metód štatistického modelovania, ktorej cieľom je opísať a kvantifikovať vzťah medzi premennými. Zameriava sa na modelovanie funkčného vzťahu medzi závislou premennou (odozvou) a nezávislými premennými (prediktormi). Hlavným cieľom regresie je poskytnúť rámec predpokladov pre štatistickú dedukciu alebo  predikcie v bodoch priestoru prediktorov, kde už nie sú dostupné pozorovania.
 
-V štatistickej praxi má regresia široké uplatnenie: od odhadu ekonomických ukazovateľov, cez medicínske modely, až po výpočtové systémy strojového učenia. Okrem predikcie však umožňuje aj odhaľovanie vzťahov, identifikáciu dôležitých premenných a interpretáciu dopadu jednotlivých faktorov.
+V štatistickej praxi má regresia široké uplatnenie: od odhadu ekonomických ukazovateľov, cez medicínske modely, až po predikčné algoritmy strojového učenia, kde regresia tvorí základ mnohých modelov. Okrem predikcie však umožňuje aj odhaľovanie vzťahov, identifikáciu dôležitých premenných a interpretáciu dopadu jednotlivých faktorov.
+
+Všeobecným rámcom regresného modelovania je aditívny model v tvare:
+\begin{equation}
+Y = f(X) + \varepsilon,
+\end{equation}
+kde:
+\begin{itemize}
+  \item $Y$ je náhodná premenná predstavujúca \textit{odozvu (závislú premennú)},
+  \item $X$ je (vektor) \textit{prediktorov (nezávislých premenných)},
+  \item $f(X)$ je \textit{deterministická zložka modelu}, ktorá opisuje očakávanú hodnotu odozvy vzhľadom na prediktory,
+  \item $\varepsilon$ je \textit{stochastická zložka}, reprezentujúca náhodné odchýlky od tejto očakávanej hodnoty.
+\end{itemize}
+
+Cieľom regresného modelovania je oddeliť systematické správanie (očakávanú hodnotu) od náhodnej variability v údajoch. Funkcia $f(X)$ tak zachytáva \textit{hlavný trend} alebo \textit{závislosť}, zatiaľ čo náhodná chyba $\varepsilon$ modeluje šum - nepozorované faktory a nepravidelnosti v údajoch.
+
+Rôzne typy regresných modelov sa líšia práve tým, aký konkrétny tvar má funkcia $f(X)$ a aké predpoklady kladieme na rozdelenie chyby $\varepsilon$ (napr. normálne rozdelenie s nulovou strednou hodnotou a konštantným rozptylom).
 
 Podľa toho ako je vzťah medzi prediktormi a odozvou definovaný možno rozlišovať rôzne druhy regresných modelov, ako napríklad:
 \begin{itemize}
@@ -167,7 +253,7 @@ V tejto podkapitole sa zameriame najmä na lineárny regresný model, jeho teore
 
 Lineárna regresia predstavuje základný a zároveň veľmi užitočný prístup v štatistickom modelovaní. Napriek svojej jednoduchosti si zachováva vysokú interpretovateľnosť, robustnosť a je východiskom pre zložitejšie modely, ktoré ju častokrát zovšeobecňujú.
 
-V prípade \textbf{jednoduchej lineárnej regresie}, kde máme len jeden vysvetľujúci (nezávislý) prediktor $X$, model predpokladá lineárny vzťah so závislou premennou $Y$ v tvare:
+V prípade jednoduchej lineárnej regresie, kde máme len jeden vysvetľujúci (nezávislý) prediktor $X$, model predpokladá lineárny vzťah so závislou premennou $Y$ v tvare:
 
 \begin{equation}
 Y = \beta_0 + \beta_1 X + \varepsilon
@@ -177,7 +263,7 @@ kde $\beta_0$ je intercept (priesečník s osou $Y$), $\beta_1$ je smernica regr
 
 \subsubsection{Odhad parametrov}
 
-Odhady parametrov $\hat{\beta}_0$ a $\hat{\beta}_1$ získame pomocou \textbf{metódy najmenších štvorcov (OLS)} minimalizáciou súčtu štvorcov rezíduí:
+Odhady parametrov $\hat{\beta}_0$ a $\hat{\beta}_1$ získame pomocou metódy najmenších štvorcov (OLS) minimalizáciou súčtu štvorcov rezíduí:
 
 \begin{equation}
 RSS = \sum_{i=1}^{n} \left( y_i - \hat{y}_i \right)^2 = \sum_{i=1}^{n} \left( y_i - \hat{\beta}_0 - \hat{\beta}_1 x_i \right)^2
@@ -202,7 +288,7 @@ Rozptyl chybového člena $\sigma^2$ odhadujeme ako:
 \hat{\sigma}^2 = \frac{RSS}{n - 2}
 \end{equation}
 
-Na základe toho možno odvodiť \textbf{štandardné chyby} pre odhady parametrov a konštruovať intervaly spoľahlivosti:
+Na základe toho možno odvodiť štandardné chyby pre odhady parametrov a konštruovať intervaly spoľahlivosti:
 
 \begin{equation}
 \hat{\beta}_j \pm t_{1 - \alpha/2}(n - 2) \cdot SE(\hat{\beta}_j)
@@ -212,7 +298,7 @@ Tieto intervaly poskytujú rozsah hodnôt, ktoré by parameter mohol nadobúdať
 
 \subsubsection{Vyhodnotenie presnosti modelu}
 
-Presnosť regresného modelu možno hodnotiť pomocou \textbf{reziduálneho rozptylu} alebo pomocou \textbf{koeficientu determinácie} $R^2$, ktorý vyjadruje podiel vysvetlenej variability modelom:
+Presnosť regresného modelu možno hodnotiť pomocou reziduálneho rozptylu alebo pomocou koeficientu determinácie $R^2$, ktorý vyjadruje podiel vysvetlenej variability modelom:
 
 \begin{equation}
 R^2 = 1 - \frac{RSS}{TSS}
@@ -256,7 +342,7 @@ kde:
   \item $\varepsilon$ je náhodná chyba.
 \end{itemize}
 
-Na odhad parametrov je bežným prístupom \textbf{logaritmická transformácia}, ktorou sa model linearizuje:
+Na odhad parametrov je bežným prístupom logaritmická transformácia, ktorou sa model linearizuje:
 
 \begin{equation}
 \ln(Y) = \ln(\alpha) + \beta X + \varepsilon'
