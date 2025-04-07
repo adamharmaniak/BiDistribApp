@@ -77,18 +77,18 @@ kde \textbf{percentil} $p$ predstavuje kvantil zodpovedajúci hodnote $q = \frac
 
 \subsection{Základné momentové charakteristiky rozdelenia}
 
-\subsubsection{Stredná hodnota ($\mathbb{E}[X]$ alebo $\mu$)}
+\subsubsection{Stredná hodnota ($\mathbb{E}[X]$ alebo $\mu(X)$)}
 
 Stredná hodnota je začiatočný moment prvého rádu, ktorý definujeme:
 
 \begin{itemize}
   \item Pre diskrétnu náhodnú premennú ako:
   \begin{equation}
-    \mathbb{E}[X] = \mu = \sum_{x \in H} x \cdot p(x)
+    \mathbb{E}[X] = \mu(X) = \sum_{x \in H} x \cdot p(x), \quad H = \{ x \in \mathbb{R} \mid p(x) > 0 \}
   \end{equation}
   \item Pre spojitú náhodnú premennú ako:
   \begin{equation}
-    \mathbb{E}[X] = \mu = \int_{-\infty}^{\infty} x \cdot f(x) \, dx
+    \mathbb{E}[X] = \mu(X) = \int_{-\infty}^{\infty} x \cdot f(x) \, dx
   \end{equation}
 \end{itemize}
 
@@ -106,7 +106,7 @@ Rozptyl, alternatívne disperzia, je centrálny moment druhého rádu, definovan
 \begin{itemize}
   \item Pre diskrétne premenné ako:
   \begin{equation}
-  \mathrm{Var}(X) = \sigma^2(X) = \sum_{x \in H} (x - \mathbb{E}[X])^2 \cdot p(x)
+  \mathrm{Var}(X) = \sigma^2(X) = \sum_{x \in H} (x - \mathbb{E}[X])^2 \cdot p(x), \quad H = \{ x \in \mathbb{R} \mid p(x) > 0 \}
   \end{equation}
   \item Pre spojité premenné ako:
   \begin{equation}
