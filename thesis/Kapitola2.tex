@@ -248,6 +248,59 @@ Podľa toho ako je vzťah medzi prediktormi a odozvou definovaný možno rozliš
 
 V tejto podkapitole sa zameriame najmä na lineárny regresný model, jeho teoretické východiská, predpoklady, odhad parametrov pomocou metódy najmenších štvorcov, ako aj na praktické aspekty ako diagnostika modelu, interpretácia koeficientov a potenciálne problémy ako multikolinearita alebo výskyt odľahlých hodnôt. Na tento základ nadviažu v ďalších častiach aj nelineárne a generalizované regresné prístupy.
 
+\noindent
+Aby bolo možné model $f(X)$ konkrétne špecifikovať a následne odhadnúť, využíva sa častokrát jeho aproximácia pomocou \textit{bázových funkcií}. V tomto prípade sa deterministická zložka modelu zapisuje ako lineárna kombinácia zvolených funkcií $\phi_j(X)$:
+\begin{equation}
+f(X) = \beta_0 + \beta_1 \phi_1(X) + \beta_2 \phi_2(X) + \cdots + \beta_p \phi_p(X).
+\end{equation}
+Vo vektorovom tvare môžeme model vyjadriť ako:
+\begin{equation}
+Y = \boldsymbol{\phi}(X)^\top \boldsymbol{\beta} + \varepsilon,
+\end{equation}
+kde $\boldsymbol{\phi}(X) = (1, \phi_1(X), \ldots, \phi_p(X))^\top$ je vektor bázových funkcií a $\boldsymbol{\beta}$ vektor parametrov modelu. Táto reprezentácia zahŕňa nielen klasickú lineárnu regresiu (kde $\phi_j(X) = X_j$), ale aj jej zovšeobecnené formy, ako napríklad \textit{polynomiálnu regresiu}, \textit{regresiu s interakciami} alebo modely s nelineárnymi transformáciami vstupov.
+
+\smallskip
+\noindent
+\textbf{Transformácia odozvy} 
+
+V niektorých prípadoch môže byť vhodné transformovať závislú premennú $Y$ pred samotným modelovaním. Typické dôvody na to sú:
+
+\begin{itemize}
+  \item \textit{Linearizácia} funkčného vzťahu medzi $Y$ a $X$ (napr. exponenciálne alebo logaritmické transformácie),
+  \item \textit{Symetrizácia rozdelenia šumu} $\varepsilon$ – napr. pri výrazne šikmých rozdeleniach.
+\end{itemize}
+Transformácie tak môžu zlepšiť splnenie predpokladov lineárneho modelu a zvýšiť presnosť odhadov aj interpretovateľnosť výsledkov.
+
+\smallskip
+\noindent
+\textbf{Kódovanie kvalitatívnych premenných}
+
+Ak medzi prediktormi $X$ figurujú aj \textit{kvalitatívne (kategoriálne)} premenné, je potrebné ich previesť na číselnú formu. Najčastejšie sa využíva tzv. \textit{indikátorové (dummy) kódovanie}, pri ktorom sa pre každú kategóriu (okrem referenčnej) vytvorí binárna premenná s hodnotami \{0,1\}. Takto je možné zaradiť aj nominálne a ordinálne premenné do lineárneho modelu.
+
+\smallskip
+\noindent
+\textbf{Maticová reprezentácia a odhad parametrov}
+
+Ak pozorujeme $n$ realizácií premenných, môžeme model zapísať v maticovej forme ako:
+\begin{equation}
+\mathbf{Y} = \mathbf{X} \boldsymbol{\beta} + \boldsymbol{\varepsilon},
+\end{equation}
+kde:
+\begin{itemize}
+  \item $\mathbf{Y}$ je $(n \times 1)$ vektor pozorovaných hodnôt odozvy,
+  \item $\mathbf{X}$ je $(n \times p)$ matica plánu, ktorej riadky obsahujú hodnoty bázových funkcií pre každé pozorovanie,
+  \item $\boldsymbol{\beta}$ je $(p \times 1)$ vektor neznámych parametrov,
+  \item $\boldsymbol{\varepsilon}$ je vektor náhodných chýb.
+\end{itemize}
+Parametre $\boldsymbol{\beta}$ sa najčastejšie odhadujú pomocou metódy najmenších štvorcov (OLS), ktorá minimalizuje súčet štvorcov rezíduí:
+\[
+\hat{\boldsymbol{\beta}} = (\mathbf{X}^\top \mathbf{X})^{-1} \mathbf{X}^\top \mathbf{Y}.
+\]
+
+\smallskip
+\noindent
+Napokon, existuje aj trieda modelov, pre ktoré nie je možné nájsť transformáciu, ktorá by ich previedla na lineárny tvar vzhľadom na parametre. Tieto modely označujeme ako \textit{nelineárne regresné modely} a na ich odhad sa využívajú špecializované numerické metódy – napríklad \textit{nelineárna metóda najmenších štvorcov}, založená na iteračných algoritmoch (ako napr. Newtonova metóda).
+
 \subsection{Lineárny regresný model}
 \label{subsec:linear_regression}
 
@@ -305,6 +358,16 @@ R^2 = 1 - \frac{RSS}{TSS}
 \end{equation}
 
 kde $TSS = \sum_{i=1}^{n}(y_i - \bar{y})^2$ je celková suma štvorcov. Hodnota $R^2 \in [0, 1]$ vyjadruje, ako dobre model vystihuje pozorované dáta. Zároveň sa $R^2$ zhoduje s druhou mocninou Pearsonovho korelačného koeficientu medzi $X$ a $Y$.
+
+Ďalšou bežne používanou mierou kvality modelu je \textit{stredná kvadratická chyba} (Mean Squared Error, MSE), ktorá predstavuje priemernú kvadratickú vzdialenosť medzi skutočnými a predikovanými hodnotami:
+
+\begin{equation}
+\mathrm{MSE} = \frac{1}{n} \sum_{i=1}^{n} (y_i - \hat{y}_i)^2
+\end{equation}
+
+kde $y_i$ sú skutočné a $\hat{y}_i$ predikované hodnoty. MSE teda vyjadruje priemerné zvyškové chyby modelu. Je úzko príbuzná so sumou štvorcov rezíduí (RSS), pretože $\mathrm{MSE} = \frac{RSS}{n}$. V niektorých kontextoch sa pre korekciu počtu stupňov voľnosti namiesto $n$ používa $n - p$, čím vzniká tzv. \textit{odhadnutý rozptyl rezíduí}.
+
+Nižšie hodnoty MSE indikujú lepšiu aproximáciu dát modelom, hoci treba brať do úvahy aj mierku odozvovej premennej, pretože MSE je citlivá na rozsah hodnôt.
 
 \subsection{Všeobecná polynomiálna regresia n-tého stupňa}
 \label{subsec:polynomial_regression}
@@ -468,70 +531,90 @@ Pretože sa vzdialenosti počítajú v metrickom priestore, je dôležité, aby 
 
 Voľba optimálneho $k$ sa často realizuje pomocou metód resamplingu\footnote{\textbf{resampling} sú techniky ako napr. krížová validácia, ktoré opakovane rozdeľujú dáta na trénovacie a testovacie časti, aby spoľahlivo odhadli výkon modelu a zabránili overfittingu.}, ako je napríklad \textit{krížová validácia}. Jednoduchým pravidlom pre výber je $k \approx \sqrt{n}$, kde $n$ je počet pozorovaní.
 
-
-
 \subsection{Generatívne metódy}
 \label{subsec:gener_methods}
 
+Generatívne klasifikačné metódy vychádzajú z modelovania celkového združeného rozdelenia $(X, Y)$ – konkrétne podmieneného rozdelenia $f_k(x) = f(X = x \mid Y = c_k)$ a apriórnych pravdepodobností $\pi_k = \mathrm{Pr}(Y = c_k)$. Pomocou Bayesovej vety potom vyjadríme aposteriórnu pravdepodobnosť priradenia triedy $c_k$ pre pozorovanie $x$ nasledovne:
 
+\begin{equation}\label{eq:apost_prob}
+\mathrm{Pr}(Y = c_k \mid X = x) = \frac{\pi_k \, f_k(x)}{\sum\limits_{\ell = 1}^{K} \pi_\ell \, f_\ell(x)}
+\end{equation}
+
+Práve na základe týchto pravdepodobností vykonáva klasifikátor rozhodovanie – priradí pozorovanie $x$ k tej triede, pre ktorú je aposteriórna pravdepodobnosť najvyššia. Rôzne generatívne metódy sa líšia v predpokladoch o tvaroch hustôt $f_k(x)$.
 
 \subsubsection{Lineárna diskriminačná analýza (LDA)}
 \label{subsubsec:lda}
 
-Lineárna diskriminačná analýza (LDA) je generatívna klasifikačná metóda, ktorá predpokladá, že podmienené rozdelenie vysvetľujúcich premenných $X$ vzhľadom na triedu $Y = c_k$ má normálne rozdelenie so strednou hodnotou $\mu_k$ a spoločnou kovariančnou maticou $\Sigma$ pre všetky triedy.
-
-V prípade jedného prediktora sa predpokladá, že pre každú triedu $k$ platí:
+Lineárna diskriminačná analýza (LDA) patrí medzi najjednoduchšie generatívne klasifikačné metódy. Predpokladá, že podmienené rozdelenia $f_k(x)$ sú normálne a všetky triedy zdieľajú spoločný rozptyl $\sigma^2$. Teda pre každú triedu $k$ platí:
 
 \begin{equation}
 f_k(x) = \frac{1}{\sqrt{2\pi} \, \sigma} \exp\left( -\frac{(x - \mu_k)^2}{2\sigma^2} \right)
 \end{equation}
 
-Pomocou Bayesovej vety potom vyjadríme pravdepodobnosť priradenia triedy:
-
-\begin{equation}
-\mathrm{Pr}(Y = c_k \mid X = x) = \frac{\pi_k \, f_k(x)}{\sum\limits_{\ell = 1}^{K} \pi_\ell \, f_\ell(x)}
-\end{equation}
-
-kde $\pi_k$ je apriórna pravdepodobnosť triedy $k$.
-
-Pre praktickú klasifikáciu sa využíva diskriminačná funkcia:
+Aposteriórne pravdepodobnosti potom vyplývajú zo všeobecného vzťahu uvedeného vyššie \eqref{eq:apost_prob}. Po logaritmickej úprave a zanedbaní konštánt spoločných všetkým triedam vzniká tzv. diskriminačná funkcia:
 
 \begin{equation}
 \delta_k(x) = \frac{x \mu_k}{\sigma^2} - \frac{\mu_k^2}{2\sigma^2} + \ln(\pi_k)
 \end{equation}
 
-Pozorovanie $x$ priradíme do triedy s najväčšou hodnotou $\delta_k(x)$. Z lineárneho tvaru tejto funkcie vzhľadom na $x$ má táto metóda názov „lineárna“.
-
-Ak je počet prediktorov $p \geq 2$, LDA predpokladá, že podmienené rozdelenie vektorovej premennej $\vec{X} = (X_1, \dots, X_p)$ má viacrozmerné normálne rozdelenie:
-
-\begin{equation}
-\vec{X} \mid Y = c_k \sim \mathcal{N}(\vec{\mu}_k, \Sigma)
-\end{equation}
-
-kde $\vec{\mu}_k$ je vektor stredných hodnôt a $\Sigma$ spoločná kovariančná matica. Diskriminačné funkcie majú aj v tomto prípade lineárnu podobu a hranice medzi triedami sú lineárne hyperroviny.
-
-LDA je efektívna, ak sú predpoklady o normálnom rozdelení a rovnosti kovariančných matíc splnené. V opačnom prípade je vhodnejšie použiť kvadratickú diskriminačnú analýzu (QDA), ktorá od týchto predpokladov upúšťa.
+Trieda s najvyššou hodnotou $\delta_k(x)$ je tá, do ktorej klasifikátor zaradí pozorovanie $x$. Keďže $\delta_k(x)$ je lineárna funkcia v $x$, rozhodovacie hranice medzi triedami sú lineárne – odtiaľ názov \textit{lineárna} diskriminačná analýza.
 
 \subsubsection{Kvadratická diskriminačná analýza (QDA)}
 \label{subsubsec:qda}
 
-Kvadratická diskriminačná analýza (QDA) je rozšírením lineárnej diskriminačnej analýzy (LDA), ktoré upúšťa od predpokladu o spoločnej kovariančnej matici pre všetky triedy. V QDA sa predpokladá, že každá trieda $c_k$ má vlastnú kovariančnú maticu $\Sigma_k$, takže:
+Kvadratická diskriminačná analýza (QDA) upúšťa od predpokladu o spoločnom rozptyle a umožňuje tak každej triede $c_k$ mať vlastný rozptyl $\sigma_k^2$. Podmienené rozdelenie je preto:
 
 \begin{equation}
-\vec{X} \mid Y = c_k \sim \mathcal{N}(\vec{\mu}_k, \Sigma_k)
+f_k(x) = \frac{1}{\sqrt{2\pi} \, \sigma_k} \exp\left( -\frac{(x - \mu_k)^2}{2\sigma_k^2} \right)
 \end{equation}
 
-kde $\vec{\mu}_k$ je vektor stredných hodnôt pre triedu $k$ a $\Sigma_k$ je jej vlastná kovariančná matica.
-
-Diskriminačná funkcia pre triedu $k$ potom nadobúda tvar:
+Z logaritmicky upravenej Bayesovej klasifikácie \eqref{eq:apost_prob} vzniká diskriminačná funkcia v tvare:
 
 \begin{equation}
-\delta_k(x) = -\frac{1}{2} (x - \mu_k)^T \Sigma_k^{-1} (x - \mu_k) - \frac{1}{2} \ln|\Sigma_k| + \ln(\pi_k)
+\delta_k(x) = -\frac{1}{2} \frac{(x - \mu_k)^2}{\sigma_k^2} - \frac{1}{2} \ln(\sigma_k^2) + \ln(\pi_k)
 \end{equation}
 
-Po algebraickej úprave možno funkciu prepísať do kvadratickej formy vzhľadom na $x$, čo opäť vysvetľuje názov metódy.
+Funkcia $\delta_k(x)$ je kvadratická vo vzťahu k $x$, čo poskytuje väčšiu flexibilitu pri modelovaní odlišných tvarov tried. Zároveň však požaduje odhad väčšieho počtu parametrov, a teda aj väčšiu trénovaciu vzorku.
 
-QDA poskytuje väčšiu flexibilitu pri modelovaní, keďže umožňuje rôznu tvarovú orientáciu tried v priestore vysvetľujúcich premenných. Cena za túto flexibilitu je požadovaná vyššia početnosť odhadovaných parametrov – QDA vyžaduje odhad až $Kp(p+1)/2$ parametrov, kým LDA iba $Kp$.
+\subsubsection{Naivný Bayesov klasifikátor}
+\label{subsubsec:naivebayes}
 
-Voľba medzi LDA a QDA závisí od kompromisu medzi zaujatosťou (bias) a rozptylom (variance). LDA je vhodnejšia pri menších dátových súboroch, kde hrozí vysoký rozptyl odhadov. QDA sa odporúča, ak máme veľký objem dát alebo ak existuje dôvod domnievať sa, že kovariančné matice medzi triedami sa výrazne líšia.
+Naivný Bayesov klasifikátor predstavuje zjednodušený generatívny prístup ku klasifikácii, ktorý sa vyhýba potrebe modelovať zložité združené rozdelenia prediktorov. Jeho základným predpokladom je \textit{podmienená nezávislosť prediktorov} vzhľadom na triedu. Znamená to, že pre vektor prediktorov $\vec{X} = (X_1, \dots, X_p)$ platí:
 
+\begin{equation}
+f_k(x) = f_{k1}(x_1) \cdot f_{k2}(x_2) \cdot \dots \cdot f_{kp}(x_p),
+\end{equation}
+
+kde $f_{kj}(x_j)$ je podmienená hustota (alebo pravdepodobnosť) pre $X_j$ vzhľadom na triedu $Y = c_k$.
+
+Tento predpoklad umožňuje výrazne zjednodušiť odhad hustoty $f_k(x)$ – netreba odhadovať kovariancie alebo zložité spoločné rozdelenia, ako je to pri LDA a QDA. Aj keď nezávislosť prediktorov je v praxi zvyčajne nerealistická (preto označenie „naivný“), klasifikátor častokrát dosahuje prekvapivo dobré výsledky, najmä v úlohách s väčšou dimenziou.
+
+\medskip
+\noindent
+Odhad hustôt $f_{kj}(x_j)$ závisí od typu prediktora:
+\begin{itemize}
+  \item Ak je $X_j$ \textbf{kvantitatívna premenná}, možno predpokladať:
+  \begin{itemize}
+    \item normálne rozdelenie: $(X_j \mid Y = c_k) \sim \mathcal{N}(\mu_{kj}, \sigma^2_{kj})$, čím vzniká špeciálny prípad QDA s diagonálnymi kovariančnými maticami,
+    \item iné spojité rozdelenie (napr. exponenciálne, uniformné),
+    \item neparametrické odhady (napr. histogram alebo jadrový odhad hustoty).
+  \end{itemize}
+  \item Ak je $X_j$ \textbf{kvalitatívna (kategoriálna premenná)}, hustotu $f_{kj}(x_j)$ možno odhadnúť ako relatívnu početnosť výskytov triedy $c_k$ pre danú hodnotu $x_j$.
+\end{itemize}
+
+\noindent
+Aj napriek svojej zdanlivej jednoduchosti sa Naivný Bayesov klasifikátor ukázal byť relatívne robustný, najmä v prípadoch, kde prediktory pôsobia nezávislo alebo máme výrazný šum.
+
+\subsubsection{Vyhodnotenie presnosti klasifikačných modelov}
+
+Presnosť klasifikačných modelov je často hodnotená na základe \textbf{celkovej klasifikačnej chyby (error rate)}, ktorá predstavuje podiel nesprávne klasifikovaných prípadov:
+
+\begin{equation}
+ER = \frac{1}{n} \sum_{i=1}^{n} \mathbb{I}(\hat{y}_i \neq y_i),
+\end{equation}
+
+kde $n$ je počet pozorovaní, $y_i$ skutočné a $\hat{y}_i$ predikované triedy. Komplementom tejto veličiny je \textit{celková presnosť klasifikácie (accuracy)}, ktorá udáva relatívny počet správne klasifikovaných prípadov.
+
+Presnosť modelu možno detailnejšie analyzovať aj pomocou \textit{klasifikačnej matice (confusion matrix)}, ktorá zobrazuje rozloženie správnych a nesprávnych predikcií medzi jednotlivými triedami, kde mimo-diagonálne prvky indikujú chyby.
+
+V prípade nerovnomernosti tried (rozdielna početnosť alebo dôležitosť) môže byť celková presnosť zavádzajúca. V takýchto situáciách sa využívajú alternatívne metriky ako napríklad \textit{vážená klasifikačná chyba} alebo \textit{Cohenova kappa}, ktoré berú do úvahy očakávanú náhodnú zhodu a štruktúru matice. Tieto metriky sú obzvlášť dôležité tam, kde nie všetky klasifikačné chyby majú rovnaký dopad.
