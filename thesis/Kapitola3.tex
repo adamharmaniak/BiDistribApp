@@ -122,7 +122,7 @@ Z iného pohľadu, marginálne rozdelenie premennej $X_2$ vyjadruje pravdepodobn
     \label{fig:marg_strip}
 \end{figure}
 
-Ak si pás rozdelíme na plôšky $dx_1 \cdot dx_2$  (Obrázok ~\ref{fig:marg_strip_b}), potom z nich váženým súčtom dostaneme:
+Ak si pás rozdelíme na plôšky $dx_1 \cdot dx_2$  (Obr.~\ref{fig:marg_strip_b}), potom z nich váženým súčtom dostaneme:
 
 \begin{equation}
 \mathrm{Pr}(x_2 \leq X_2 \leq x_2 + dx_2) \approx \sum_i f(x_1^{(i)}, x_2) \, dx_1 \, dx_2
@@ -137,6 +137,13 @@ Podobne marginálne rozdelenie premennej $X_1$ získame ako:
 \begin{equation} f_1(x_1) = \int_{-\infty}^{\infty} f(x_1, x_2)  dx_2 \end{equation}
 
 Tieto marginálne rozdelenia slúžia ako základ pre rozklad združeného rozdelenia pomocou kopúl, ktorý bude predmetom nasledujúcej podkapitoly.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{hustota_hlbka_dlzka_zobaku_2D}
+    \caption{Vrstevnice združenej PDF(Obr.~\ref{fig:zobak_joint_density}) + marginálne PDF premenných \textit{Hĺbka zobáku} a \textit{Dĺžka zobáku} tučniakov (metóda: jadrové vyhladzovanie ~\ref{textbf:kernel_smoothing})}
+    \label{fig:zobak_marg_density}
+\end{figure}
 
 \section{Rozklad - marginálie a kopule}\label{sec:rozklad_kopule}
 \section{Odhad}\label{sec:odhad}
