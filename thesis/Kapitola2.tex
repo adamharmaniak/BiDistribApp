@@ -177,7 +177,7 @@ Na rozdiel od strednej hodnoty alebo mediánu môže byť modus:
 
 Neparametrické prístupy modelovania sú typické tým, že nepredpokladajú konkrétny tvar rozdelenia.
 
-\textbf{Vyhladené (angl. Kernel Smoothing)}
+\textbf{Vyhladené (angl. Kernel Smoothing)}\label{textbf:kernel_smoothing}
 
 Ide o neparametrický prístup, pri ktorom sa pre každé pozorovanie počíta hladká funkcia (jadro). Jej typický tvar je:
 \begin{equation}
@@ -331,7 +331,7 @@ Exponenciálna regresia je nelineárny regresný model, ktorý sa používa na o
 Základná forma exponenciálneho modelu je:
 
 \begin{equation}
-Y = \alpha \cdot e^{\beta X} + \varepsilon
+Y = \alpha \cdot e^{\beta X+\varepsilon}
 \end{equation}
 
 kde:
@@ -345,7 +345,7 @@ kde:
 Na odhad parametrov je bežným prístupom logaritmická transformácia, ktorou sa model linearizuje:
 
 \begin{equation}
-\ln(Y) = \ln(\alpha) + \beta X + \varepsilon'
+\ln(Y) = \ln(\alpha) + \beta X + \varepsilon
 \end{equation}
 
 Po tejto transformácii je možné použiť metódu najmenších štvorcov podobne ako pri lineárnej regresii.
@@ -354,13 +354,13 @@ Exponenciálna regresia sa uplatňuje najmä v oblasti prírodných vied, epidem
 
 \section{Klasifikačné metódy}\label{sec:classification}
 
-Klasifikácia je oblasť štatistického modelovania, ktorá sa zaoberá predikciou kvalitatívnych (kategoriálnych) náhodných premenných. 
+Klasifikácia je oblasť štatistického modelovania, ktorá sa zaoberá modelovaním rozdelenia kvalitatívnych (kategoriálnych) náhodných premenných. 
 
-Pri modelovaní kvalitatívnej premennej nie je vhodné aplikovať priamo metódy lineárnej regresie, pretože ich výstup nie je ohraničený a nepopisuje úplne správne pravdepodobnostný charakter úlohy. Preto sa používajú špecifické metódy klasifikácie, ktoré rešpektujú povahu výstupnej premennej a umožňujú modelovať pravdepodobnosti tried pomocou diskriminatívnych alebo generatívnych prístupov.
+Pri predikcii kvalitatívnej premennej nie je vhodné aplikovať priamo metódy lineárnej regresie, pretože ich výstup nie je ohraničený a nepopisuje úplne správne pravdepodobnostný charakter úlohy. Preto sa používajú špecifické metódy, ktoré rešpektujú povahu výstupnej premennej a umožňujú modelovať pravdepodobnosti výskytu tried.
 
 \subsection*{Typy klasifikačných metód}
 
-Z pohľadu modelovania rozdelenia pravdepodobnosti rozdeľujeme klasifikačné metódy na dve hlavné skupiny:
+Podľa prístupu ku modelovaniu rozdelenia pravdepodobnosti rozdeľujeme klasifikačné metódy na dve hlavné skupiny:
 
 \begin{itemize}
   \item \textbf{Diskriminatívne metódy} – modelujú priamo podmienenú pravdepodobnosť triedy vzhľadom na pozorovanie. Medzi tieto metódy patria:
@@ -368,10 +368,10 @@ Z pohľadu modelovania rozdelenia pravdepodobnosti rozdeľujeme klasifikačné m
     \item \textit{Logistická regresia} – pre binárnu klasifikáciu (dve triedy),
     \item \textit{Multinomická logistická regresia} – pre viac ako dve triedy bez poradia,
     \item \textit{Ordinálna logistická regresia} – pre usporiadané triedy,
-    \item \textit{k-najbližších susedov (k-NN)} – neparametrická metóda založená na podobnosti vstupov.
+    \item \textit{k-najbližších susedov (k-NN)} – univerzálna neparametrická metóda (použiteľná aj pri riešení regresnej úlohy), ktorá využíva euklidovskú vzdialenosť ako prostriedok pre predikciu ďalších hodnôt.
   \end{itemize}
   
-  \item \textbf{Generatívne metódy} – modelujú združené rozdelenie prediktorov a odozvy a využívajú Bayesovu vetu. Patria sem:
+  \item \textbf{Generatívne metódy} – modelujú združené rozdelenie prediktorov pre jednotlivé hodnoty odozvy a využívajú Bayesovu vetu. Patria sem:
   \begin{itemize}
     \item \textit{Lineárna diskriminačná analýza (LDA)},
     \item \textit{Kvadratická diskriminačná analýza (QDA)},
@@ -389,7 +389,7 @@ V nasledujúcich podkapitolách budú podrobnejšie rozobrané tieto vybrané kl
 \subsubsection{Logistická regresia}
 \label{subsubsec:log_regression}
 
-Logistická regresia patrí medzi základné diskriminatívne klasifikačné metódy a používa sa v prípade, že cieľová (závislá) premenná $Y$ nadobúda dve možné hodnoty (binárna klasifikácia). Cieľom je modelovať pravdepodobnosť, že $Y$ nadobudne jednu z dvoch hodnôt $c_1$ alebo $c_2$, vzhľadom na hodnoty vysvetľujúcich premenných $X_1, X_2, ..., X_n$, pre $n \in N$.
+Logistická regresia patrí medzi základné diskriminatívne klasifikačné metódy a používa sa v prípade, že cieľová (závislá) premenná $Y$ nadobúda iba dve možné hodnoty (binárna klasifikácia). Cieľom je modelovať pravdepodobnosť, že $Y$ nadobudne jednu z dvoch hodnôt $c_1$ alebo $c_2$, vzhľadom na hodnoty vysvetľujúcich premenných $X_1, X_2, ..., X_n$, pre $n \in N$.
 
 Namiesto priameho modelovania pravdepodobnosti pomocou lineárnej funkcie, ktorá by mohla produkovať neinterpretovateľné hodnoty, teda mimo intervalu $(0,1)$, sa v logistickej regresii lineárna funkcia transformuje pomocou tzv. \textit{logit transformácie}, ktorá modeluje logaritmus šance (odds), že $Y = c_1$:
 
@@ -472,6 +472,8 @@ Voľba optimálneho $k$ sa často realizuje pomocou metód resamplingu\footnote{
 
 \subsection{Generatívne metódy}
 \label{subsec:gener_methods}
+
+
 
 \subsubsection{Lineárna diskriminačná analýza (LDA)}
 \label{subsubsec:lda}
