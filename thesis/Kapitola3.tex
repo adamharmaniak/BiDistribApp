@@ -16,12 +16,21 @@ V tejto kapitole sa zameriame na:
 Konkrétne budeme v tejto kapitole pracovať so združenými rozdeleniami náhodných premenných rovnakého typu – teda buď čisto spojitými, alebo čisto diskrétnymi. Budeme rozoberať všeobecné princípy modelovania, analýzy a odhady takýchto rozdelení. Praktické príklady budú vychádzať z regresných a klasifikačných kontextov, kde sa využívajú znalosti o marginálnych a podmienených rozdeleniach. Pre ilustráciu štruktúry dát a závislostí medzi premennými využijeme nástroje popisnej štatistiky a vizualizačné techniky, ktoré sú súčasťou výstupov mnou implementovanej interaktívnej aplikácie. Táto aplikácia predstavuje aplikačnú časť tejto bakalárskej práce a poskytuje praktické vizualizačné a analytické nástroje na skúmanie združených rozdelení pravdepodobnosti, ktoré sú využité aj pri prezentácii výsledkov v tejto kapitole. Modelovanie zmesi spojitých a diskrétnych náhodných premenných, ako špecifický prípad heterogénnych štruktúr, bude predmetom samostatnej kapitoly, keďže ide o hlavnú problematiku, na ktorú sa v tejto práci chceme zamerať.
 
 
-\section{Základy modelovania}\label{sec:zaklady_modelovania}
+\section{Základy modelovania}\label{sec:joint_zaklady_modelovania}
 
-\subsection{Združená hustota pravdepodobnosti}
-\label{subsec:joint_pdf}
+\subsection{Funkčná reprezentácia}\label{subsec:joint_representation}
 
-Združené rozdelenie pravdepodobnosti pre dve náhodné premenné $X_1$ a $X_2$ môžeme opísať buď pomocou ich spoločnej distribučnej funkcie (angl. joint cumulative distribution function – CDF), alebo pomocou ďalších vhodných nástrojov v závislosti od typu premenných. 
+Podobne ako to bolo v jednorozmernom prípade, aj viacrozmerné združené rozdelenie možno reprezentovať rôznymi funkciami. My sa v tejto práci budeme zaoberať iba dvojrozmerným prípadom. Dve náhodné premenné $X_1$ a $X_2$ teda môžeme opísať buď pomocou ich spoločnej distribučnej funkcie (angl. joint cumulative distribution function – CDF), alebo pomocou ďalších vhodných nástrojov v závislosti od typu premenných.
+
+\subsubsection{Združená distribučná funkcia (CDF)}\label{subsec:joint_cdf}
+
+Spoločná distribučná funkcia $F(x_1, x_2)$ dvoch náhodných premenných $X_1$ a $X_2$ vyjadruje pravdepodobnosť, že obe premenné nadobudnú súčasne hodnoty najviac $x_1$ a $x_2$:
+
+\begin{equation}
+F(x_1, x_2) = \mathrm{Pr}(X_1 \leq x_1,\ X_2 \leq x_2)
+\end{equation}
+
+\subsubsection{Združená hustota pravdepodobnosti (PDF)}\label{subsec:joint_pdf}
 
 Ak sú premenné spojité, spoločné rozdelenie opisujeme prostredníctvom \textit{združenej hustoty pravdepodobnosti} (angl. joint probability density function – PDF) $f(x_1, x_2)$, ktorá udáva pravdepodobnostnú hustotu výskytu dvojice hodnôt v danej oblasti roviny $\mathbb{R}^2$.
 
@@ -72,13 +81,62 @@ Združená hustota veľmi efektívne popisuje spoločné správanie sa dvoch spo
 
 Na nasledujúcom obrázku môžeme vidieť príklad vizualizácie združenej hustoty pravdepodobnosti homogénnej spojitej štruktúry dvoch premenných, pričom ako model výpočtu tu používame jadrové vyhladzovanie, viď ~\ref{textbf:kernel_smoothing}.
 
-\begin{figure}[H]
+\begin{figure}[htpb]
     \centering
     \includegraphics[width=0.7\linewidth]{hustota_hlbka_dlzka_zobaku_3D}
     \caption{3D znázornenie združenej hustoty pravdepodobnosti (PDF) medzi premennými \textit{Hĺbka zobáku} a \textit{Dĺžka zobáku} tučniakov.}
     \label{fig:zobak_joint_density}
 \end{figure}
 
+\subsection{Marginálne rozdelenie}\label{subsec:marginal_dist}
 
-\section{Rozklad - marginálne rozdelenia + kopula}\label{sec:rozklad_kopule}
+Ak nás nezaujíma spoločné správanie všetkých náhodných premenných vektorovej premennej $\vec{X} = (X_1, X_2)$, ale iba jedného jej komponentu, môžeme skúmať jej vlastné pravdepodobnostné rozdelenie. Takéto rozdelenie nazývame \textit{marginálne rozdelenie} (angl. marginal distribution).
+
+Na vizualizáciu marginálneho rozdelenia danej premennej (napr. $X_2$) môžeme premietnuť každý bod z roviny $(x_1, x_2)$ na os $x_2$ a zostrojiť tak histogram týchto projekcií. Výsledný histogram, po normalizácii tak, aby plocha všetkých stĺpcov bola rovná 1, poskytuje empirický odhad marginálnej hustoty $f_2(x_2)$.
+
+\begin{figure}[H] 
+    \centering 
+    \includegraphics[width=0.7\linewidth]{marg_proj_hist.png} 
+    \caption{Empirický odhad marginálneho rozdelenia $f_2(x_2)$} 
+    \label{fig:margin_proj} 
+\end{figure}
+
+Z iného pohľadu, marginálne rozdelenie premennej $X_2$ vyjadruje pravdepodobnosť, že hodnota $X_2$ spadne do veľmi úzkeho intervalu $[x_2, x_2 + dx_2]$. V kontexte dvojrozmerného bodového grafu to zodpovedá pravdepodobnosti, že sa bod $(x_1, x_2)$ nachádza v horizontálnom páse výšky $dx_2$.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{marg_strip_sum1.png}
+        \caption{Horizontálny pás šírky $dx_2$ reprezentujúci interval pre $X_2$.}
+        \label{fig:marg_strip_a}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{marg_strip_sum2.png}
+        \caption{Pás rozdelený na plôšky $dx_1 \cdot dx_2$, z ktorých sa skladá marginálne rozdelenie $f_2(x_2)$.}
+        \label{fig:marg_strip_b}
+    \end{subfigure}
+    \caption{Vizuálna interpretácia marginálneho rozdelenia $f_2(x_2)$}
+    \label{fig:marg_strip}
+\end{figure}
+
+Ak si pás rozdelíme na plôšky $dx_1 \cdot dx_2$  (Obrázok ~\ref{fig:marg_strip_b}), potom z nich váženým súčtom dostaneme:
+
+\begin{equation}
+\mathrm{Pr}(x_2 \leq X_2 \leq x_2 + dx_2) \approx \sum_i f(x_1^{(i)}, x_2) \, dx_1 \, dx_2
+\end{equation}
+
+Porovnaním so vzťahom pre jednorozmernú hustotu pre spojité premenné nám vychádza vzťah, ktorý hovorí o tom, že marginálne rozdelenie $X_2$ možno získať z hustoty združeného rozdelenia $f(x_1, x_2)$ integráciou cez všetky hodnoty $x_1$:
+
+\begin{equation} f_2(x_2) = \int_{-\infty}^{\infty} f(x_1, x_2) dx_1 \end{equation}
+
+Podobne marginálne rozdelenie premennej $X_1$ získame ako:
+
+\begin{equation} f_1(x_1) = \int_{-\infty}^{\infty} f(x_1, x_2)  dx_2 \end{equation}
+
+Tieto marginálne rozdelenia slúžia ako základ pre rozklad združeného rozdelenia pomocou kopúl, ktorý bude predmetom nasledujúcej podkapitoly.
+
+\section{Rozklad - marginálie a kopule}\label{sec:rozklad_kopule}
 \section{Odhad}\label{sec:odhad}
