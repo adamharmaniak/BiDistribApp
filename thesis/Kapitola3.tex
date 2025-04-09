@@ -22,12 +22,22 @@ Konkrétne budeme v tejto kapitole pracovať so združenými rozdeleniami náhod
 
 Podobne ako to bolo v jednorozmernom prípade, aj viacrozmerné združené rozdelenie možno reprezentovať rôznymi funkciami. My sa v tejto práci budeme zaoberať iba dvojrozmerným prípadom. Dve náhodné premenné $X_1$ a $X_2$ teda môžeme opísať buď pomocou ich spoločnej distribučnej funkcie (angl. joint cumulative distribution function – CDF), alebo pomocou ďalších vhodných nástrojov v závislosti od typu premenných.
 
-\subsubsection{Združená distribučná funkcia (CDF)}\label{subsec:joint_cdf}
+\subsubsection{Kumulatívna distribučná funkcia (CDF)}\label{subsec:joint_cdf}
 
 Spoločná distribučná funkcia $F(x_1, x_2)$ dvoch náhodných premenných $X_1$ a $X_2$ vyjadruje pravdepodobnosť, že obe premenné nadobudnú súčasne hodnoty najviac $x_1$ a $x_2$:
 
 \begin{equation}
-F(x_1, x_2) = \mathrm{Pr}(X_1 \leq x_1,\ X_2 \leq x_2)
+F(x_1, x_2) = \mathrm{Pr}(X_1 \leq x_1,\ X_2 \leq x_2),
+\end{equation}
+
+pričom vo vzťahu k združenej hustote týchto premenných platia nasledujúce vzťahy:
+
+\begin{equation}
+F(x_1, x_2) = \int_{-\infty}^{x_1} \int_{-\infty}^{x_2} f(y_1, y_2) \, dy_1 dy_2
+\end{equation}
+
+\begin{equation}
+f(x) = \left. \frac{\partial^2 F(y_1, y_2)}{\partial y_1 \partial y_2} \right|_{y = x}
 \end{equation}
 
 \subsubsection{Združená hustota pravdepodobnosti (PDF)}\label{subsec:joint_pdf}
@@ -88,11 +98,75 @@ Na nasledujúcom obrázku môžeme vidieť príklad vizualizácie združenej hus
     \label{fig:zobak_joint_density}
 \end{figure}
 
+\subsection{Bodové charakteristiky}\label{joint_moments}
+
+Rovnako ako v jednorozmernom prípade, aj v prípade viacrozmerných náhodných veličín (náhodného vektora) sú základnými charakteristikami rozdelenia \textit{stredná hodnota} a \textit{rozptyl}, pričom tentokrát si zavedieme aj pojem \textit{kovariancie}.
+
+\subsubsection{Stredná hodnota}\label{subsubsec:joint_mean}
+
+Pre náš dvojrozmerný náhodný vektor \(\vec{X} = (X_1, X_2)\) definujeme vektor stredných hodnôt ako:
+
+\begin{equation}
+\mathbb{E}[\vec{X}] = \left( \mathbb{E}[X_1], \mathbb{E}[X_2] \right)
+\end{equation}
+
+Pre obidva komponenty ho môžeme vyjadriť pomocou marginálnej hustoty (bližšie popísané v kapitole o marginálnom rozdelení~\ref{subsec:marginal_dist}). Napríklad pre \(X_1\) a marginálnu hustotu \(f_1(x_1)\) platí:
+
+\begin{equation}
+\mathbb{E}[X_1] = \int_{\mathbb{R}} x_1 \, f_1(x_1) \, dx_1
+\end{equation}
+
+alebo pomocou združenej hustoty:
+
+\begin{equation}
+\mathbb{E}[X_1] = \iint_{\mathbb{R}^2} x_1 \, f(x_1, x_2) \, dx_1 \, dx_2
+\end{equation}
+
+\subsubsection{Rozptyl}\label{subsubsec:joint_variance}
+
+Rozptyl (disperzia) je definovaný ako očakávaná kvadratická odchýlka od strednej hodnoty:
+
+\begin{equation}
+\mathrm{Var}[X_1] = \mathbb{E}[(X_1 - \mathbb{E}[X_1])^2]
+\end{equation}
+
+Alternatívne možno rozptyl zapísať aj ako rozdiel momentov:
+
+\begin{equation}
+\mathrm{Var}[X_1] = \mathbb{E}[X_1^2] - (\mathbb{E}[X_1])^2
+\end{equation}
+
+\subsubsection{Kovariancia}\label{subsubsec:joint_covariance}
+
+Kovariancia vyjadruje mieru lineárnej závislosti medzi dvoma náhodnými premennými \(X_1\) a \(X_2\). Definujeme ju ako:
+
+\begin{equation}
+\mathrm{Cov}[X_1, X_2] = \mathbb{E}[(X_1 - \mathbb{E}[X_1])(X_2 - \mathbb{E}[X_2])]
+\end{equation}
+
+Kovariancia sa dá alternatívne vyjadriť aj pomocou spoločného momentu:
+
+\begin{equation}
+\mathrm{Cov}[X_1, X_2] = \mathbb{E}[X_1 X_2] - \mathbb{E}[X_1] \cdot \mathbb{E}[X_2]
+\end{equation}
+
+Tieto hodnoty sa sumarizujú do dvojdimenzionálnej \textit{kovariančnej matice} \(\Sigma\), ktorá je symetrická a pozitívne semidefinitná:
+
+\begin{equation}
+\Sigma = 
+\begin{bmatrix}
+\mathrm{Var}[X_1] & \mathrm{Cov}[X_1, X_2] \\
+\mathrm{Cov}[X_2, X_1] & \mathrm{Var}[X_2] \\
+\end{bmatrix}
+\end{equation}
+
+Kovariančná matica je nevyhnutným nástrojom pre analýzu rozptylu a závislostí medzi komponentami náhodného vektora. Využíva sa napríklad pri odhade parametrov v lineárnej regresii alebo v diskriminačnej analýze.
+
 \subsection{Marginálne rozdelenie}\label{subsec:marginal_dist}
 
 Ak nás nezaujíma spoločné správanie všetkých náhodných premenných vektorovej premennej $\vec{X} = (X_1, X_2)$, ale iba jedného jej komponentu, môžeme skúmať jej vlastné pravdepodobnostné rozdelenie. Takéto rozdelenie nazývame \textit{marginálne rozdelenie} (angl. marginal distribution).
 
-Na vizualizáciu marginálneho rozdelenia danej premennej (napr. $X_2$) môžeme premietnuť každý bod z roviny $(x_1, x_2)$ na os $x_2$ a zostrojiť tak histogram týchto projekcií. Výsledný histogram, po normalizácii tak, aby plocha všetkých stĺpcov bola rovná 1, poskytuje empirický odhad marginálnej hustoty $f_2(x_2)$.
+Na vizualizáciu marginálneho rozdelenia danej premennej, napríklad $X_2$, môžeme premietnuť každý bod z roviny $(x_1, x_2)$ na os $x_2$ a zostrojiť tak histogram týchto projekcií. Výsledný histogram, po normalizácii tak, aby plocha všetkých stĺpcov bola rovná 1, poskytuje empirický odhad marginálnej hustoty $f_2(x_2)$.
 
 \begin{figure}[H] 
     \centering 
@@ -141,9 +215,48 @@ Tieto marginálne rozdelenia slúžia ako základ pre rozklad združeného rozde
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.8\linewidth]{hustota_hlbka_dlzka_zobaku_2D}
-    \caption{Vrstevnice združenej PDF(Obr.~\ref{fig:zobak_joint_density}) + marginálne PDF premenných \textit{Hĺbka zobáku} a \textit{Dĺžka zobáku} tučniakov (metóda: jadrové vyhladzovanie ~\ref{textbf:kernel_smoothing})}
+    \caption{Vrstevnice združenej PDF(Obr.~\ref{fig:zobak_joint_density}) + po bokoch marginálne PDF premenných \textit{Hĺbka zobáku} a \textit{Dĺžka zobáku} tučniakov (metóda: jadrové vyhladzovanie ~\ref{textbf:kernel_smoothing})}
     \label{fig:zobak_marg_density}
 \end{figure}
 
-\section{Rozklad - marginálie a kopule}\label{sec:rozklad_kopule}
+\subsection{Podmienené rozdelenie}\label{subsec:conditional_distribution}
+
+Kým marginálne rozdelenie opisuje správanie jednej premennej bez toho aby sa bral do úvahy vplyv ostatných premenných na túto premennú, v mnohých praktických situáciách nás zaujíma, ako sa rozdelenie jednej premennej mení v závislosti od známych hodnôt inej premennej. V takýchto prípadoch hovoríme o \textit{podmienenom rozdelení}.
+
+\subsubsection{Hustota}\label{subsubsec:conditional_density}
+
+Formálne, ak máme náhodný vektor $(X_1, X_2)$, potom podmienená hustota premennej $X_2$ vzhľadom na známu hodnotu $X_1 = x_1$ je definovaná ako:
+
+\begin{equation}
+f_{2 \mid 1}(x_2 \mid x_1) = \frac{f(x_1, x_2)}{f_1(x_1)},
+\end{equation}
+
+kde:
+\begin{itemize}
+  \item $f(x_1, x_2)$ je združená hustota,
+  \item $f_1(x_1) = \int_{-\infty}^{\infty} f(x_1, x_2) \, dx_2$ je marginálna hustota premennej $X_1$.
+\end{itemize}
+
+Z definície o podmienenej pravdepodobnosti vyplýva:
+
+\begin{equation}
+\mathrm{Pr}(a \leq X_2 \leq b \mid X_1 = x_1) = \int_a^b f_{2 \mid 1}(x_2 \mid x_1) \, dx_2.
+\end{equation}
+
+Podmienenú hustotu tu taktiež možno intuitívne interpretovať ako hustotu v rámci tenkého vertikálneho pásu, kde náhodná premenná $X_1$ nadobúda hodnoty z intervalu $[x, x + \varepsilon]$ (Obr.~\ref{fig:cond_density_strip}). V tomto pásme vyberieme všetky body, ktoré spadajú do intervalu $[x, x + \varepsilon]$, a z nich vytvoríme histogram hodnôt premennej $X_2$, čím získame empirický odhad hustoty $f_{2 \mid 1}(x_2 \mid X_1 = x)$.
+
+Tento postup je znázornený na nasledujúcom obrázku:
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\linewidth]{marg_condition_strip.png}
+    \caption{Empirický odhad podmienenej hustoty $f_{2 \mid 1}(x_2 \mid x_1 \in [x, x + \epsilon])$}
+    \label{fig:cond_density_strip}
+\end{figure}
+
+Týmto sme zaviedli pojem podmienenej hustoty, ktorý bude ďalej kľúčový pri výpočte tzv. \textit{podmienenej strednej hodnoty}.
+
+\subsubsection{Podmienená stredná hodnota}\label{subsubsec:conditional_mean}
+
+\section{Rozklad}\label{sec:rozklad_kopule}
 \section{Odhad}\label{sec:odhad}
