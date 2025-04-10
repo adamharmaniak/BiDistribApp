@@ -2,15 +2,15 @@
 
 V predchádzajúcich kapitolách sme sa zaoberali modelovaním rozdelenia pravdepodobnosti jednotlivých náhodných premenných alebo cieľových premenných v kontexte regresie a klasifikácie. V oboch týchto prístupoch sme vychádzali prevažne z predpokladu, že modelujeme samostatnú premennú alebo závislosť jednej výstupnej premennej na vstupe. V praxi však častokrát pracujeme s viacerými náhodnými premennými súčasne, ktorých správanie môže byť navzájom ovplyvňované. Ich spoločné správanie popisuje tzv. \textit{združené rozdelenie pravdepodobnosti}.
 
-Ak premenné modelujeme ako komponenty náhodného vektora, napríklad $\vec{X} = (X_1, X_2)$, potom znalosť ich združeného rozdelenia nám umožňuje odvodiť ďalšie dôležité vlastnosti systému – napríklad ako vyzerajú podmienené rozdelenia, marginálne rozdelenia alebo podmienená stredná hodnota jednej premennej vzhľadom k iným premenným. Tieto pojmy sú kľúčové nielen pre štatistické modelovanie ako také, ale aj pre praktické aplikácie ako sú predikcie, rozhodovania sa založené na týchto predikciách alebo celková analýza závislostí.
+Ak premenné modelujeme ako komponenty náhodného vektora $\vec{X} = (X_1, X_2)$, potom znalosť ich združeného rozdelenia nám umožňuje odvodiť ďalšie dôležité vlastnosti systému – napríklad ako vyzerajú podmienené rozdelenia, marginálne rozdelenia alebo podmienená stredná hodnota jednej premennej vzhľadom k druhej a naopak. Tieto pojmy sú kľúčové nielen pre štatistické modelovanie ako také, ale aj pre praktické aplikácie ako sú predikcie, rozhodovania sa založené na týchto predikciách alebo celková analýza závislostí.
 
-Presné vyjadrenie alebo odhad združeného rozdelenia je však zložitý, čo je podnecované vyšším počtom premenných. S rastúcim rozmerom vektora náhodných premenných rastie aj počet parametrov a miera závislosti, ktorú je potrebné zohľadniť. Preto sa častokrát používajú zjednodušujúce predpoklady, napríklad o nezávislosti alebo naopak špecifickej štruktúre závislosti medzi premennými.
+Presné vyjadrenie alebo odhad združeného rozdelenia je však zložitý, čo je podnecované vyšším počtom premenných. S rastúcim rozmerom vektora náhodných premenných rastie aj počet parametrov a miera závislosti, ktorú je potrebné zohľadniť. Preto sa častokrát používajú zjednodušujúce predpoklady, napríklad o nezávislosti alebo naopak špecifickej štruktúre závislosti medzi premennými. My sa však budeme zaoberať modelovaním združeného rozdelenia práve dvoch náhodných premenných.
 
 V tejto kapitole sa zameriame na:
 \begin{itemize}
-  \item základy modelovania združených rozdelení, vrátane podmienených a marginálnych funkcií,
+  \item základy modelovania združeného rozdelenia, vrátane podmienených a marginálnych funkcií,
   \item rozklad združeného rozdelenia na marginálne rozdelenia a kopulovú funkciu,
-  \item praktické aspekty odhadu združeného rozdelenia na základe údajov.
+  \item praktické aspekty odhadu združeného rozdelenia na základe dostupných údajov.
 \end{itemize}
 
 Konkrétne budeme v tejto kapitole pracovať so združenými rozdeleniami náhodných premenných rovnakého typu – teda buď čisto spojitými, alebo čisto diskrétnymi. Budeme rozoberať všeobecné princípy modelovania, analýzy a odhady takýchto rozdelení. Praktické príklady budú vychádzať z regresných a klasifikačných kontextov, kde sa využívajú znalosti o marginálnych a podmienených rozdeleniach. Pre ilustráciu štruktúry dát a závislostí medzi premennými využijeme nástroje popisnej štatistiky a vizualizačné techniky, ktoré sú súčasťou výstupov mnou implementovanej interaktívnej aplikácie. Táto aplikácia predstavuje aplikačnú časť tejto bakalárskej práce a poskytuje praktické vizualizačné a analytické nástroje na skúmanie združených rozdelení pravdepodobnosti, ktoré sú využité aj pri prezentácii výsledkov v tejto kapitole. Modelovanie zmesi spojitých a diskrétnych náhodných premenných, ako špecifický prípad heterogénnych štruktúr, bude predmetom samostatnej kapitoly, keďže ide o hlavnú problematiku, na ktorú sa v tejto práci chceme zamerať.
@@ -61,7 +61,7 @@ Bez ohľadu na typ premenných platí, že združené rozdelenie poskytuje kompl
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.7\linewidth]{SK_verzia_praca/figures/pravdeb_funk_ostrov_druhy_3D.png}
-    \caption{3D znázornenie združenej pravdepodobnostnej funkcie (PMF) medzi premennými \textit{Ostrov ako miesto výskytu} a \textit{Druh} tučniakov.}
+    \caption{Združená pravdepodobnostná funkcia (PMF) medzi premennými \textit{Ostrov ako miesto výskytu} a \textit{Druh} tučniakov.}
     \label{fig:miesto_druh_joint_density}
 \end{figure}
 
@@ -87,20 +87,20 @@ Aby funkcia $f(x_1, x_2)$ bola platnou hustotou pravdepodobnosti, musí platiť:
 \iint_{\mathbb{R}^2} f(x_1, x_2) \, dx_1 \, dx_2 = 1
 \end{equation}
 
-Združená hustota veľmi efektívne popisuje spoločné správanie sa dvoch spojitých náhodných premenných a tvorí základ pre ďalšie koncepty ako sú marginálne a podmienené rozdelenia.
+Združená hustota veľmi efektívne popisuje spoločné správanie dvoch spojitých náhodných premenných a tvorí základ pre ďalšie koncepty ako sú marginálne a podmienené rozdelenia.
 
-Na nasledujúcom obrázku môžeme vidieť príklad vizualizácie združenej hustoty pravdepodobnosti homogénnej spojitej štruktúry dvoch premenných, pričom ako model výpočtu tu používame jadrové vyhladzovanie, viď ~\ref{textbf:kernel_smoothing}.
+Na nasledujúcom obrázku môžeme vidieť príklad vizualizácie združenej hustoty pravdepodobnosti homogénnej spojitej štruktúry dvoch premenných, pričom ako model výpočtu tu používame jadrové vyhladzovanie (kap.~\ref{textbf:kernel_smoothing}).
 
 \begin{figure}[htpb]
     \centering
     \includegraphics[width=0.7\linewidth]{hustota_hlbka_dlzka_zobaku_3D}
-    \caption{3D znázornenie združenej hustoty pravdepodobnosti (PDF) medzi premennými \textit{Hĺbka zobáku} a \textit{Dĺžka zobáku} tučniakov.}
+    \caption{Združená hustota pravdepodobnosti (PDF) medzi premennými \textit{Hĺbka zobáku} a \textit{Dĺžka zobáku} tučniakov.}
     \label{fig:zobak_joint_density}
 \end{figure}
 
-\subsection{Bodové charakteristiky}\label{joint_moments}
+\subsection{Momentové charakteristiky}\label{joint_moments}
 
-Rovnako ako v jednorozmernom prípade, aj v prípade viacrozmerných náhodných veličín (náhodného vektora) sú základnými charakteristikami rozdelenia \textit{stredná hodnota} a \textit{rozptyl}, pričom tentokrát si zavedieme aj pojem \textit{kovariancie}.
+Rovnako ako v jednorozmernom prípade, aj v prípade viacrozmerných náhodných veličín (náhodného vektora) sú základnými charakteristikami rozdelenia \textit{stredná hodnota} a \textit{rozptyl}, pričom tentokrát si zavedieme aj pojmy \textit{kovariancie} a \textit{korelačného koeficientu}.
 
 \subsubsection{Stredná hodnota}\label{subsubsec:joint_mean}
 
@@ -110,7 +110,7 @@ Pre náš dvojrozmerný náhodný vektor \(\vec{X} = (X_1, X_2)\) definujeme vek
 \mathbb{E}[\vec{X}] = \left( \mathbb{E}[X_1], \mathbb{E}[X_2] \right)
 \end{equation}
 
-Pre obidva komponenty ho môžeme vyjadriť pomocou marginálnej hustoty (bližšie popísané v kapitole o marginálnom rozdelení~\ref{subsec:marginal_dist}). Napríklad pre \(X_1\) a marginálnu hustotu \(f_1(x_1)\) platí:
+Pre obidva komponenty ho môžeme vyjadriť pomocou marginálnej hustoty (kap.~\ref{subsec:marginal_dist}). Napríklad pre \(X_1\) a marginálnu hustotu \(f_1(x_1)\) platí:
 
 \begin{equation}
 \mathbb{E}[X_1] = \int_{\mathbb{R}} x_1 \, f_1(x_1) \, dx_1
@@ -162,16 +162,36 @@ Tieto hodnoty sa sumarizujú do dvojdimenzionálnej \textit{kovariančnej matice
 
 Kovariančná matica je nevyhnutným nástrojom pre analýzu rozptylu a závislostí medzi komponentami náhodného vektora. Využíva sa napríklad pri odhade parametrov v lineárnej regresii alebo v diskriminačnej analýze.
 
+\subsubsection{Korelačný koeficient}\label{subsubsec:correlation}
+
+Aj keď kovariancia $\mathrm{Cov}[X_1, X_2]$ vyjadruje spoločnú variabilitu dvoch náhodných premenných $X_1$ a $X_2$, jej interpretácia môže byť problematická, pretože jej hodnota závisí od mierky jednotlivých premenných. Teda rovnaká úroveň závislosti medzi premennými môže viesť k rôznym hodnotám kovariancie, ak sú tieto premenné škálované rozdielne.
+
+Túto nevýhodu rieši tzv. \textit{Pearsonov korelačný koeficient}, ktorý je definovaný ako normalizovaná kovariancia:
+
+\begin{equation}
+\rho(X_1, X_2) = \frac{\mathrm{Cov}[X_1, X_2]}{\sqrt{\mathrm{Var}[X_1] \cdot \mathrm{Var}[X_2]}}
+\end{equation}
+
+Hodnota $\rho(X_1, X_2)$ leží vždy v intervale $[-1, 1]$, pričom:
+
+\begin{itemize}
+  \item $\rho = 1$ znamená úplnú pozitívnu lineárnu závislosť,
+  \item $\rho = -1$ znamená úplnú negatívnu lineárnu závislosť,
+  \item $\rho = 0$ znamená žiadnu lineárnu závislosť (lineárna nezávislosť).
+\end{itemize}
+
+Dôležité je, že korelačný koeficient (rovnako ako kovariancia) meria iba \textit{lineárnu} závislosť medzi premennými. Nulová korelácia teda neznamená, že premenné sú nezávislé – iba že medzi nimi nie je lineárny vzťah. Naopak, ak sú dve premenné nezávislé, ich kovariancia aj korelácia sú vždy nulové.
+
 \subsection{Marginálne rozdelenie}\label{subsec:marginal_dist}
 
 Ak nás nezaujíma spoločné správanie všetkých náhodných premenných vektorovej premennej $\vec{X} = (X_1, X_2)$, ale iba jedného jej komponentu, môžeme skúmať jej vlastné pravdepodobnostné rozdelenie. Takéto rozdelenie nazývame \textit{marginálne rozdelenie} (angl. marginal distribution).
 
-Na vizualizáciu marginálneho rozdelenia danej premennej, napríklad $X_2$, môžeme premietnuť každý bod z roviny $(x_1, x_2)$ na os $x_2$ a zostrojiť tak histogram týchto projekcií. Výsledný histogram, po normalizácii tak, aby plocha všetkých stĺpcov bola rovná 1, poskytuje empirický odhad marginálnej hustoty $f_2(x_2)$.
+Na vizualizáciu marginálneho rozdelenia danej premennej, napríklad $X_2$, môžeme premietnuť každý bod z roviny $(x_1, x_2)$ na os $x_2$ a zostrojiť tak histogram týchto projekcií. Výsledný histogram, po normalizácii tak, aby plocha všetkých stĺpcov bola rovná 1, poskytuje empirický odhad marginálneho rozdelenia $X_2$.
 
 \begin{figure}[H] 
     \centering 
     \includegraphics[width=0.7\linewidth]{marg_proj_hist.png} 
-    \caption{Empirický odhad marginálneho rozdelenia $f_2(x_2)$} 
+    \caption{Empirický odhad marginálneho rozdelenia premennej $X_2$} 
     \label{fig:margin_proj} 
 \end{figure}
 
@@ -189,10 +209,10 @@ Z iného pohľadu, marginálne rozdelenie premennej $X_2$ vyjadruje pravdepodobn
     \begin{subfigure}[b]{0.48\linewidth}
         \centering
         \includegraphics[width=\linewidth]{marg_strip_sum2.png}
-        \caption{Pás rozdelený na plôšky $dx_1 \cdot dx_2$, z ktorých sa skladá marginálne rozdelenie $f_2(x_2)$.}
+        \caption{Pás rozdelený na plôšky $dx_1 \cdot dx_2$, z ktorých sa skladá marginálne rozdelenie $X_2$.}
         \label{fig:marg_strip_b}
     \end{subfigure}
-    \caption{Vizuálna interpretácia marginálneho rozdelenia $f_2(x_2)$}
+    \caption{Vizuálna interpretácia marginálneho rozdelenia premennej $X_2$}
     \label{fig:marg_strip}
 \end{figure}
 
@@ -210,7 +230,7 @@ Podobne marginálne rozdelenie premennej $X_1$ získame ako:
 
 \begin{equation} f_1(x_1) = \int_{-\infty}^{\infty} f(x_1, x_2)  dx_2 \end{equation}
 
-Tieto marginálne rozdelenia slúžia ako základ pre rozklad združeného rozdelenia pomocou kopúl, ktorý bude predmetom nasledujúcej podkapitoly.
+Tieto marginálne rozdelenia slúžia ako základ pre rozklad združeného rozdelenia pomocou kopúl, ktorému sa budeme venovať v samostatnej podkapitole.
 
 \begin{figure}[H]
     \centering
@@ -243,9 +263,9 @@ Z definície o podmienenej pravdepodobnosti vyplýva:
 \mathrm{Pr}(a \leq X_2 \leq b \mid X_1 = x_1) = \int_a^b f_{2 \mid 1}(x_2 \mid x_1) \, dx_2.
 \end{equation}
 
-Podmienenú hustotu tu taktiež možno intuitívne interpretovať ako hustotu v rámci tenkého vertikálneho pásu, kde náhodná premenná $X_1$ nadobúda hodnoty z intervalu $[x, x + \varepsilon]$ (Obr.~\ref{fig:cond_density_strip}). V tomto pásme vyberieme všetky body, ktoré spadajú do intervalu $[x, x + \varepsilon]$, a z nich vytvoríme histogram hodnôt premennej $X_2$, čím získame empirický odhad hustoty $f_{2 \mid 1}(x_2 \mid X_1 = x)$.
+Podmienenú hustotu $f_{2 \mid 1}(x_2 \mid x_1)$ tu taktiež možno intuitívne interpretovať ako hustotu v rámci tenkého vertikálneho pásu, kde náhodná premenná $X_1$ nadobúda hodnoty z intervalu $[x, x + \varepsilon]$ (Obr.~\ref{fig:cond_density_strip}). V tomto pásme vyberieme všetky body, ktoré spadajú do daného intervalu a z nich vytvoríme histogram hodnôt premennej $X_2$, čím získame empirický odhad hustoty $f_{2 \mid 1}(x_2 \mid x \leq X_1 \leq x +\epsilon)$.
 
-Tento postup je znázornený na nasledujúcom obrázku:
+Pre lepšiu predstavu je tento postup znázornený na nasledujúcom obrázku:
 
 \begin{figure}[H]
     \centering
@@ -256,7 +276,74 @@ Tento postup je znázornený na nasledujúcom obrázku:
 
 Týmto sme zaviedli pojem podmienenej hustoty, ktorý bude ďalej kľúčový pri výpočte tzv. \textit{podmienenej strednej hodnoty}.
 
-\subsubsection{Podmienená stredná hodnota}\label{subsubsec:conditional_mean}
+\subsubsection{Stredná hodnota}\label{subsubsec:conditional_mean}
+
+Vo všeobecnosti podmienená stredná hodnota vyjadruje očakávanú hodnotu jednej náhodnej premennej vzhľadom na známu hodnotu inej premennej.
+
+Pre diskrétne náhodné premenné $X$ a $Y$ je podmienená stredná hodnota premennej $Y$ vzhľadom na to, že $X = x$, definovaná ako:
+
+\begin{equation}
+\mu_{Y|X} = \mathbb{E}[Y|X = x] = \sum_{y} y \cdot \mathrm{Pr}(Y = y \mid X = x)
+\end{equation}
+
+Analogicky, ak ide o spojité premenné, tak platí:
+
+\begin{equation}
+\mu_{Y|X} = \mathbb{E}[Y|X = x] = \int_{-\infty}^{\infty} y \cdot f_{Y|X}(y \mid x) \, dy
+\end{equation}
+
+kde $f_{Y|X}(y \mid x)$, ako už vieme z predošlej podkapitoly, je v tomto prípade podmienená hustota pravdepodobnosti náhodnej premennej $Y$ za predpokladu, že $X = x$.
+
+Podmienená stredná hodnota je teda funkciou známej hodnoty inej premennej a v kontexte regresného modelovania častokrát vystupuje ako regresná funkcia. Napríklad, funkcia $\mu_{Y|X}$ opisuje očakávaný výstup $Y$ vzhľadom na vstup $x$, čo presne zodpovedá určeniu deterministickej zložky regresného modelu.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{podm_stredna_hodnota.png}
+    \caption{Podmienená stredná hodnota pre premenné $Y=$ \textit{Dĺžka zobáka tučniaka} a $X=$ \textit{Hmotnosť tučniaka v gramoch} s vypočítanou hodnotou v $\mathbb{E}[Y \mid X=5000]$}
+    \label{fig:cond_mean}
+\end{figure}
+
+\subsubsection{Kvantilová funkcia}
+\label{subsubsec:conditional_quantile_function}
+
+Kvantilová regresia (\textit{Quantile Regression}, QR) umožňuje odhadovať \textit{kvantily podmieneného rozdelenia} odozvy vzhľadom na hodnoty prediktora. Na rozdiel od klasickej regresie, ktorá sa zameriava iba na strednú hodnotu $\mathbb{E}[Y \mid X = x]$, kvantilová regresia modeluje \textit{celú podmienenú distribúciu}.
+
+Pre daný kvantil $q \in (0,1)$ je \textit{podmienená kvantilová funkcia} definovaná ako:
+\begin{equation}
+Q_{Y \mid X}(q) := \inf \left\{ y \in \mathbb{R} \mid \Pr(Y \leq y \mid X = x) \geq q \right\}
+\end{equation}
+
+V prípade \textit{lineárnej kvantilovej regresie} sa predpokladá, že kvantilová funkcia má tvar:
+
+\begin{equation}
+Q_{Y \mid X}(q) = X^\top \beta_q
+\end{equation}
+
+kde $\beta_q$ je vektor parametrov pre daný kvantil $q$. Tento prístup umožňuje skúmať účinok kovariátov nielen na strednú hodnotu, ale aj na ľubovoľný kvantil podmieneného rozdelenia.
+
+Parametre $\beta_\tau$ sa odhadujú pomocou minimalizácie cieľovej funkcie založenej na tzv. \textit{"check function"}:
+
+\begin{equation}
+\hat{\beta}_q = \arg\min_{\beta \in \mathbb{R}^p} \sum_{i=1}^n \rho_q (y_i - x_i^\top \beta)
+\end{equation}
+kde $\rho_q(u)$ je definovaná ako:
+\begin{equation}
+\rho_q(u) = u(q - \mathbb{I}(u < 0))
+\end{equation}
+
+\textbf{Výhody kvantilovej regresie:}
+\begin{itemize}
+  \item Zachytáva \textit{heteroskedasticitu}, teda zmenu variability odozvy vzhľadom na hodnoty kovariátov.
+  \item Poskytuje detailnejší obraz o štruktúre dát — napríklad rôzne účinky kovariátov v nízkych a vysokých kvantiloch.
+  \item Je robustná voči odľahlým hodnotám, obzvlášť pri odhadoch mediánu ($q = 0{,}5$).
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{cond_quant_func.png}
+    \caption{Podmienené kvantilové funkcie $Q_{Y \mid X}(0.05)$, $Q_{Y \mid X}(0.95)$ a stredná hodnota $\mathbb{E}[Y \mid X]$ pre premenné $Y=$ \textit{Dĺžka zobáka tučniaka} a $X=$ \textit{Hmotnosť tučniaka v gramoch} s vypočítanou hodnotou v $X=5000$}
+    \label{fig:cond_quant_mean}
+\end{figure}
 
 \section{Rozklad}\label{sec:rozklad_kopule}
 \section{Odhad}\label{sec:odhad}
