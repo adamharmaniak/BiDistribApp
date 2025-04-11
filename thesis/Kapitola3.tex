@@ -274,7 +274,14 @@ Pre lepšiu predstavu je tento postup znázornený na nasledujúcom obrázku:
     \label{fig:cond_density_strip}
 \end{figure}
 
-Týmto sme zaviedli pojem podmienenej hustoty, ktorý bude ďalej kľúčový pri výpočte tzv. \textit{podmienenej strednej hodnoty}.
+Týmto sme zaviedli pojem podmienenej hustoty, ktorý bude ďalej kľúčový pri výpočte tzv. \textit{podmienenej strednej hodnoty}. Na ďalšom obrázku môžeme vidieť príklad vizualizácie podmienených hustôt pre spojitú odozvu a prediktor.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{cond_normal_densities.png}
+    \caption{Podmienené hustoty pre premenné (Odozva) $Y=$ \textit{Dĺžka zobáka tučniaka} a (Prediktor) $X=$ \textit{Hmotnosť tučniaka v gramoch} (parametrický prístup: \textit{normálne rozdelenie}, kap.~\ref{subsubsec:parametric_models})}
+    \label{fig:cond_normal_densities}
+\end{figure}
 
 \subsubsection{Stredná hodnota}\label{subsubsec:conditional_mean}
 
@@ -299,7 +306,7 @@ Podmienená stredná hodnota je teda funkciou známej hodnoty inej premennej a v
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.8\linewidth]{podm_stredna_hodnota.png}
-    \caption{Podmienená stredná hodnota pre premenné $Y=$ \textit{Dĺžka zobáka tučniaka} a $X=$ \textit{Hmotnosť tučniaka v gramoch} s vypočítanou hodnotou v $\mathbb{E}[Y \mid X=5000]$}
+    \caption{Podmienená stredná hodnota pre premenné (Odozva) $Y=$ \textit{Dĺžka zobáka tučniaka} a (Prediktor) $X=$ \textit{Hmotnosť tučniaka v gramoch} s vypočítanou hodnotou v $\mathbb{E}[Y \mid X=5000]$}
     \label{fig:cond_mean}
 \end{figure}
 
@@ -321,7 +328,7 @@ Q_{Y \mid X}(q) = X^\top \beta_q
 
 kde $\beta_q$ je vektor parametrov pre daný kvantil $q$. Tento prístup umožňuje skúmať účinok kovariátov nielen na strednú hodnotu, ale aj na ľubovoľný kvantil podmieneného rozdelenia.
 
-Parametre $\beta_\tau$ sa odhadujú pomocou minimalizácie cieľovej funkcie založenej na tzv. \textit{"check function"}:
+Parametre $\beta_q$ sa odhadujú pomocou minimalizácie cieľovej funkcie:
 
 \begin{equation}
 \hat{\beta}_q = \arg\min_{\beta \in \mathbb{R}^p} \sum_{i=1}^n \rho_q (y_i - x_i^\top \beta)
@@ -335,8 +342,10 @@ kde $\rho_q(u)$ je definovaná ako:
 \begin{itemize}
   \item Zachytáva \textit{heteroskedasticitu}, teda zmenu variability odozvy vzhľadom na hodnoty kovariátov.
   \item Poskytuje detailnejší obraz o štruktúre dát — napríklad rôzne účinky kovariátov v nízkych a vysokých kvantiloch.
-  \item Je robustná voči odľahlým hodnotám, obzvlášť pri odhadoch mediánu ($q = 0{,}5$).
+  \item Je robustná voči odľahlým hodnotám.
 \end{itemize}
+
+Na nasledujúcom obrázku môžeme pozorovať kvantilové funkcie pre vybrané kvantily vo vzťahu k strednej hodnote.
 
 \begin{figure}[H]
     \centering
