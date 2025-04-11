@@ -356,7 +356,7 @@ Na nasledujúcom obrázku môžeme pozorovať kvantilové funkcie pre vybrané k
 
 \section{Rozklad}\label{sec:rozklad_kopule}
 
-Modelovanie viacrozmerného náhodného vektora nie je vždy efektívne, ak sa snažíme zachytiť spoločné správanie jeho zložiek prostredníctvom jednej združenej distribučnej funkcie (CDF). Tento prístup totiž neumožňuje samostatne modelovať štruktúru závislostí a vlastností jednotlivých premenných.
+Modelovanie viacrozmerného náhodného vektora nie je vždy efektívne, ak sa snažíme zachytiť spoločné správanie jeho zložiek prostredníctvom jednej združenej distribučnej funkcie (CDF). Tento prístup totiž neumožňuje samostatne modelovať štruktúru závislosti a vlastností jednotlivých premenných.
 
 Vhodnou alternatívou tu je preto rozklad združeného rozdelenia pravdepodobnosti na dve zložky:
 \begin{itemize}
@@ -366,13 +366,13 @@ Vhodnou alternatívou tu je preto rozklad združeného rozdelenia pravdepodobnos
 
 Tento prístup formuluje tzv. \textit{Sklarova veta}, ktorá v dvojrozmernom prípade pre každú spojitú distribučnú funkciu $F(x_1, x_2)$ zabezpečuje existenciu unikátnej kopuly $C$, pre ktorú platí:
 
-\begin{equation}
+\begin{equation}\label{eq:copula_dist}
 F(x_1, x_2) = C\left(F_1(x_1), F_2(x_2)\right)
 \end{equation}
 
 Pre funkciu hustoty dostávame nasledovný rozklad:
 
-\begin{equation}
+\begin{equation}\label{eq:copula_density}
 f(x_1, x_2) = c\left(F_1(x_1), F_2(x_2)\right) \cdot f_1(x_1) f_2(x_2)
 \end{equation}
 
@@ -408,8 +408,158 @@ Tento princíp je ilustrovaný na nasledujúcom obrázku:
 
 Výhoda tohto prístupu spočíva v tom, že umožňuje flexibilne kombinovať rôzne marginálne rozdelenia s rôznymi typmi závislostí a výrazne zjednodušuje modelovanie a výpočet podmienených rozdelení, čo je užitočné pri predikcii, rôznych simuláciách a v aplikáciách akou je napríklad kvantilová regresia.
 
-\subsection{Kopule}\label{subsec:kopule}
+\subsection{Kopule}
+\label{subsec:copulas}
 
+Kopula je matematická funkcia, ktorá umožňuje oddeliť modelovanie marginálnych rozdelení od modelovania závislosti medzi náhodnými premennými (pozri~\ref{eq:copula_dist} a ~\ref{eq:copula_density}).
 
+\subsubsection{Vlastnosti}
+
+Každá kopula $C: [0,1]^p \to [0,1]$ musí spĺňať nasledovné vlastnosti:
+
+\begin{itemize}
+  \item Hraničné podmienky: $C(u_1, \dots, u_i = 0, \dots, u_p) = 0$ pre ľubovoľné $i$.
+  \item Identita: $C(1, \dots, 1, u_i, 1, \dots, 1) = u_i$.
+  \item $p$-rastúca: pre $p=2$ platí:
+  \begin{equation}
+    C(v_1, v_2) - C(v_1, u_2) - C(u_1, v_2) + C(u_1, u_2) \geq 0, \quad \text{ak } u_i \leq v_i.
+  \end{equation}
+\end{itemize}
+
+\subsubsection{Špeciálne prípady}
+
+\begin{itemize}
+  \item \textit{Kopula nezávislosti} (produktová):
+  \begin{equation}
+  \Pi(u_1, \dots, u_p) = u_1 \cdot \dots \cdot u_p.
+  \end{equation}
+  \item \textit{Kopula úplnej závislosti}:
+  \begin{equation}
+  M(u_1, \dots, u_p) = \min(u_1, \dots, u_p).
+  \end{equation}
+  \item \textit{Kopula úplnej negatívnej závislosti (iba pre $p=2$)}:
+  \begin{equation}
+  W(u_1, u_2) = \max(0, u_1 + u_2 - 1).
+  \end{equation}
+\end{itemize}
+
+Pre dvojrozmerný prípad platí ohraničenie kopuly:
+\[
+W(u_1, u_2) \leq C(u_1, u_2) \leq M(u_1, u_2).
+\]
+
+\subsubsection{Využitie modelu závislosti}
+
+Kopula predstavuje štruktúru závislosti v združenom modeli. Umožňuje napríklad výpočet:
+
+\begin{itemize}
+  \item Spoločnej pravdepodobnosti: $\Pr(U_1 \leq u_1,\, U_2 \leq u_2) = C(u_1, u_2)$,
+  \item Pravdepodobnosti prekročenia: $\Pr(U_1 > u_1 \vee U_2 > u_2) = 1 - C(u_1, u_2)$,
+  \item Podmienených pravdepodobností:
+  \[
+  \Pr(U_1 \leq u_1 \mid U_2 = u_2) = \frac{\partial C(u_1, u_2)}{\partial u_2}.
+  \]
+\end{itemize}
+
+\subsubsection{Parametrické triedy}\label{subsubsec:parametric_copula}
+
+\begin{itemize}
+  \item \textit{Eliptické kopuly} – napr. Gaussova, t-kopula: modelujú lineárnu závislosť a sú konštruované cez štandardizáciu marginálií eliptických rozdelení:
+  
+  \begin{equation}
+    C_{\Phi}(u_1, \dots, u_p) = \Phi\left( \Phi_1^{-1}(u_1), \dots, \Phi_p^{-1}(u_p) \right)
+  \end{equation}
+
+  \item \textit{Archimedovské kopuly} – napr. Gumbelova, Claytonova, Frankova: jednoduché konštrukcie pomocou generátora $f:[0,1] \to [0,\infty)$:
+
+  \begin{equation}
+  C(u_1, \dots, u_p) = f^{-1}\left( f(u_1) + \dots + f(u_p) \right)
+  \end{equation}
+
+  \item \textit{Extreme-value kopuly} – napr. Gumbelova: vhodné pre modelovanie maximálnych javov (napr. povodne). Generované pomocou \textit{dependence function} $\ell : [0, \infty)^p \rightarrow [0, \infty)$:
+
+  \begin{equation}
+  C(u_1, \dots, u_p) = \exp\left(-\ell(-\log u_1, \dots, -\log u_p)\right)
+  \end{equation}
+  
+\end{itemize}
+
+Pre porovnanie jednotlivých typov kopúl sme si spravili nasledujúce simulácie.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\linewidth]{parametric_copulas.png}
+    \caption{Simulácie náhodných výberov}
+    \label{fig:parametric_copulas}
+\end{figure}
+
+\subsubsection{Neparametrické triedy}\label{subsubsec:nonparametric_copula}
+
+\textit{Empirická kopula} je neparametrický odhad kopuly vytvorený priamo z dát bez predpokladu konkrétneho modelu (žiadna Gumbel, Clayton ani t-distribúcia).
+
+Je definovaná ako:
+
+\begin{equation}
+C_n(u, v) = \frac{1}{n} \sum_{i=1}^{n} \mathbf{1}\left( \hat{U}^{(i)} \leq u,\ \hat{V}^{(i)} \leq v \right)
+\end{equation}
+
+kde $\left(\hat{U}^{(i)}, \hat{V}^{(i)}\right)$ sú \textit{pseudo-observácie}, teda transformované dáta pomocou empirických distribučných funkcií (ECDF) na interval $[0,1]$.
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}[t]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{nonparametric_copula.png}
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{nonparametric_copula_dens.png}
+    \end{minipage}
+    \caption{Empirická kopula: Simulácia náhodného výberu + hustota pravdepodobnosti (marginálie: jadrové vyhladzovanie, ~\ref{textbf:kernel_smoothing})}
+    \label{fig:empcopula}
+\end{figure}
 
 \section{Odhad}\label{sec:odhad}
+
+V predchádzajúcich častiach sme sa venovali teoretickému rámcu združených rozdelení pravdepodobnosti a ich dekompozícii pomocou marginálnych rozdelení a kopúl. V tejto časti sa zameriame na praktický aspekt — teda ako možno parametre týchto modelov odhadnúť zo vzorky dát, pričom sa opäť obmedzíme na dvojrozmerné prípady. Predpokladáme, že rozdelenie náhodného vektora $\vec{X} = (X_1, X_2)$ patrí do známej parametrickej triedy rozdelení s parametrami $\theta \in \Theta$.
+
+Na tento účel sa najčastejšie používajú tri základné prístupy:
+
+\subsection{Metóda momentov}\label{subsection:moments_method}
+
+Metóda momentov vychádza z priameho vzťahu medzi teoretickými momentami rozdelenia a jeho parametrami. Tieto momenty sa nahradia empirickými momentami (z výberu) a výsledný súbor rovníc sa vyrieši vzhľadom na neznáme parametre.
+
+Táto metóda má výhodu v jednoduchej implementácii a nízkych výpočtových nárokoch. Na druhej strane, nie vždy existuje jednoznačný alebo analytický vzťah medzi momentami a parametrami, čo obmedzuje jej použiteľnosť. Navyše, výsledné odhady nemajú vo všeobecnosti optimálne vlastnosti ako napríklad minimálnu varianciu.
+
+\subsection{Metóda maximálnej vierohodnosti (Maximum Likelihood, ML)}\label{subsection:max_likelihood}
+
+Tento prístup odhaduje parametre $\theta$ maximalizáciou logaritmickej vierohodnostnej funkcie, ktorá vyjadruje pravdepodobnosť výskytu pozorovanej vzorky vzhľadom na daný model. Formálne:
+
+\begin{equation}
+\hat{\theta} = \arg\max_{\theta \in \Theta} \frac{1}{n} \sum_{i=1}^{n} \ln f(X_{i1}, X_{i2} \mid \theta)
+\end{equation}
+
+Metóda maximálnej vierohodnosti vedie k odhadom, ktoré sú:
+\begin{itemize}
+  \item \textit{konzistentné} – konvergujú v pravdepodobnosti ku skutočnej hodnote parametra pre $n \to \infty$,
+  \item \textit{nevychýlené (angl. unbiased)} – v priemere odhadujú pravú hodnotu,
+  \item \textit{efektívne} – majú najmenší možný rozptyl,
+  \item \textit{asymptoticky normálne rozdelené}.
+\end{itemize}
+
+Nevýhodou tejto metódy je jej vyššia výpočtová náročnosť, závislosť od počiatočných hodnôt a možná vychýlenosť pri malých výberoch.
+
+\subsection{Metóda najmenších štvorcov}\label{subsec:least_squares}
+
+Táto metóda vychádza z minimalizácie vzdialenosti medzi teoretickou distribučnou funkciou modelu a jej empirickým odhadom. Napríklad vo forme:
+
+\begin{equation}
+\hat{\theta} = \arg\min_{\theta \in \Theta} \sum_{i=1}^{n} \left( F(X_{i1}, X_{i2} \mid \theta) - \hat{F}_n(X_{i1}, X_{i2}) \right)^2
+\end{equation}
+
+Metóda najmenších štvorcov je univerzálnejšia a často sa používa tam, kde nie je možné jednoducho odvodiť vierohodnostnú funkciu. Napriek tomu však nemusí poskytovať také dobré vlastnosti odhadov ako ML.
+
+\vspace{1em}
+
+Každý z vyššie uvedených prístupov má svoje opodstatnenie a vhodnosť ich použitia závisí od typu rozdelenia, počtu pozorovaní a účelu analýzy.
