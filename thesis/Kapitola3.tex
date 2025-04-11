@@ -355,4 +355,61 @@ Na nasledujúcom obrázku môžeme pozorovať kvantilové funkcie pre vybrané k
 \end{figure}
 
 \section{Rozklad}\label{sec:rozklad_kopule}
+
+Modelovanie viacrozmerného náhodného vektora nie je vždy efektívne, ak sa snažíme zachytiť spoločné správanie jeho zložiek prostredníctvom jednej združenej distribučnej funkcie (CDF). Tento prístup totiž neumožňuje samostatne modelovať štruktúru závislostí a vlastností jednotlivých premenných.
+
+Vhodnou alternatívou tu je preto rozklad združeného rozdelenia pravdepodobnosti na dve zložky:
+\begin{itemize}
+  \item \textit{marginálne rozdelenia} jednotlivých komponentov náhodného vektora,
+  \item \textit{kopulu} – funkciu, ktorá tieto marginály spája do jedného celku a zachytáva ich vzájomnú závislosť.
+\end{itemize}
+
+Tento prístup formuluje tzv. \textit{Sklarova veta}, ktorá v dvojrozmernom prípade pre každú spojitú distribučnú funkciu $F(x_1, x_2)$ zabezpečuje existenciu unikátnej kopuly $C$, pre ktorú platí:
+
+\begin{equation}
+F(x_1, x_2) = C\left(F_1(x_1), F_2(x_2)\right)
+\end{equation}
+
+Pre funkciu hustoty dostávame nasledovný rozklad:
+
+\begin{equation}
+f(x_1, x_2) = c\left(F_1(x_1), F_2(x_2)\right) \cdot f_1(x_1) f_2(x_2)
+\end{equation}
+
+kde $f_1(x_1)$ a $f_2(x_2)$ sú \textit{marginálne hustoty} a $c(u_1, u_2)$ je hustota kopuly.
+
+Tento rozklad nám umožňuje samostatne modelovať:
+\begin{itemize}
+  \item \textit{tvar individuálnych rozdelení} (napr. normálne, log-normálne, gama, atď.),
+  \item \textit{závislosť medzi premennými} prostredníctvom voľby vhodnej kopuly (napr. Gaussova, t-kopula, Claytonova, Gumbelova, atď.).
+\end{itemize}
+
+Pre zjednodušenie sa častokrát používajú transformácie do tzv. \textit{uniformného priestoru}, pričom každá náhodná premenná $X_i$ sa nahradí svojou distribučnou funkciou $U_i = F_i(X_i)$, čím vznikne nový vektor $(U_1, U_2)$, ktorého všetky komponenty sú rovnomerne rozdelené na intervale $[0,1]$.
+
+Tento princíp je ilustrovaný na nasledujúcom obrázku:
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{0.45\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{dist_transform_pred.png}
+    \end{minipage}
+    \begin{minipage}{0.05\linewidth}
+        \centering
+        \Huge$\Rightarrow$
+    \end{minipage}
+    \begin{minipage}{0.45\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{SK_verzia_praca/figures/dist_transform_po.png}
+    \end{minipage}
+    \caption{Rozklad združeného rozdelenia: pôvodné hodnoty $(x, y)$ s rôznymi marginálami (vľavo) sú transformované cez $F_1$, $F_2$ na $(u,v)$ (vpravo), ktoré majú rovnomerné rozdelenie na $[0,1]$. Spoločná závislosť sa prenáša do tvaru kopuly.}
+    \label{fig:sklar_transform}
+\end{figure}
+
+Výhoda tohto prístupu spočíva v tom, že umožňuje flexibilne kombinovať rôzne marginálne rozdelenia s rôznymi typmi závislostí a výrazne zjednodušuje modelovanie a výpočet podmienených rozdelení, čo je užitočné pri predikcii, rôznych simuláciách a v aplikáciách akou je napríklad kvantilová regresia.
+
+\subsection{Kopule}\label{subsec:kopule}
+
+
+
 \section{Odhad}\label{sec:odhad}
