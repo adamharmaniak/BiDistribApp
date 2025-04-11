@@ -166,7 +166,7 @@ server <- function(input, output, session) {
         conditionalPanel(
           condition = "input.data_mode == 'builtin'",
           selectInput("builtin_dataset", "Choose dataset:",
-                      choices = c("mtcars", "iris", "ToothGrowth"))
+                      choices = c("mtcars", "iris", "ToothGrowth","faithful"))
         ),
         
         conditionalPanel(
@@ -625,7 +625,15 @@ server <- function(input, output, session) {
               })
               rendered_outputs <- append(rendered_outputs, list(plotlyOutput("model_outputs_plot3d")))
             } else {
-              output$model_outputs_plot3d <- renderPlotly({ result3D$plot })
+              output$model_outputs_plot3d <- renderPlotly({
+                if ("plotly" %in% class(result3D)) {
+                  result3D
+                } else if (is.list(result3D) && "plot" %in% names(result3D)) {
+                  result3D$plot
+                } else {
+                  NULL
+                }
+              })
               rendered_outputs <- append(rendered_outputs, list(plotlyOutput("model_outputs_plot3d")))
             }
           }

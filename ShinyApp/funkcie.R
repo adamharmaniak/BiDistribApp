@@ -800,6 +800,7 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
       fig_3d <- plot_ly(
         x = ~x_vals, y = ~y_vals, z = ~z_matrix,
         type = "surface",
+        opacity = 0.7,
         colors = colorRamp(c("blue", "cyan", "yellow", "red"))
       ) %>% layout(
         title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], paste0(" (KDE + ", copula_type, " kopula)")),
@@ -810,7 +811,12 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
         )
       )
       
-      return(fig_3d)
+      return(list(
+        plot = fig_3d,
+        x_vals = x_vals,
+        y_vals = y_vals,
+        z_matrix = z_matrix
+      ))
       
     } else if (plot_type == "2D") {
       # 2D Vizualizacia
@@ -915,6 +921,7 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
       fig_3d <- plot_ly(
         x = ~x_vals, y = ~y_vals, z = ~z_matrix,
         type = "surface",
+        opacity = 0.7,
         colors = colorRamp(c("blue", "cyan", "yellow", "red"))
       ) %>% layout(
         title = paste0("Združená hustota ", continuous_vars[1], " a ", continuous_vars[2], " (dnorm + ", copula_type, " kopula)"),
@@ -925,7 +932,12 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
         )
       )
       
-      return(fig_3d)
+      return(list(
+        plot = fig_3d,
+        x_vals = x_vals,
+        y_vals = y_vals,
+        z_matrix = z_matrix
+      ))
       
     } else if (plot_type == "2D") {
       # 2D Vizualizacia
@@ -1027,6 +1039,7 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
       fig_3d <- plot_ly(
         x = ~x_vals, y = ~y_vals, z = ~z_matrix,
         type = "surface",
+        opacity = 0.7,
         colors = colorRamp(c("blue", "cyan", "yellow", "red"))
       ) %>% layout(
         title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], paste0("(t-rozdelenie + ", copula_type, " kopula)")),
@@ -1037,7 +1050,12 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
         )
       )
       
-      return(fig_3d)
+      return(list(
+        plot = fig_3d,
+        x_vals = x_vals,
+        y_vals = y_vals,
+        z_matrix = z_matrix
+      ))
       
     } else if (plot_type == "2D") {
       # 2D Vizualizacia
@@ -1085,9 +1103,8 @@ discrete_joint_distribution <- function(data, discrete_vars, plot_type, abort_si
   tab <- as.data.frame(table(data[, discrete_vars]))
   tab$Probability <- tab$Freq / sum(tab$Freq)
   
-  tab[[discrete_vars[1]]] <- as.numeric(as.character(tab[[discrete_vars[1]]]))
-  tab[[discrete_vars[2]]] <- as.numeric(as.character(tab[[discrete_vars[2]]]))
-  
+  tab[[discrete_vars[1]]] <- as.numeric(as.factor(tab[[discrete_vars[1]]]))
+  tab[[discrete_vars[2]]] <- as.numeric(as.factor(tab[[discrete_vars[2]]]))
   
   if (plot_type == "2D") {
     marginal_x <- tab %>%
@@ -1193,7 +1210,7 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
           stop("Nebol zadany typ grafu na vykreslenie.")
         }
         result <- continuous_joint_distribution_copula(data, continuous_vars, model_type, copula_type, marginal_densities, plot_type, abort_signal)
-        print(result)
+        return(result)
       }
     }
   } else if (length(selected_variables) == 2 && length(discrete_vars) == 1) {
@@ -1257,7 +1274,7 @@ model_conditional_mean <- function(data, selected_variables, mean_method = "line
   
   # Vizualizácia
   p <- ggplot(data, aes_string(x = predictor_name, y = response_name)) +
-    geom_point(alpha = 0.4, color = "darkgreen") +
+    geom_point(alpha = 0.4, color = "orange") +
     geom_line(aes(x = x_seq, y = mean_pred), color = "blue", size = 1.2) +
     geom_point(aes(x = specific_x, y = specific_mean), color = "blue", size = 3) +
     annotate("text", x = specific_x, y = specific_mean,
@@ -1334,7 +1351,7 @@ model_conditional_quantiles <- function(data, selected_variables, quantile_metho
   
   # Vizualizacia
   p <- ggplot(data, aes_string(x = predictor_name, y = response_name)) +
-    geom_point(alpha = 0.4, color = "darkgreen") +
+    geom_point(alpha = 0.4, color = "orange") +
     labs(
       title = "Podmienené kvantilové funkcie",
       x = paste0(predictor_name, " (Prediktor)"),
@@ -1438,7 +1455,7 @@ combine_conditional_models <- function(data, selected_variables, mean_method = "
   )
   
   p <- ggplot(data, aes_string(x = predictor_name, y = response_name)) +
-    geom_point(alpha = 0.4, color = "darkgreen") +
+    geom_point(alpha = 0.4, color = "orange") +
     geom_line(data = mean_result$conditional_mean, aes(x = X, y = E_Y_given_X),
               color = "blue", size = 1.2, linetype = "solid") +
     geom_point(data = data.frame(specific_x = mean_result$specific_x, specific_mean = mean_result$specific_mean),
@@ -1740,9 +1757,9 @@ classification_model <- function(data, response_name, predictor_names, method = 
   
   if (!is.factor(response)) {
     unique_values <- length(unique(response))
-    if (is.numeric(response) && unique_values <= 10) {
+    if (unique_values <= 10) {
       message(paste("Odozva", response_name, "ma", unique_values, "unikatnych hodnot. Konverzia na faktor..."))
-      response <- as.factor(response)
+      response <- as.numeric(as.factor(response))
       data[[response_name]] <- response
     } else {
       stop(paste("Odozva", response_name, "nie je diskretna! Musi byt faktor alebo mat konecny pocet kategorii."))
