@@ -10,7 +10,7 @@ Na tento základ nadväzujú ďalšie kľúčové prístupy štatistického mode
 
 V tejto kapitole popíšeme základné úlohy a metódy štatistického modelovania so zameraním sa na tri hlavné oblasti: modelovanie jednorozmerného rozdelenia pravdepodobnosti, regresné a klasifikačné techniky. Najprv bude predstavený koncept rozdelenia pravdepodobnosti, jeho charakteristiky a spôsoby modelovania. Následne sa kapitola venuje regresii, jej rôznym variantom a metódam odhadu parametrov modelu. Napokon budú popísané aj klasifikačné metódy ako nástroje na rozpoznávanie vzorov a predikovanie správania sa kategoriálnych premenných. Cieľom tejto kapitoly je teda poskytnúť prehľad o troch hlavných konceptoch štatistického modelovania, ktoré zohrávajú kľúčovú úlohu v analýze dát a v aplikáciách, ako sú predikčné modely a z nich odvíjajúce sa automatizované rozhodovacie systémy.
 
-\section{Modelovanie jednorozmerného rozdelenia pravdepodobnosti}\label{sec:1D_modelovanie}
+\section{Jednorozmerné rozdelenie pravdepodobnosti}\label{sec:1D_modelovanie}
 
 Modelovanie jednorozmerného rozdelenia pravdepodobnosti je základným krokom v štatistickej analýze náhodných premenných. Slúži na opis správania sa jednej náhodnej veličiny, ktorej hodnoty môžu byť číselné alebo kategoriálne. Pravdepodobnostné rozdelenie poskytuje informácie o tom, s akou pravdepodobnosťou nadobúda náhodná premenná konkrétne hodnoty – tzv. realizácie.
 
@@ -22,8 +22,8 @@ X : \Omega \to E,
 
 kde:
 \begin{itemize}
-  \item $\Omega$ je tzv. \textbf{priestor elementárnych javov} (vzorkový priestor), ktorý reprezentuje množinu všetkých možných výsledkov náhodného experimentu,
-  \item $E$ je \textbf{merateľný priestor hodnôt}, ktorý závisí od typu premennej:
+  \item $\Omega$ je tzv. \textit{priestor elementárnych javov} (vzorkový priestor), ktorý reprezentuje množinu všetkých možných výsledkov náhodného experimentu,
+  \item $E$ je \textit{merateľný priestor hodnôt}, ktorý závisí od typu premennej:
   \begin{itemize}
     \item pre kvantitatívne premenné zvyčajne $E = \mathbb{R}$ (alebo podmnožina $\mathbb{R}$),
     \item pre kategoriálne premenné $E$ býva konečná alebo spočítateľná množina kategórií.
@@ -149,9 +149,9 @@ Inými slovami, kvantil $x_q$ je hodnota, ktorú náhodná premenná neprekroč�
 
 Špeciálne prípady kvantilov sú:
 \begin{itemize}
-  \item \textbf{Medián} ($q = 0{,}5$): rozdeľuje rozdelenie na dve rovnaké časti,
-  \item \textbf{Kvartily} ($q = 0{,}25$, $0{,}5$, $0{,}75$): rozdeľujú rozdelenie na štyri rovnaké časti,
-  \item \textbf{Percentily} ($q = \frac{p}{100}$, $p = 1, 2, \dots, 99$): rozdeľujú rozdelenie na 100 rovnakých častí.
+  \item \textit{Medián} ($q = 0{,}5$): rozdeľuje rozdelenie na dve rovnaké časti,
+  \item \textit{Kvartily} ($q = 0{,}25$, $0{,}5$, $0{,}75$): rozdeľujú rozdelenie na štyri rovnaké časti,
+  \item \textit{Percentily} ($q = \frac{p}{100}$, $p = 1, 2, \dots, 99$): rozdeľujú rozdelenie na 100 rovnakých častí.
 \end{itemize}
 
 Kvantil je mimoriadne užitočná charakteristika v prípadoch, keď je rozdelenie asymetrické alebo obsahuje odľahlé hodnoty.
@@ -161,8 +161,8 @@ Kvantil je mimoriadne užitočná charakteristika v prípadoch, keď je rozdelen
 Modus je bodová charakteristika, ktorá predstavuje najčastejšie sa vyskytujúcu hodnotu náhodnej premennej. Inými slovami, ide o hodnotu, ktorá má najväčšiu frekvenciu výskytu v pozorovaných dátach.
 
 \begin{itemize}
-  \item V \textbf{diskrétnom prípade} (napr. pri počtoch alebo kategóriách) je modus definovaný ako hodnota $x$, ktorá sa v súbore údajov vyskytuje najčastejšie.
-  \item V \textbf{spojitom prípade} (napr. pri meraniach) ide o hodnotu, pri ktorej hustota pravdepodobnosti $f(x)$ dosahuje svoje maximum.
+  \item V \textit{diskrétnom prípade} (napr. pri počtoch alebo kategóriách) je modus definovaný ako hodnota $x$, ktorá sa v súbore údajov vyskytuje najčastejšie.
+  \item V \textit{spojitom prípade} (napr. pri meraniach) ide o hodnotu, pri ktorej hustota pravdepodobnosti $f(x)$ dosahuje svoje maximum.
 \end{itemize}
 
 Na rozdiel od strednej hodnoty alebo mediánu môže byť modus:
@@ -210,9 +210,9 @@ Typickými príkladmi sú:
 
 Postup výstavby takéhoto parametrického modelu má spravidla dve základné fázy:
 \begin{enumerate}
-  \item \textbf{Identifikácia modelu} – výber vhodnej triedy rozdelení, ktorá vystihuje tvar a vlastnosti pozorovaných údajov (napr. symetria, šikmosť, variabilita). V tomto kroku je dobré vychádzať z výstupov grafických nástrojov ako je napríklad histogram alebo QQ-graf.
+  \item \textit{Identifikácia modelu} – výber vhodnej triedy rozdelení, ktorá vystihuje tvar a vlastnosti pozorovaných údajov (napr. symetria, šikmosť, variabilita). V tomto kroku je dobré vychádzať z výstupov grafických nástrojov ako je napríklad histogram alebo QQ-graf.
   
-  \item \textbf{Odhad parametrov} – po zvolení triedy rozdelení sa pomocou štatistických metód (napr. metóda momentov, metóda maximálnej vierohodnosti) odhadujú hodnoty parametrov tak, aby model čo najlepšie zodpovedal pozorovaným dátam.
+  \item \textit{Odhad parametrov} – po zvolení triedy rozdelení sa pomocou štatistických metód (napr. metóda momentov, metóda maximálnej vierohodnosti) odhadujú hodnoty parametrov tak, aby model čo najlepšie zodpovedal pozorovaným dátam.
 \end{enumerate}
 
 Tieto modely sú výhodné v situáciách, keď máme odôvodnené predpoklady o analytickom tvare rozdelenia alebo v prípadoch, keď máme k dispozícii len obmedzené množstvo pozorovaní – pretože zavedenie štrukturálnych predpokladov redukuje potrebu dát. To je v kontraste s neparametrickými modelmi, ktoré síce nevyžadujú špecifikáciu konkrétneho tvaru rozdelenia, ale na druhej strane potrebujú viac údajov a častokrát majú vyššie výpočtové nároky.
@@ -241,9 +241,9 @@ Rôzne typy regresných modelov sa líšia práve tým, aký konkrétny tvar má
 
 Podľa toho ako je vzťah medzi prediktormi a odozvou definovaný možno rozlišovať rôzne druhy regresných modelov, ako napríklad:
 \begin{itemize}
-  \item \textbf{Lineárna regresia}
-  \item \textbf{Všeobecná polynomiálna regresia n-tého stupňa}
-  \item \textbf{Exponenciálna regresia}
+  \item \textit{Lineárna regresia}
+  \item \textit{Všeobecná polynomiálna regresia n-tého stupňa}
+  \item \textit{Exponenciálna regresia}
 \end{itemize}
 
 V tejto podkapitole sa zameriame najmä na lineárny regresný model, jeho teoretické východiská, predpoklady, odhad parametrov pomocou metódy najmenších štvorcov, ako aj na praktické aspekty ako diagnostika modelu, interpretácia koeficientov a potenciálne problémy ako multikolinearita alebo výskyt odľahlých hodnôt. Na tento základ nadviažu v ďalších častiach aj nelineárne a generalizované regresné prístupy.
@@ -593,13 +593,13 @@ Tento predpoklad umožňuje výrazne zjednodušiť odhad hustoty $f_k(x)$ – ne
 \noindent
 Odhad hustôt $f_{kj}(x_j)$ závisí od typu prediktora:
 \begin{itemize}
-  \item Ak je $X_j$ \textbf{kvantitatívna premenná}, možno predpokladať:
+  \item Ak je $X_j$ \textit{kvantitatívna premenná}, možno predpokladať:
   \begin{itemize}
     \item normálne rozdelenie: $(X_j \mid Y = c_k) \sim \mathcal{N}(\mu_{kj}, \sigma^2_{kj})$, čím vzniká špeciálny prípad QDA s diagonálnymi kovariančnými maticami,
     \item iné spojité rozdelenie (napr. exponenciálne, uniformné),
     \item neparametrické odhady (napr. histogram alebo jadrový odhad hustoty).
   \end{itemize}
-  \item Ak je $X_j$ \textbf{kvalitatívna (kategoriálna premenná)}, hustotu $f_{kj}(x_j)$ možno odhadnúť ako relatívnu početnosť výskytov triedy $c_k$ pre danú hodnotu $x_j$.
+  \item Ak je $X_j$ \textit{kvalitatívna (kategoriálna) premenná}, hustotu $f_{kj}(x_j)$ možno odhadnúť ako relatívnu početnosť výskytov triedy $c_k$ pre danú hodnotu $x_j$.
 \end{itemize}
 
 \noindent
@@ -607,7 +607,7 @@ Aj napriek svojej zdanlivej jednoduchosti sa Naivný Bayesov klasifikátor ukáz
 
 \subsubsection{Vyhodnotenie presnosti klasifikačných modelov}
 
-Presnosť klasifikačných modelov je často hodnotená na základe \textbf{celkovej klasifikačnej chyby (error rate)}, ktorá predstavuje podiel nesprávne klasifikovaných prípadov:
+Presnosť klasifikačných modelov je často hodnotená na základe \textit{celkovej klasifikačnej chyby (error rate)}, ktorá predstavuje podiel nesprávne klasifikovaných prípadov:
 
 \begin{equation}
 ER = \frac{1}{n} \sum_{i=1}^{n} \mathbb{I}(\hat{y}_i \neq y_i),
