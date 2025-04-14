@@ -164,7 +164,7 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
   }
   
   # Modelovanie hustoty ako hustoty normalneho rozdelenia (dnorm)
-  if (model_type == "parametric") {
+  if (model_type == "normal") {
     
     # Konverzia diskretnej premennej na faktor a zoradenie kategorii
     data[[discrete_vars]] <- factor(data[[discrete_vars]])
@@ -530,7 +530,7 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
   }
   
   # Modelovanie zdruzenej hustoty ako hustoty normalneho rozdelenia
-  if (model_type == "parametric") {
+  if (model_type == "normal") {
     # Vypocet zakladnych parametrov (momentov)
     mean_x <- mean(data[[continuous_vars[1]]], na.rm = TRUE)
     sd_x <- sd(data[[continuous_vars[1]]], na.rm = TRUE)
@@ -740,8 +740,8 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
 continuous_joint_distribution_copula <- function(data, continuous_vars, model_type, copula_type, marginal_densities, plot_type, abort_signal) {
   if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
   
-  # Modelovanie hustoty pomocou jadroveho vyhladzovania a kopuly (rozklad na marginaly)
-  if (model_type == "kernel") {
+  # Modelovanie zdruzenej hustoty cez kopulovu funkciu a marginalne rozdelenie (vsetko neparametricke)
+  if (model_type == "nonparametric") {
     kde_x <- density(data[[continuous_vars[1]]], n = 512)
     kde_y <- density(data[[continuous_vars[2]]], n = 512)
     
@@ -758,30 +758,30 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     u1 <- kde_x_cdf(data[[continuous_vars[1]]])
     u2 <- kde_y_cdf(data[[continuous_vars[2]]])
     
-    empirical_data <- pobs(cbind(u1, u2))  # zoradenie do [0, 1]
+    empirical_data <- pobs(cbind(u1, u2))  # zoradenie do [0,1]
     
     if (copula_type == "empirical") {
       copula_model <- empCopula(empirical_data, smoothing = "beta")
+      copula_model_fitted <- copula_model
     } else {
-      stop("Zadaný 'copula_type' nie je podporovaný. Použi: 'empirical'.")
+      stop("Zadany 'copula_type' nie je podporovany. Pouzi: 'empirical'.")
     }
     
     if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
     
-    # Vytvorenie siete pre vypocet hustoty
+    # Vytvorenie gridu
     x_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
     y_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
-    
     grid <- expand.grid(x = x_vals, y = y_vals)
     
-    # Funkcia pre vypocet zdruzenej hustoty KDE + kopula
+    # Funkcia na vypocet zdruzenej hustoty
     copula_density_function <- function(x, y) {
       if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
+      
       u1 <- kde_x_cdf(x)
       u2 <- kde_y_cdf(y)
       
-      # Hustota kopuly v bode (u1, u2)
-      copula_density <- dCopula(cbind(u1, u2), copula = copula_model)
+      copula_density <- dCopula(cbind(u1, u2), copula = copula_model_fitted)
       
       marginal_x <- kde_x_density(x)
       marginal_y <- kde_y_density(y)
@@ -789,14 +789,12 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
       copula_density * marginal_x * marginal_y
     }
     
-    # Vypocet hustoty na sieti
     grid$z <- mapply(copula_density_function, grid$x, grid$y)
     z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
     
     if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
     
     if (plot_type == "3D") {
-      # 3D Vizualizacia
       fig_3d <- plot_ly(
         x = ~x_vals, y = ~y_vals, z = ~z_matrix,
         type = "surface",
@@ -819,12 +817,9 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
       ))
       
     } else if (plot_type == "2D") {
-      # 2D Vizualizacia
-      contour_df <- grid
-      
       scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
         geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
-        geom_contour(data = contour_df, aes(x = x, y = y, z = z), color = "black", size = 0.6) +
+        geom_contour(data = grid, aes(x = x, y = y, z = z), color = "black", size = 0.6) +
         labs(
           x = continuous_vars[1],
           y = continuous_vars[2],
@@ -854,7 +849,7 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     }
   }
   
-  # Modelovanie zdruzenej hustoty ako hustoty normalneho rozdelenia a pomocou kopuly (rozklad na marginaly)
+  # Modelovanie zdruzenej hustoty cez kopulovu funkciu a marginalne rozdelenie (vsetko parametricke)
   if (model_type == "parametric") {
     # Vypocet marginalnych parametrov
     mean_x <- mean(data[[continuous_vars[1]]], na.rm = TRUE)
@@ -862,9 +857,22 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     mean_y <- mean(data[[continuous_vars[2]]], na.rm = TRUE)
     sd_y <- sd(data[[continuous_vars[2]]], na.rm = TRUE)
     
+    marginal_cdf_function <- function(value, mean, sd, index) {
+      density_type <- marginal_densities[index]
+      
+      if (density_type == "dnorm" || density_type == "log_dnorm") {
+        return(pnorm(value, mean = mean, sd = sd))
+      } else if (density_type == "t") {
+        df <- max(nrow(data) - 1, 2)
+        return(pt((value - mean) / sd, df = df))
+      } else {
+        stop(paste("Neznáma hustota:", density_type))
+      }
+    }
+    
     # Vypocet hodnoty marginalnych rozdeleni pre vstup do kopuly
-    u1 <- pnorm(data[[continuous_vars[1]]], mean = mean_x, sd = sd_x)
-    u2 <- pnorm(data[[continuous_vars[2]]], mean = mean_y, sd = sd_y)
+    u1 <- marginal_cdf_function(data[[continuous_vars[1]]], mean_x, sd_x, 1)
+    u2 <- marginal_cdf_function(data[[continuous_vars[2]]], mean_y, sd_y, 2)
     
     if (copula_type == "Clayton") {
       copula_model <- claytonCopula(param = 2, dim = 2)
@@ -872,8 +880,10 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
       copula_model <- gumbelCopula(param = 2, dim = 2)
     } else if (copula_type == "Frank") {
       copula_model <- frankCopula(param = 5, dim = 2)
+    } else if (copula_type == "Joe") {
+      copula_model <- joeCopula(param = 2, dim = 2)
     } else {
-      stop("Zadaný 'copula_type' nie je podporovaný. Použi: 'Clayton', 'Gumbel', 'Frank'.")
+      stop("Zadaný 'copula_type' nie je podporovaný. Použi: 'Clayton', 'Gumbel', 'Frank', 'Joe'.")
     }
     
     # Fitovanie kopuly na marginálne transformované dáta
@@ -889,10 +899,14 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     # Funkcia na vypocet marginalnej hustoty podla vyberu
     marginal_density_function <- function(value, mean, sd, index) {
       density_type <- marginal_densities[index]
+      
       if (density_type == "dnorm") {
         return(dnorm(value, mean = mean, sd = sd))
       } else if (density_type == "log_dnorm") {
         return(exp(dnorm(value, mean = mean, sd = sd, log = TRUE)))
+      } else if (density_type == "t") {
+        df <- max(nrow(data) - 1, 2)
+        return(dt((value - mean) / sd, df = df) / sd)
       } else {
         stop(paste("Neznáma hustota:", density_type))
       }
@@ -900,8 +914,8 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     
     # Vypocet zdruzenej hustoty cez rozklad na marginaly + kopula
     copula_density_function <- function(x, y) {
-      u1 <- pnorm(x, mean = mean_x, sd = sd_x)
-      u2 <- pnorm(y, mean = mean_y, sd = sd_y)
+      u1 <- marginal_cdf_function(x, mean_x, sd_x, 1)
+      u2 <- marginal_cdf_function(y, mean_y, sd_y, 2)
       
       copula_part <- dCopula(cbind(u1, u2), copula = copula_model_fitted)
       
@@ -980,69 +994,105 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     }
   }
   
-  # Modelovanie zdruzenej hustoty ako hustoty Studentovho t-rozdelenia a pomocou kopuly (rozklad na marginaly)
-  if (model_type == "t") {
-    # Vypocet zakladnych parametrov marginalnych Studentovych t-rozdeleni
+  # Modelovanie zdruzenej hustoty cez kopulovu funkciu a marginalne rozdelenie (lubovolny vyber)
+  if (model_type == "hybrid") {
     mean_x <- mean(data[[continuous_vars[1]]], na.rm = TRUE)
     sd_x <- sd(data[[continuous_vars[1]]], na.rm = TRUE)
     mean_y <- mean(data[[continuous_vars[2]]], na.rm = TRUE)
     sd_y <- sd(data[[continuous_vars[2]]], na.rm = TRUE)
     
-    # Stupne volnosti marginal
-    df <- nrow(data) - 1
-    if (df < 2) df <- 2
-    
-    # Hodnoty marginalnych distribucnych funkcii
-    u1 <- pt((data[[continuous_vars[1]]] - mean_x) / sd_x, df = df)
-    u2 <- pt((data[[continuous_vars[2]]] - mean_y) / sd_y, df = df)
-    
-    if (copula_type == "Clayton") {
-      copula_model <- claytonCopula(param = 2, dim = 2)
-    } else if (copula_type == "Gumbel") {
-      copula_model <- gumbelCopula(param = 2, dim = 2)
-    } else if (copula_type == "Joe") {
-      copula_model <- joeCopula(param = 2, dim = 2)
-    } else {
-      stop("Zadaný 'copula_type' nie je podporovaný. Použi: 'Clayton', 'Gumbel', 'Joe'.")
+    # Marginalne distribucne funkcie podla vyberu
+    marginal_cdf_function <- function(value, mean, sd, index) {
+      density_type <- marginal_densities[index]
+      
+      if (density_type == "dnorm" || density_type == "log_dnorm") {
+        return(pnorm(value, mean = mean, sd = sd))
+      } else if (density_type == "t") {
+        df <- max(nrow(data) - 1, 2)
+        return(pt((value - mean) / sd, df = df))
+      } else if (density_type == "kde") {
+        dens <- density(data[[continuous_vars[index]]], n = 512)
+        dx <- dens$x
+        dy <- dens$y
+        cdf_vals <- cumsum(dy) / sum(dy)
+        approx_fun <- approxfun(dx, cdf_vals, rule = 2)
+        return(approx_fun(value))
+      } else {
+        stop(paste("Neznáma hustota:", density_type))
+      }
     }
     
-    # Fitovanie kopuly na marginalne transformovane data
-    copula_fit <- fitCopula(copula_model, pobs(cbind(u1, u2)), method = "ml")
-    copula_model_fitted <- copula_fit@copula
+    u1 <- marginal_cdf_function(data[[continuous_vars[1]]], mean_x, sd_x, 1)
+    u2 <- marginal_cdf_function(data[[continuous_vars[2]]], mean_y, sd_y, 2)
     
-    # Vytvorenie siete pre vypocet hustoty
+    # Kopula podla vyberu
+    if (copula_type == "empirical") {
+      copula_model_fitted <- empCopula(pobs(cbind(u1, u2)), smoothing = "beta")
+    } else if (copula_type == "Clayton") {
+      copula_model <- claytonCopula(param = 2, dim = 2)
+      copula_fit <- fitCopula(copula_model, pobs(cbind(u1, u2)), method = "ml")
+      copula_model_fitted <- copula_fit@copula
+    } else if (copula_type == "Gumbel") {
+      copula_model <- gumbelCopula(param = 2, dim = 2)
+      copula_fit <- fitCopula(copula_model, pobs(cbind(u1, u2)), method = "ml")
+      copula_model_fitted <- copula_fit@copula
+    } else if (copula_type == "Frank") {
+      copula_model <- frankCopula(param = 5, dim = 2)
+      copula_fit <- fitCopula(copula_model, pobs(cbind(u1, u2)), method = "ml")
+      copula_model_fitted <- copula_fit@copula
+    } else if (copula_type == "Joe") {
+      copula_model <- joeCopula(param = 2, dim = 2)
+      copula_fit <- fitCopula(copula_model, pobs(cbind(u1, u2)), method = "ml")
+      copula_model_fitted <- copula_fit@copula
+    } else {
+      stop("Neznámy typ kopuly.")
+    }
+    
+    # Funkcia na vypocet marginalnej hustoty
+    marginal_density_function <- function(value, mean, sd, index) {
+      density_type <- marginal_densities[index]
+      if (density_type == "dnorm") {
+        return(dnorm(value, mean = mean, sd = sd))
+      } else if (density_type == "log_dnorm") {
+        return(exp(dnorm(value, mean = mean, sd = sd, log = TRUE)))
+      } else if (density_type == "t") {
+        df <- max(nrow(data) - 1, 2)
+        return(dt((value - mean) / sd, df = df) / sd)
+      } else if (density_type == "kde") {
+        dens <- density(data[[continuous_vars[index]]], n = 512)
+        approx_fun <- approxfun(dens$x, dens$y, rule = 2)
+        return(approx_fun(value))
+      } else {
+        stop(paste("Neznáma hustota:", density_type))
+      }
+    }
+    
     x_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
     y_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
-    
     grid <- expand.grid(x = x_vals, y = y_vals)
     
-    # Funkcia pre vypocet zdruzenej hustoty
     copula_density_function <- function(x, y) {
-      u1 <- pt((x - mean_x) / sd_x, df = df)
-      u2 <- pt((y - mean_y) / sd_y, df = df)
+      u1 <- marginal_cdf_function(x, mean_x, sd_x, 1)
+      u2 <- marginal_cdf_function(y, mean_y, sd_y, 2)
       
       copula_part <- dCopula(cbind(u1, u2), copula = copula_model_fitted)
-      
-      marginal_x <- dt((x - mean_x) / sd_x, df = df) / sd_x
-      marginal_y <- dt((y - mean_y) / sd_y, df = df) / sd_y
+      marginal_x <- marginal_density_function(x, mean_x, sd_x, 1)
+      marginal_y <- marginal_density_function(y, mean_y, sd_y, 2)
       
       copula_part * marginal_x * marginal_y
     }
     
-    # Vypocet hustoty na sieti
     grid$z <- mapply(copula_density_function, grid$x, grid$y)
     z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
     
-    
     if (plot_type == "3D") {
-      # 3D Vizualizacia
       fig_3d <- plot_ly(
         x = ~x_vals, y = ~y_vals, z = ~z_matrix,
         type = "surface",
         opacity = 0.7,
         colors = colorRamp(c("blue", "cyan", "yellow", "red"))
       ) %>% layout(
-        title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], paste0("(t-rozdelenie + ", copula_type, " kopula)")),
+        title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(hybridné marginály +", copula_type, "kopula)"),
         scene = list(
           xaxis = list(title = continuous_vars[1]),
           yaxis = list(title = continuous_vars[2]),
@@ -1058,34 +1108,28 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
       ))
       
     } else if (plot_type == "2D") {
-      # 2D Vizualizacia
+      contour_df <- grid
       scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
         geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
-        geom_contour(
-          data = grid,
-          aes(x = x, y = y, z = z),
-          bins = 10,
-          color = "black",
-          size = 0.6
-        ) +
+        geom_contour(data = contour_df, aes(x = x, y = y, z = z), color = "black", size = 0.6) +
         labs(
           x = continuous_vars[1],
           y = continuous_vars[2],
-          title = paste("Scatter + vrstevnice (t-rozdelenie +", copula_type, "kopula)")
+          title = paste("Scatter + vrstevnice (hybrid +", copula_type, "kopula)")
         ) +
         scale_color_gradient(low = "blue", high = "red") +
         theme_minimal()
       
       density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
-        stat_function(fun = function(x) dt((x - mean_x) / sd_x, df = df) / sd_x, fill = "blue", geom = "area", alpha = 0.5) +
-        labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
+        geom_density(fill = "blue", alpha = 0.5) +
+        labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")")) +
         theme_minimal() +
         theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
       
       density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
-        stat_function(fun = function(y) dt((y - mean_y) / sd_y, df = df) / sd_y, fill = "red", geom = "area", alpha = 0.5) +
+        geom_density(fill = "red", alpha = 0.5) +
         coord_flip() +
-        labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
+        labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")")) +
         theme_minimal() +
         theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
       
@@ -1385,7 +1429,54 @@ model_conditional_quantiles <- function(data, selected_variables, quantile_metho
   ))
 }
 
-combine_conditional_models <- function(data, selected_variables, mean_method = "linear", quantile_method = "linear", poly_mean_degree = NULL, poly_quant_degree = NULL, quantiles = 0.5, specific_x = NULL) {
+model_discrete_predictor <- function(data, selected_variables, discrete_model_type = "lm") {
+  response_name <- selected_variables[1]
+  predictor_name <- selected_variables[2]
+  
+  response <- data[[response_name]]
+  predictor <- data[[predictor_name]]
+  
+  # Prevedieme na faktor a ulozime si jeho urovne
+  if (!is.factor(predictor)) {
+    predictor <- factor(predictor)
+  }
+  levels_pred <- levels(predictor)
+  
+  # Fit model
+  df <- data.frame(response = response, predictor = predictor)
+  names(df) <- c(response_name, predictor_name)
+  
+  if (!is.null(discrete_model_type) && discrete_model_type == "lm") {
+    fit <- lm(as.formula(paste(response_name, "~", predictor_name)), data = df)
+    r_squared <- summary(fit)$r.squared
+  } else if (!is.null(discrete_model_type) && discrete_model_type == "glm_log") {
+    fit <- glm(as.formula(paste(response_name, "~", predictor_name)),
+               data = df, family = gaussian(link = "log"))
+    r_squared <- 1 - fit$deviance / fit$null.deviance
+  } else {
+    stop("Neplatný model_type. Použi 'lm' alebo 'glm_log'.")
+  }
+  
+  # --- Boxplot ---
+  plot <- ggplot(df, aes(x = factor(!!as.name(predictor_name)), y = !!as.name(response_name))) +
+    geom_boxplot(outlier.shape = NA, fill = "gold", alpha = 0.4) +
+    stat_summary(fun = mean, geom = "point", color = "darkblue", size = 3) +
+    stat_summary(fun.data = mean_se, geom = "errorbar", color = "darkblue", width = 0.2) +
+    theme_minimal() +
+    labs(
+      title = paste0("Boxplot s odhadmi E[Y | X = kategória] (", discrete_model_type, ")"),
+      x = predictor_name,
+      y = response_name
+    )
+  
+  return(list(
+    model = fit,
+    r_squared = r_squared,
+    plot = plot
+  ))
+}
+
+combine_conditional_models <- function(data, selected_variables, mean_method = "linear", quantile_method = "linear", poly_mean_degree = NULL, poly_quant_degree = NULL, quantiles = 0.5, specific_x = NULL, discrete_model_type = "lm") {
   if (length(selected_variables) != 2) {
     stop("Zadavaju sa dve premenne: odozva a prediktor.")
   }
@@ -1393,19 +1484,19 @@ combine_conditional_models <- function(data, selected_variables, mean_method = "
   response_name <- selected_variables[1]
   predictor_name <- selected_variables[2]
   
-  if (mean_method == "poly" && is.null(poly_mean_degree)) {
+  if (!is.null(mean_method) && mean_method == "poly" && is.null(poly_mean_degree)) {
     stop("Pri mean_method = 'poly' je treba zadat aj poly_mean_degree.")
   }
   
-  if (!is.null(poly_mean_degree) && mean_method != "poly") {
+  if (!is.null(poly_mean_degree) && (is.null(mean_method) || mean_method != "poly")) {
     stop("poly_mean_degree sa pouziva iba pri mean_method = 'poly'.")
   }
   
-  if (quantile_method == "poly" && is.null(poly_quant_degree)) {
+  if (!is.null(quantile_method) && quantile_method == "poly" && is.null(poly_quant_degree)) {
     stop("Pri quantile_method = 'poly' je treba zadat poly_quant_degree.")
   }
   
-  if (!is.null(poly_quant_degree) && quantile_method != "poly") {
+  if (!is.null(poly_quant_degree) && (is.null(quantile_method) || quantile_method != "poly")) {
     stop("poly_quant_degree sa pouziva iba pri quantile_method = 'poly'.")
   }
   
@@ -1417,10 +1508,6 @@ combine_conditional_models <- function(data, selected_variables, mean_method = "
   
   if (!(predictor_name %in% colnames(data))) {
     stop(paste("Premenna", predictor_name, "nie je v datach."))
-  }
-  
-  if (!(predictor_name %in% variable_types$Spojite)) {
-    stop(paste("Prediktor", predictor_name, "musi byt spojita premenna."))
   }
   
   if (response_name %in% variable_types$Diskretne) {
@@ -1435,6 +1522,18 @@ combine_conditional_models <- function(data, selected_variables, mean_method = "
       message(paste("Premenna", response_name, "je character. Pretypovanie na cislo."))
       data[[response_name]] <- as.numeric(as.factor(data[[response_name]]))
     }
+  }
+  
+  if (predictor_name %in% variable_types$Diskretne) {
+    message(paste("Prediktor", predictor_name, "je diskretny – pouzitie model_discrete_predictor."))
+    
+    discrete_result <- model_discrete_predictor(data, selected_variables, discrete_model_type = discrete_model_type)
+    
+    return(list(
+      combined_plot = discrete_result$plot,
+      mean_result = list(model = discrete_result$model, r_squared = discrete_result$r_squared),
+      quantile_result = NULL
+    ))
   }
   
   mean_result <- model_conditional_mean(
@@ -1952,7 +2051,7 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
         x = x_max - emp_density$y * density_scaling,
         y = emp_density$x,
         section = unique(sub_df$section),
-        type = "empirical"
+        type = "non-parametric"
       )
       output[[length(output) + 1]] <- df_emp
     }
@@ -1970,7 +2069,7 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
         x = x_max - norm_density * density_scaling,
         y = xs,
         section = unique(sub_df$section),
-        type = "normal"
+        type = "parametric"
       )
       output[[length(output) + 1]] <- df_theo
     }

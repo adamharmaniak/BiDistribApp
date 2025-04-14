@@ -45,6 +45,19 @@ server <- function(input, output, session) {
     }
   })
   
+  output$regressionPredictorType <- renderText({
+    req(input$reg_predictor, loaded_data())
+    variable_types <- identify_variables(loaded_data())
+    if (input$reg_predictor %in% variable_types$Spojite) {
+      "continuous"
+    } else if (input$reg_predictor %in% variable_types$Diskretne) {
+      "discrete"
+    } else {
+      ""
+    }
+  })
+  outputOptions(output, "regressionPredictorType", suspendWhenHidden = FALSE)
+  
   observeEvent(input$cond_response, {
     req(loaded_data())
     var_types <- identify_variables(loaded_data())
@@ -144,8 +157,8 @@ server <- function(input, output, session) {
     
     choices <- switch(model_type,
                       "parametric" = c("Clayton", "Gumbel", "Frank"),
-                      "t" = c("Clayton", "Gumbel", "Joe"),
-                      "kernel" = c("empirical"),
+                      "hybrid" = c("Clayton", "Gumbel", "Joe", "empirical"),
+                      "nonparametric" = c("empirical"),
                       NULL
     )
     
@@ -192,15 +205,35 @@ server <- function(input, output, session) {
         ),
         
         conditionalPanel(
-          condition = "output.densityVarConfig == '2_spojite' || output.densityVarConfig == 'zmiesane'",
+          condition = "output.densityVarConfig == 'zmiesane'",
           selectInput(
             "density_model_type", "Select model type:",
-            choices = c("Parametric" = "parametric",
+            choices = c("Normal" = "normal",
                         "Student-t" = "t",
-                        "Kernel density" = "kernel"),
+                        "Kernel smoothing" = "kernel"),
             selected = isolate(input$density_model_type)
           )
         ),
+        
+        conditionalPanel(
+          condition = "output.densityVarConfig == '2_spojite'",
+          
+          radioButtons(
+            "use_copula", "Use copula:",
+            choices = c("No" = "false", "Yes" = "true"),
+            selected = isolate(input$use_copula)
+          ),
+          
+          conditionalPanel(
+            condition = "input.use_copula == 'false'",
+            selectInput(
+              "density_model_type", "Select model type:",
+              choices = c("Normal" = "normal",
+                          "Student-t" = "t",
+                          "Kernel smoothing" = "kernel"),
+              selected = isolate(input$density_model_type)
+            )
+          ),
         
         conditionalPanel(
           condition = "output.densityVarConfig == 'zmiesane' && input.density_model_type == 'kernel'",
@@ -217,30 +250,45 @@ server <- function(input, output, session) {
             )
           )
         ),
-        
-        conditionalPanel(
-          condition = "output.densityVarConfig == '2_spojite'",
-          radioButtons(
-            "use_copula", "Use copula:",
-            choices = c("No" = "false", "Yes" = "true"),
-            selected = isolate(input$use_copula)
-          ),
           
           conditionalPanel(
             condition = "input.use_copula == 'true'",
+            
+            selectInput(
+              "density_model_type", "Select model type:",
+              choices = c("Parametric" = "parametric",
+                          "Non-parametric" = "nonparametric",
+                          "Hybrid" = "hybrid"),
+              selected = isolate(input$density_model_type)
+            ),
+            
             uiOutput("copula_type_ui"),
             
             conditionalPanel(
               condition = "input.density_model_type == 'parametric'",
               selectInput(
-                "marginal_densities", "Marginal densities:",
-                choices = list(
-                  "log_dnorm & dnorm" = "log_dnorm, dnorm",
-                  "dnorm & log_dnorm" = "dnorm, log_dnorm",
-                  "dnorm & dnorm" = "dnorm, dnorm",
-                  "log_dnorm & log_dnorm" = "log_dnorm, log_dnorm"
-                ),
-                selected = isolate(input$marginal_densities)
+                "marginal_density_1", "Marginal density (X):",
+                choices = c("dnorm", "log_dnorm", "t"),
+                selected = isolate(input$marginal_density_1)
+              ),
+              selectInput(
+                "marginal_density_2", "Marginal density (Y):",
+                choices = c("dnorm", "log_dnorm", "t"),
+                selected = isolate(input$marginal_density_2)
+              )
+            ),
+            
+            conditionalPanel(
+              condition = "input.density_model_type == 'hybrid'",
+              selectInput(
+                "marginal_density_1", "Marginal density (X):",
+                choices = c("dnorm", "log_dnorm", "t", "kde"),
+                selected = isolate(input$marginal_density_1)
+              ),
+              selectInput(
+                "marginal_density_2", "Marginal density (Y):",
+                choices = c("dnorm", "log_dnorm", "t", "kde"),
+                selected = isolate(input$marginal_density_2)
               )
             )
           )
@@ -269,63 +317,82 @@ server <- function(input, output, session) {
       )
       
     } else if (tab == "regression") {
+      
       req(loaded_data())
       data <- loaded_data()
       var_names <- names(data)
       selected_response <- input$reg_response
       
-      # Vyber len spojite premenne (prediktory)
       variable_types <- identify_variables(data)
       continuous_vars <- variable_types$Spojite
+      discrete_vars <- variable_types$Diskretne
       
-      available_predictors <- if (!is.null(selected_response)) {
-        setdiff(continuous_vars, selected_response)
+      available_responses <- continuous_vars
+      
+      if (!is.null(selected_response)) {
+        available_predictors <- setdiff(c(continuous_vars, discrete_vars), selected_response)
       } else {
-        continuous_vars
+        available_predictors <- c(continuous_vars, discrete_vars)
       }
       
       tagList(
         h4("Regression Model Settings"),
         
         selectInput("reg_response", "Select response variable:",
-                    choices = var_names,
+                    choices = available_responses,
                     selected = isolate(input$reg_response)),
         
         selectInput("reg_predictor", "Select predictor variable:",
                     choices = available_predictors,
                     selected = isolate(input$reg_predictor)),
         
-        selectInput("mean_method", "Mean Type:",
-                    choices = c("linear", "poly", "exp", "loess", "gam", "spline"),
-                    selected = isolate(input$mean_method)),
+        conditionalPanel(
+          condition = "output.regressionPredictorType == 'continuous'",
+          tagList(
+            selectInput("mean_method", "Mean Type:",
+                        choices = c("linear", "poly", "exp", "loess", "gam", "spline"),
+                        selected = isolate(input$mean_method)),
+            
+            conditionalPanel(
+              condition = "input.mean_method == 'poly'",
+              numericInput("poly_mean_degree", "Polynomial degree for mean:",
+                           value = isolate(input$poly_mean_degree),
+                           min = 1, max = 4, step = 1)
+            ),
+            
+            selectInput("quantile_method", "Quantiles Type:",
+                        choices = c("linear", "poly", "spline"),
+                        selected = isolate(input$quantile_method)),
+            
+            conditionalPanel(
+              condition = "input.quantile_method == 'poly'",
+              numericInput("poly_quant_degree", "Polynomial degree for quantiles:",
+                           value = isolate(input$poly_quant_degree),
+                           min = 1, max = 4, step = 1)
+            ),
+            
+            h5("Quantiles:"),
+            uiOutput("quantiles_ui"),
+            div(
+              style = "margin-top: 10px;",
+              actionButton("add_quantile", "Add Quantile", width = "49%"),
+              actionButton("remove_quantile", "Delete Quantile", width = "49%")
+            ),
+            
+            uiOutput("specific_x_ui")
+          )
+        ),
         
         conditionalPanel(
-          condition = "input.mean_method == 'poly'",
-          numericInput("poly_mean_degree", "Polynomial degree for mean:",
-                       value = isolate(input$poly_mean_degree),
-                       min = 1, max = 4, step = 1)
+          condition = "output.regressionPredictorType == 'discrete'",
+          selectInput("discrete_model_type", "Model for discrete predictor:",
+                      choices = c(
+                        "Linear regression" = "lm",
+                        "GLM (log link)" = "glm_log"
+                      ),
+                      selected = isolate(input$discrete_model_type)
+                      )
         ),
-        
-        selectInput("quantile_method", "Quantiles Type:",
-                    choices = c("linear", "poly", "spline"),
-                    selected = isolate(input$quantile_method)),
-        
-        conditionalPanel(
-          condition = "input.quantile_method == 'poly'",
-          numericInput("poly_quant_degree", "Polynomial degree for quantiles:",
-                       value = isolate(input$poly_quant_degree),
-                       min = 1, max = 4, step = 1)
-        ),
-        
-        h5("Quantiles:"),
-        uiOutput("quantiles_ui"),
-        div(
-          style = "margin-top: 10px;",
-          actionButton("add_quantile", "Add Quantile", width = "49%"),
-          actionButton("remove_quantile", "Delete Quantile", width = "49%")
-        ),
-        
-        uiOutput("specific_x_ui"),
         
         div(
           style = "display: flex; gap: 10px;",
@@ -495,8 +562,8 @@ server <- function(input, output, session) {
     
     # Marginal densities
     marginal_densities <- NULL
-    if (use_copula && model_type == "parametric") {
-      marginal_densities <- strsplit(input$marginal_densities, ",\\s*")[[1]]
+    if (use_copula && (model_type == "parametric" || model_type == "hybrid")) {
+      marginal_densities <- c(input$marginal_density_1, input$marginal_density_2)
     }
     
     # Vymazanie predchadzajucich grafov a tabuliek
@@ -797,21 +864,40 @@ server <- function(input, output, session) {
     data <- loaded_data()
     selected_vars <- c(input$reg_response, input$reg_predictor)
     
-    # Modelové voľby
-    mean_method <- input$mean_method
-    quantile_method <- input$quantile_method
-    poly_mean_degree <- if (mean_method == "poly") input$poly_mean_degree else NULL
-    poly_quant_degree <- if (quantile_method == "poly") input$poly_quant_degree else NULL
+    variable_types <- identify_variables(data)
+    predictor_is_continuous <- !is.null(input$reg_predictor) &&
+      !is.null(variable_types$Spojite) &&
+      input$reg_predictor %in% variable_types$Spojite
     
-    # Kvantily
-    quant_values <- sapply(seq_along(quantile_inputs()), function(i) {
-      input[[paste0("quant_", i)]]
-    })
+    predictor_is_discrete <- !is.null(input$reg_predictor) &&
+      !is.null(variable_types$Diskretne) &&
+      input$reg_predictor %in% variable_types$Diskretne
     
-    # Konkrétna hodnota prediktora
-    specific_x <- input$specific_x
+    mean_method <- NULL
+    quantile_method <- NULL
+    poly_mean_degree <- NULL
+    poly_quant_degree <- NULL
+    quant_values <- NULL
+    specific_x <- NULL
+    discrete_model_type <- NULL
     
-    # Vyčistenie výstupov
+    if (predictor_is_continuous) {
+      mean_method <- input$mean_method
+      quantile_method <- input$quantile_method
+      poly_mean_degree <- if (mean_method == "poly") input$poly_mean_degree else NULL
+      poly_quant_degree <- if (quantile_method == "poly") input$poly_quant_degree else NULL
+      specific_x <- input$specific_x
+      
+      # Kvantily
+      quant_values <- sapply(seq_along(quantile_inputs()), function(i) {
+        input[[paste0("quant_", i)]]
+      })
+    }
+    
+    if (predictor_is_discrete) {
+      discrete_model_type <- input$discrete_model_type
+    }
+    
     output$model_outputs_plot2d <- renderPlot({ NULL })
     output$model_outputs_plot3d <- renderPlotly({ NULL })
     output$model_outputs_table <- renderTable({ NULL })
@@ -826,7 +912,8 @@ server <- function(input, output, session) {
         poly_mean_degree = poly_mean_degree,
         poly_quant_degree = poly_quant_degree,
         quantiles = quant_values,
-        specific_x = specific_x
+        specific_x = specific_x,
+        discrete_model_type = discrete_model_type
       )
       
       output$model_outputs_regression <- renderPlot({
@@ -834,18 +921,28 @@ server <- function(input, output, session) {
       })
       
       output$model_outputs_combined <- renderUI({
-        tagList(
+        ui_elements <- list(
           h4("Regression Plot:"),
-          plotOutput("model_outputs_regression"),
-          h5(paste("Presnosť modelu (R²):", round(result$mean_result$r_squared * 100, 2), "%"))
+          plotOutput("model_outputs_regression")
         )
+        
+        if (!is.null(result$mean_result) &&
+            !is.null(result$mean_result$r_squared) &&
+            !is.na(result$mean_result$r_squared)) {
+          
+          r2_label <- h5(paste("Presnosť modelu (R²):",
+                               round(result$mean_result$r_squared * 100, 2), "%"))
+          ui_elements <- append(ui_elements, list(r2_label))
+        }
+        
+        tagList(ui_elements)
       })
       
     }, error = function(e) {
       showNotification(paste("Chyba:", e$message), type = "error")
     })
-    
   })
+  
   
   # Klasifikacia
   output$class_predictors_ui <- renderUI({
