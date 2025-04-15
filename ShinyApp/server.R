@@ -216,6 +216,22 @@ server <- function(input, output, session) {
         ),
         
         conditionalPanel(
+          condition = "output.densityVarConfig == 'zmiesane' && input.density_model_type == 'kernel'",
+          checkboxInput(
+            "set_bw", "Set manual bandwidth (bw)",
+            value = isolate(input$set_bw) %||% FALSE
+          ),
+          conditionalPanel(
+            condition = "input.set_bw == true",
+            numericInput(
+              "bw_value", "Bandwidth (0.10 – 100.00):",
+              value = isolate(input$bw_value) %||% NULL,
+              min = 0.10, max = 100.00, step = 0.1
+            )
+          )
+        ),
+        
+        conditionalPanel(
           condition = "output.densityVarConfig == '2_spojite'",
           
           radioButtons(
@@ -234,22 +250,6 @@ server <- function(input, output, session) {
               selected = isolate(input$density_model_type)
             )
           ),
-        
-        conditionalPanel(
-          condition = "output.densityVarConfig == 'zmiesane' && input.density_model_type == 'kernel'",
-          checkboxInput(
-            "set_bw", "Set manual bandwidth (bw)",
-            value = isolate(input$set_bw) %||% FALSE
-          ),
-          conditionalPanel(
-            condition = "input.set_bw == true",
-            numericInput(
-              "bw_value", "Bandwidth (0.10 – 100.00):",
-              value = isolate(input$bw_value) %||% NULL,
-              min = 0.10, max = 100.00, step = 0.1
-            )
-          )
-        ),
           
           conditionalPanel(
             condition = "input.use_copula == 'true'",
@@ -291,6 +291,12 @@ server <- function(input, output, session) {
                 selected = isolate(input$marginal_density_2)
               )
             )
+          ),
+          
+          checkboxInput("density_cut", "Density Cut", value = FALSE),
+          conditionalPanel(
+            condition = "input.density_cut == true",
+            numericInput("num_cuts", "Number of Cuts (1–3):", value = 1, min = 1, max = 3)
           )
         ),
         
@@ -301,12 +307,6 @@ server <- function(input, output, session) {
             choices = c("2D", "3D"),
             selected = isolate(input$plot_type)
           )
-        ),
-        
-        checkboxInput("density_cut", "Density Cut", value = FALSE),
-        conditionalPanel(
-          condition = "input.density_cut == true",
-          numericInput("num_cuts", "Number of Cuts (1–3):", value = 1, min = 1, max = 3)
         ),
         
         div(
@@ -614,6 +614,7 @@ server <- function(input, output, session) {
               plot_type = "2D",
               abort_signal = abort_requested
             )
+            
             output$model_outputs_plot2d <- renderPlot({ result2D })
             rendered_outputs <- append(rendered_outputs, list(plotOutput("model_outputs_plot2d")))
           }
