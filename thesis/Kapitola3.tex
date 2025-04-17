@@ -1,10 +1,10 @@
 \chapter{Združené rozdelenie pravdepodobnosti}\label{sec:joint_dist}
 
-V predchádzajúcich kapitolách sme sa zaoberali modelovaním rozdelenia pravdepodobnosti jednotlivých náhodných premenných alebo cieľových premenných v kontexte regresie a klasifikácie. V oboch týchto prístupoch sme vychádzali prevažne z predpokladu, že modelujeme samostatnú premennú alebo závislosť jednej výstupnej premennej na vstupe. V praxi však častokrát pracujeme s viacerými náhodnými premennými súčasne, ktorých správanie môže byť navzájom ovplyvňované. Ich spoločné správanie popisuje tzv. \textit{združené rozdelenie pravdepodobnosti}.
+V predchádzajúcich kapitolách sme sa zaoberali modelovaním rozdelenia pravdepodobnosti jednej náhodnej premennej, či už jednotlivo alebo v závislosti od ďalších premenných, ktoré už nemusia byť náhodné (regresia a klasifikácia). V praxi sú však prípady, kedy potrebujeme popísať vzájomné správanie niekoľkých náhodných premenných. Na to slúži tzv. \textit{združené rozdelenie pravdepodobnosti}.
 
-Ak premenné modelujeme ako komponenty náhodného vektora $\vec{X} = (X_1, X_2)$, potom znalosť ich združeného rozdelenia nám umožňuje odvodiť ďalšie dôležité vlastnosti systému – napríklad ako vyzerajú podmienené rozdelenia, marginálne rozdelenia alebo podmienená stredná hodnota jednej premennej vzhľadom k druhej a naopak. Tieto pojmy sú kľúčové nielen pre štatistické modelovanie ako také, ale aj pre praktické aplikácie ako sú predikcie, rozhodovania sa založené na týchto predikciách alebo celková analýza závislostí.
+Ak premenné modelujeme ako komponenty náhodného vektora $\vec{X} = (X_1, X_2)$, potom znalosť ich združeného rozdelenia nám umožňuje odvodiť ďalšie dôležité vlastnosti systému – napríklad ako vyzerajú podmienené alebo marginálne rozdelenia, prípadne  asymetrie a chvostové závislosti v systéme.
 
-Presné vyjadrenie alebo odhad združeného rozdelenia je však zložitý, čo je podnecované vyšším počtom premenných. S rastúcim rozmerom vektora náhodných premenných rastie aj počet parametrov a miera závislosti, ktorú je potrebné zohľadniť. Preto sa častokrát používajú zjednodušujúce predpoklady, napríklad o nezávislosti alebo naopak špecifickej štruktúre závislosti medzi premennými. My sa však budeme zaoberať modelovaním združeného rozdelenia práve dvoch náhodných premenných.
+Presné vyjadrenie alebo odhad združeného rozdelenia je však zložitý, čo je podnecované vyšším počtom premenných. S rastúcim rozmerom vektora náhodných premenných rastie aj počet parametrov a miera závislosti, ktorú je potrebné zohľadniť. Preto sa častokrát používajú zjednodušujúce predpoklady, napríklad o nezávislosti alebo naopak špecifickej štruktúre závislosti medzi premennými. My sa budeme zaoberať modelovaním združeného rozdelenia dvoch náhodných premenných.
 
 V tejto kapitole sa zameriame na:
 \begin{itemize}
@@ -13,36 +13,18 @@ V tejto kapitole sa zameriame na:
   \item praktické aspekty odhadu združeného rozdelenia na základe dostupných údajov.
 \end{itemize}
 
-Konkrétne budeme v tejto kapitole pracovať so združenými rozdeleniami náhodných premenných rovnakého typu – teda buď čisto spojitými, alebo čisto diskrétnymi. Budeme rozoberať všeobecné princípy modelovania, analýzy a odhady takýchto rozdelení. Praktické príklady budú vychádzať z regresných a klasifikačných kontextov, kde sa využívajú znalosti o marginálnych a podmienených rozdeleniach. Pre ilustráciu štruktúry dát a závislostí medzi premennými využijeme nástroje popisnej štatistiky a vizualizačné techniky, ktoré sú súčasťou výstupov mnou implementovanej interaktívnej aplikácie. Táto aplikácia predstavuje aplikačnú časť tejto bakalárskej práce a poskytuje praktické vizualizačné a analytické nástroje na skúmanie združených rozdelení pravdepodobnosti, ktoré sú využité aj pri prezentácii výsledkov v tejto kapitole. Modelovanie zmesi spojitých a diskrétnych náhodných premenných, ako špecifický prípad heterogénnych štruktúr, bude predmetom samostatnej kapitoly, keďže ide o hlavnú problematiku, na ktorú sa v tejto práci chceme zamerať.
+Konkrétne budeme v tejto kapitole pracovať so združenými rozdeleniami náhodných premenných rovnakého typu – teda buď čisto spojitými, alebo čisto diskrétnymi. Budeme rozoberať všeobecné princípy modelovania, analýzy a odhady takýchto rozdelení. Praktické príklady budú vychádzať z regresných a klasifikačných kontextov, kde sa využívajú znalosti o marginálnych a podmienených rozdeleniach. Pre ilustráciu štruktúry dát a závislostí medzi premennými využijeme nástroje popisnej štatistiky a vizualizačné techniky, ktoré sú súčasťou výstupov mnou implementovanej interaktívnej aplikácie. Táto aplikácia predstavuje aplikačnú časť tejto bakalárskej práce a poskytuje praktické vizualizačné a analytické nástroje na skúmanie združených rozdelení pravdepodobnosti, ktoré sú využité aj pri prezentácii výsledkov v tejto kapitole. Ako ilustračný príklad využívame dataset \textit{Palmer Penguins}, ktorý obsahuje morfologické údaje o troch druhoch tučniakov (Adélie, Chinstrap a Gentoo) žijúcich na ostrovoch Antarktídy. Dataset zahŕňa premenné ako \textit{dĺžku} a \textit{hĺbku zobáka}, \textit{dĺžku plutiev}, \textit{hmotnosť} či \textit{pohlavie} jedincov.
+
+Modelovanie zmesi spojitých a diskrétnych náhodných premenných, ako špecifický prípad heterogénnych štruktúr, bude predmetom samostatnej kapitoly, keďže ide o hlavnú problematiku, na ktorú sa v tejto práci chceme zamerať. Avšak bez ohľadu na typ premenných platí, že združené rozdelenie poskytuje kompletný popis ich spoločného správania a tvorí základ pre odvodenie marginálnych a podmienených rozdelení, ako aj závislostí medzi premennými.
 
 
 \section{Základy modelovania}\label{sec:joint_zaklady_modelovania}
 
 \subsection{Funkčná reprezentácia}\label{subsec:joint_representation}
 
-Podobne ako to bolo v jednorozmernom prípade, aj viacrozmerné združené rozdelenie možno reprezentovať rôznymi funkciami. My sa v tejto práci budeme zaoberať iba dvojrozmerným prípadom. Dve náhodné premenné $X_1$ a $X_2$ teda môžeme opísať buď pomocou ich spoločnej distribučnej funkcie (angl. joint cumulative distribution function – CDF), alebo pomocou ďalších vhodných nástrojov v závislosti od typu premenných.
-
-\subsubsection{Kumulatívna distribučná funkcia (CDF)}\label{subsec:joint_cdf}
-
-Spoločná distribučná funkcia $F(x_1, x_2)$ dvoch náhodných premenných $X_1$ a $X_2$ vyjadruje pravdepodobnosť, že obe premenné nadobudnú súčasne hodnoty najviac $x_1$ a $x_2$:
-
-\begin{equation}
-F(x_1, x_2) = \mathrm{Pr}(X_1 \leq x_1,\ X_2 \leq x_2),
-\end{equation}
-
-pričom vo vzťahu k združenej hustote týchto premenných platia nasledujúce vzťahy:
-
-\begin{equation}
-F(x_1, x_2) = \int_{-\infty}^{x_1} \int_{-\infty}^{x_2} f(y_1, y_2) \, dy_1 dy_2
-\end{equation}
-
-\begin{equation}
-f(x) = \left. \frac{\partial^2 F(y_1, y_2)}{\partial y_1 \partial y_2} \right|_{y = x}
-\end{equation}
+Podobne ako to bolo v jednorozmernom prípade, aj viacrozmerné združené rozdelenie možno reprezentovať rôznymi funkciami. My sa v tejto práci budeme zaoberať iba dvojrozmerným prípadom. Dve náhodné premenné $X_1$ a $X_2$ sú najčastejšie charakterizované združenou pravdepodobnostnou funkciou, hustotou alebo distribučnou funkciou, a to v závislosti od typu premenných a existencie uzavretej podoby funkčného vzťahu.
 
 \subsubsection{Združená hustota pravdepodobnosti (PDF)}\label{subsec:joint_pdf}
-
-Ak sú premenné spojité, spoločné rozdelenie opisujeme prostredníctvom \textit{združenej hustoty pravdepodobnosti} (angl. joint probability density function – PDF) $f(x_1, x_2)$, ktorá udáva pravdepodobnostnú hustotu výskytu dvojice hodnôt v danej oblasti roviny $\mathbb{R}^2$.
 
 V prípade diskrétnych premenných sa namiesto hustoty používa \textit{združená pravdepodobnostná funkcia} (angl. joint probability mass function – PMF), ktorá každému páru hodnôt $(x_1, x_2)$ priraďuje konkrétnu pravdepodobnosť výskytu: 
 
@@ -56,8 +38,6 @@ Táto pravdepodobnosť je daná explicitne pre jednotlivé kombinácie hodnôt, 
 \sum_{x_1} \sum_{x_2} p(x_1, x_2) = 1
 \end{equation}
 
-Bez ohľadu na typ premenných platí, že združené rozdelenie poskytuje kompletný popis ich spoločného správania a tvorí základ pre odvodenie marginálnych a podmienených rozdelení, ako aj závislostí medzi premennými.
-
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.7\linewidth]{SK_verzia_praca/figures/pravdeb_funk_ostrov_druhy_3D.png}
@@ -65,6 +45,7 @@ Bez ohľadu na typ premenných platí, že združené rozdelenie poskytuje kompl
     \label{fig:miesto_druh_joint_density}
 \end{figure}
 
+Ak sú premenné spojité, spoločné rozdelenie opisujeme prostredníctvom \textit{združenej hustoty pravdepodobnosti} $f$ (angl. joint probability density function – PDF), ktorá udáva pravdepodobnostnú hustotu výskytu dvojice hodnôt v danej oblasti roviny $\mathbb{R}^2$.
 Zatiaľ čo v jednorozmernom spojitom prípade nás zaujímala pravdepodobnosť výskytu náhodnej premennej v určitej oblasti na reálnej osi, v prípade dvoch spojitých premenných nás už zaujíma pravdepodobnosť, že realizácie oboch premenných spadnú do danej oblasti v rovine $\mathbb{R}^2$.
 
 Ak $R_1 = [x_1, x_1 + dx_1]$ a $R_2 = [x_2, x_2 + dx_2]$ sú malé intervaly okolo bodu $(x_1, x_2)$, potom pravdepodobnosť, že náhodný vektor $(X_1, X_2)$ spadne do oblasti $R_1 \times R_2$, je približne:
@@ -97,6 +78,20 @@ Na nasledujúcom obrázku môžeme vidieť príklad vizualizácie združenej hus
     \caption{Združená hustota pravdepodobnosti (PDF) medzi premennými \textit{Hĺbka zobáku} a \textit{Dĺžka zobáku} tučniakov.}
     \label{fig:zobak_joint_density}
 \end{figure}
+
+\subsubsection{Kumulatívna distribučná funkcia (CDF)}\label{subsec:joint_cdf}
+
+Spoločná distribučná funkcia $F(x_1, x_2)$ dvoch náhodných premenných $X_1$ a $X_2$ vyjadruje pravdepodobnosť, že obe premenné nadobudnú súčasne hodnoty najviac $x_1$ a $x_2$:
+
+\begin{equation}
+F(x_1, x_2) = \mathrm{Pr}(X_1 \leq x_1,\ X_2 \leq x_2),
+\end{equation}
+
+pričom vo vzťahu k združenej hustote týchto premenných platia nasledujúce vzťahy:
+
+\begin{equation}
+F(x_1, x_2) = \int_{-\infty}^{x_1} \int_{-\infty}^{x_2} f(y_1, y_2) \, dy_1 dy_2
+\end{equation}
 
 \subsection{Momentové charakteristiky}\label{joint_moments}
 
@@ -180,7 +175,7 @@ Hodnota $\rho(X_1, X_2)$ leží vždy v intervale $[-1, 1]$, pričom:
   \item $\rho = 0$ znamená žiadnu lineárnu závislosť (lineárna nezávislosť).
 \end{itemize}
 
-Dôležité je, že korelačný koeficient (rovnako ako kovariancia) meria iba \textit{lineárnu} závislosť medzi premennými. Nulová korelácia teda neznamená, že premenné sú nezávislé – iba že medzi nimi nie je lineárny vzťah. Naopak, ak sú dve premenné nezávislé, ich kovariancia aj korelácia sú vždy nulové.
+Dôležité je, že korelačný koeficient (rovnako ako kovariancia) meria iba \textit{lineárnu} závislosť medzi premennými. Nulová korelácia teda neznamená, že premenné sú nezávislé, ale len to, že medzi nimi nie je lineárny vzťah. Naopak, ak sú dve premenné nezávislé, ich kovariancia aj korelácia sú vždy nulové.
 
 \subsection{Marginálne rozdelenie}\label{subsec:marginal_dist}
 
@@ -230,7 +225,7 @@ Podobne marginálne rozdelenie premennej $X_1$ získame ako:
 
 \begin{equation} f_1(x_1) = \int_{-\infty}^{\infty} f(x_1, x_2)  dx_2 \end{equation}
 
-Tieto marginálne rozdelenia slúžia ako základ pre rozklad združeného rozdelenia pomocou kopúl, ktorému sa budeme venovať v samostatnej podkapitole.
+Tieto marginálne rozdelenia slúžia ako základ pre rozklad združeného rozdelenia (ale aj pre podmieňovanie pravdepodobnosti) pomocou kopúl, ktorému sa budeme venovať v samostatnej podkapitole.
 
 \begin{figure}[H]
     \centering
@@ -313,8 +308,6 @@ Podmienená stredná hodnota je teda funkciou známej hodnoty inej premennej a v
 \subsubsection{Kvantilová funkcia}
 \label{subsubsec:conditional_quantile_function}
 
-Kvantilová regresia (\textit{Quantile Regression}, QR) umožňuje odhadovať \textit{kvantily podmieneného rozdelenia} odozvy vzhľadom na hodnoty prediktora. Na rozdiel od klasickej regresie, ktorá sa zameriava iba na strednú hodnotu $\mathbb{E}[Y \mid X = x]$, kvantilová regresia modeluje \textit{celú podmienenú distribúciu}.
-
 Pre daný kvantil $q \in (0,1)$ je \textit{podmienená kvantilová funkcia} definovaná ako:
 \begin{equation}
 Q_{Y \mid X}(q) := \inf \left\{ y \in \mathbb{R} \mid \Pr(Y \leq y \mid X = x) \geq q \right\}
@@ -326,7 +319,7 @@ V prípade \textit{lineárnej kvantilovej regresie} sa predpokladá, že kvantil
 Q_{Y \mid X}(q) = X^\top \beta_q
 \end{equation}
 
-kde $\beta_q$ je vektor parametrov pre daný kvantil $q$. Tento prístup umožňuje skúmať účinok kovariátov nielen na strednú hodnotu, ale aj na ľubovoľný kvantil podmieneného rozdelenia.
+kde $\beta_q$ je vektor parametrov pre daný kvantil $q$. Tento prístup umožňuje skúmať účinok prediktorov nielen na strednú hodnotu, ale aj na ľubovoľný kvantil podmieneného rozdelenia.
 
 Parametre $\beta_q$ sa odhadujú pomocou minimalizácie cieľovej funkcie:
 
@@ -338,10 +331,14 @@ kde $\rho_q(u)$ je definovaná ako:
 \rho_q(u) = u(q - \mathbb{I}(u < 0))
 \end{equation}
 
-\textbf{Výhody kvantilovej regresie:}
+Kvantilová regresia (\textit{Quantile Regression}, QR) umožňuje odhadovať \textit{kvantily podmieneného rozdelenia} odozvy vzhľadom na hodnoty prediktora. Na rozdiel od klasickej regresie, ktorá sa zameriava na strednú hodnotu $\mathbb{E}[Y \mid X = x]$ a zvyšok rozdelenia predpokladá cez špecifikovanú šumovú zložku, kvantilová regresia priamo modeluje konkrétny kvantil bez potreby predpokladu o rozdelení reziduí.
+
+V štandardnom lineárnom modeli sa zvyšok rozdelenia popisuje prostredníctvom aditívnej šumovej zložky s konštantným rozptylom (napr. $\varepsilon \sim \mathcal{N}(0, \sigma^2)$). V tejto štruktúre je teda modelovaná stredná hodnota a rozptyl predstavuje samostatný parameter. Naproti tomu v zovšeobecnených lineárnych modeloch (GLM) sa predpokladá, že rozptyl odozvy závisí od strednej hodnoty a vtedy model plne určuje tvar podmieneného rozdelenia.
+
+\textbf{Výhody kvantilovej regresie oproti klasickej lineárnej regresii:}
 \begin{itemize}
-  \item Zachytáva \textit{heteroskedasticitu}, teda zmenu variability odozvy vzhľadom na hodnoty kovariátov.
-  \item Poskytuje detailnejší obraz o štruktúre dát — napríklad rôzne účinky kovariátov v nízkych a vysokých kvantiloch.
+  \item Zachytáva \textit{heteroskedasticitu}, teda zmenu variability odozvy vzhľadom na hodnoty prediktorov.
+  \item Poskytuje detailnejší obraz o štruktúre dát — napríklad rôzne účinky prediktorov v nízkych a vysokých kvantiloch.
   \item Je robustná voči odľahlým hodnotám.
 \end{itemize}
 
@@ -356,7 +353,7 @@ Na nasledujúcom obrázku môžeme pozorovať kvantilové funkcie pre vybrané k
 
 \section{Rozklad}\label{sec:rozklad_kopule}
 
-Modelovanie viacrozmerného náhodného vektora nie je vždy efektívne, ak sa snažíme zachytiť spoločné správanie jeho zložiek prostredníctvom jednej združenej distribučnej funkcie (CDF). Tento prístup totiž neumožňuje samostatne modelovať štruktúru závislosti a vlastností jednotlivých premenných.
+Modelovanie spojitého viacrozmerného náhodného vektora nie je vždy efektívne, ak sa snažíme zachytiť spoločné správanie jeho zložiek prostredníctvom jednej parametrickej triedy združeného rozdelenia. Tento prístup totiž neumožňuje samostatne modelovať štruktúru závislosti a vlastností jednotlivých premenných.
 
 Vhodnou alternatívou tu je preto rozklad združeného rozdelenia pravdepodobnosti na dve zložky:
 \begin{itemize}
@@ -384,7 +381,7 @@ Tento rozklad nám umožňuje samostatne modelovať:
   \item \textit{závislosť medzi premennými} prostredníctvom voľby vhodnej kopuly (napr. Gaussova, t-kopula, Claytonova, Gumbelova, atď.).
 \end{itemize}
 
-Pre zjednodušenie sa častokrát používajú transformácie do tzv. \textit{uniformného priestoru}, pričom každá náhodná premenná $X_i$ sa nahradí svojou distribučnou funkciou $U_i = F_i(X_i)$, čím vznikne nový vektor $(U_1, U_2)$, ktorého všetky komponenty sú rovnomerne rozdelené na intervale $[0,1]$.
+Základom rozkladu podľa \textit{Sklarovej vety} je transformácia pôvodných náhodných premenných $X_i$ pomocou ich marginálnych distribučných funkcií $F_i$, čím sa získa nový vektor $(U_1, U_2)$, kde $U_i = F_i(X_i)$. Výsledné premenné $U_i$ sú potom rovnomerne rozdelené na intervale $[0,1]$, a ich spoločná distribučná funkcia definuje kopulu, ktorá vystihuje štruktúru závislosti nezávisle od tvaru marginálnych rozdelení.
 
 Tento princíp je ilustrovaný na nasledujúcom obrázku:
 
@@ -406,8 +403,6 @@ Tento princíp je ilustrovaný na nasledujúcom obrázku:
     \label{fig:sklar_transform}
 \end{figure}
 
-Výhoda tohto prístupu spočíva v tom, že umožňuje flexibilne kombinovať rôzne marginálne rozdelenia s rôznymi typmi závislostí a výrazne zjednodušuje modelovanie a výpočet podmienených rozdelení, čo je užitočné pri predikcii, rôznych simuláciách a v aplikáciách akou je napríklad kvantilová regresia.
-
 \subsection{Kopule}
 \label{subsec:copulas}
 
@@ -415,12 +410,12 @@ Kopula je matematická funkcia, ktorá umožňuje oddeliť modelovanie marginál
 
 \subsubsection{Vlastnosti}
 
-Každá kopula $C: [0,1]^p \to [0,1]$ musí spĺňať nasledovné vlastnosti:
+Každá kopula $C: [0,1]^2 \to [0,1]$ musí spĺňať nasledovné vlastnosti:
 
 \begin{itemize}
-  \item Hraničné podmienky: $C(u_1, \dots, u_i = 0, \dots, u_p) = 0$ pre ľubovoľné $i$.
-  \item Identita: $C(1, \dots, 1, u_i, 1, \dots, 1) = u_i$.
-  \item $p$-rastúca: pre $p=2$ platí:
+  \item Hraničné podmienky: $C(u_1=0, u_2) = C(u_1, u_2=0) = 0$.
+  \item Identita: $C(u_1, 1) = u_1$, $C(1, u_2) = u_2$.
+  \item Rastúca:
   \begin{equation}
     C(v_1, v_2) - C(v_1, u_2) - C(u_1, v_2) + C(u_1, u_2) \geq 0, \quad \text{ak } u_i \leq v_i.
   \end{equation}
@@ -431,13 +426,13 @@ Každá kopula $C: [0,1]^p \to [0,1]$ musí spĺňať nasledovné vlastnosti:
 \begin{itemize}
   \item \textit{Kopula nezávislosti} (produktová):
   \begin{equation}
-  \Pi(u_1, \dots, u_p) = u_1 \cdot \dots \cdot u_p.
+  \Pi(u_1, u_2) = u_1 u_2.
   \end{equation}
   \item \textit{Kopula úplnej závislosti}:
   \begin{equation}
-  M(u_1, \dots, u_p) = \min(u_1, \dots, u_p).
+  M(u_1,u_2) = \min(u_1, u_2).
   \end{equation}
-  \item \textit{Kopula úplnej negatívnej závislosti (iba pre $p=2$)}:
+  \item \textit{Kopula úplnej negatívnej závislosti}:
   \begin{equation}
   W(u_1, u_2) = \max(0, u_1 + u_2 - 1).
   \end{equation}
@@ -467,19 +462,19 @@ Kopula predstavuje štruktúru závislosti v združenom modeli. Umožňuje napr�
   \item \textit{Eliptické kopuly} – napr. Gaussova, t-kopula: modelujú lineárnu závislosť a sú konštruované cez štandardizáciu marginálií eliptických rozdelení:
   
   \begin{equation}
-    C_{\Phi}(u_1, \dots, u_p) = \Phi\left( \Phi_1^{-1}(u_1), \dots, \Phi_p^{-1}(u_p) \right)
+    C_{\Phi}(u_1, u_2) = \Phi\left( \Phi_1^{-1}(u_1), \Phi_2^{-1}(u_2) \right)
   \end{equation}
 
   \item \textit{Archimedovské kopuly} – napr. Gumbelova, Claytonova, Frankova: jednoduché konštrukcie pomocou generátora $f:[0,1] \to [0,\infty)$:
 
   \begin{equation}
-  C(u_1, \dots, u_p) = f^{-1}\left( f(u_1) + \dots + f(u_p) \right)
+  C(u_1, u_2) = f^{-1}\left( f(u_1) + f(u_2) \right)
   \end{equation}
 
-  \item \textit{Extreme-value kopuly} – napr. Gumbelova: vhodné pre modelovanie maximálnych javov (napr. povodne). Generované pomocou \textit{dependence function} $\ell : [0, \infty)^p \rightarrow [0, \infty)$:
+  \item \textit{Extreme-value kopuly} – napr. Gumbelova: vhodné pre modelovanie maximálnych javov (napr. povodne). Generované pomocou \textit{dependence function} $\ell : [0, \infty)^2 \rightarrow [0, \infty)$:
 
   \begin{equation}
-  C(u_1, \dots, u_p) = \exp\left(-\ell(-\log u_1, \dots, -\log u_p)\right)
+  C(u_1, u_2) = \exp\left(-\ell(-\log u_1, -\log u_2)\right)
   \end{equation}
   
 \end{itemize}
@@ -495,7 +490,7 @@ Pre porovnanie jednotlivých typov kopúl sme si spravili nasledujúce simuláci
 
 \subsubsection{Neparametrické triedy}\label{subsubsec:nonparametric_copula}
 
-\textit{Empirická kopula} je neparametrický odhad kopuly vytvorený priamo z dát bez predpokladu konkrétneho modelu (žiadna Gumbel, Clayton ani t-distribúcia).
+\textit{Empirická kopula} je neparametrický odhad kopuly vytvorený priamo z dát bez predpokladu konkrétneho tvaru (žiadna Gumbel, Clayton ani t-distribúcia).
 
 Je definovaná ako:
 
@@ -503,22 +498,7 @@ Je definovaná ako:
 C_n(u, v) = \frac{1}{n} \sum_{i=1}^{n} \mathbf{1}\left( \hat{U}^{(i)} \leq u,\ \hat{V}^{(i)} \leq v \right)
 \end{equation}
 
-kde $\left(\hat{U}^{(i)}, \hat{V}^{(i)}\right)$ sú \textit{pseudo-observácie}, teda transformované dáta pomocou empirických distribučných funkcií (ECDF) na interval $[0,1]$.
-
-\begin{figure}[H]
-    \centering
-    \begin{minipage}[t]{0.48\linewidth}
-        \centering
-        \includegraphics[width=\linewidth]{nonparametric_copula.png}
-    \end{minipage}
-    \hfill
-    \begin{minipage}[t]{0.48\linewidth}
-        \centering
-        \includegraphics[width=\linewidth]{nonparametric_copula_dens.png}
-    \end{minipage}
-    \caption{Empirická kopula: Simulácia náhodného výberu + hustota pravdepodobnosti (marginálie: jadrové vyhladzovanie, ~\ref{textbf:kernel_smoothing})}
-    \label{fig:empcopula}
-\end{figure}
+kde $\left(\hat{U}^{(i)}, \hat{V}^{(i)}\right)$ sú \textit{pseudo-pozorovania}, teda dáta transformované pomocou empirických distribučných funkcií (ECDF) na interval $[0,1]$.
 
 \section{Odhad}\label{sec:odhad}
 
@@ -563,3 +543,80 @@ Metóda najmenších štvorcov je univerzálnejšia a často sa používa tam, k
 \vspace{1em}
 
 Každý z vyššie uvedených prístupov má svoje opodstatnenie a vhodnosť ich použitia závisí od typu rozdelenia, počtu pozorovaní a účelu analýzy.
+
+\section{Modelovanie}\label{sec:modelovanie}
+
+Združené rozdelenie pravdepodobnosti je možné modelovať rôznymi spôsobmi v závislosti od typu údajov, predpokladanej štruktúry a cieľov analýzy. Tak, ako aj v jednorozmernom prípade si tu predstavíme dve hlavné vetvy prístupov: parametrické a neparametrické modely.
+
+\subsection{Parametrické modely}\label{subsec:joint_param_models}
+
+Parametrické modelovanie predpokladá, že združené rozdelenie pravdepodobnosti $\vec{X} = (X_1, X_2)$ patrí do známej triedy rozdelení, určenej vektormi parametrov $\theta \in \Theta$. K takýmto modelom patria:
+
+\begin{itemize}
+  \item \textit{Združené normálne rozdelenie} – dvojrozmerné normálne rozdelenie s hustotou
+  \begin{equation}
+  f_{\mu, \Sigma}(x_1, x_2) = \frac{1}{2\pi |\Sigma|^{1/2}} \exp\left( -\frac{1}{2} (\vec{x} - \vec{\mu})^\top \Sigma^{-1} (\vec{x} - \vec{\mu}) \right),
+  \end{equation}
+  kde $\vec{\mu} = (\mu_1, \mu_2)^\top$ a $\Sigma$ je symetrická pozitívne definitná kovariančná matica.
+  
+  \item \textit{Kopulové modely} – založené na dekompozícii rozdelenia na marginálne rozdelenia $F_1, F_2$ a kopulu $C$, kde sa parametrická forma týka výberu konkrétnej triedy kopuly (napr. Gaussovská, Claytonova, Gumbelova, t-kopula).
+\end{itemize}
+
+\subsubsection{Odhad parametrov}\label{subsubsec:param_estimation}
+
+Odhad parametrov $\theta$ pre daný model možno vykonať viacerými spôsobmi, najčastejšie spôsoby sú:
+
+\paragraph{Metóda momentov} - vychádza z priameho vzťahu medzi teoretickými momentami rozdelenia a jeho parametrami. Tieto momenty sa nahradia empirickými momentami (z výberu) a výsledný súbor rovníc sa vyrieši vzhľadom na neznáme parametre.
+
+\paragraph{Metóda maximálnej vierohodnosti (Maximum Likelihood)} - tento prístup odhaduje parametre $\theta$ maximalizáciou logaritmickej vierohodnostnej funkcie, ktorá vyjadruje pravdepodobnosť výskytu pozorovanej vzorky vzhľadom na daný model. Formálne:
+
+\begin{equation}
+\hat{\theta} = \arg\max_{\theta \in \Theta} \frac{1}{n} \sum_{i=1}^{n} \ln f(X_{i1}, X_{i2} \mid \theta)
+\end{equation}
+
+pričom získané odhady sú konzistentné, efektívne a asymptoticky normálne rozdelené.
+
+\paragraph{Metóda najmenších štvorcov} - táto metóda vychádza z minimalizácie vzdialenosti medzi teoretickou distribučnou funkciou modelu a jej empirickým odhadom. Napríklad vo forme:
+
+\begin{equation}
+\hat{\theta} = \arg\min_{\theta \in \Theta} \sum_{i=1}^{n} \left( F(X_{i1}, X_{i2} \mid \theta) - \hat{F}_n(X_{i1}, X_{i2}) \right)^2
+\end{equation}
+
+\subsection{Neparametrické modely}\label{subsec:joint_nonparam_models}
+
+Rovnako ako v jednorozmernom prípade, \textit{neparametrické prístupy} nevyžadujú predpoklad o tvare hustoty či distribučnej funkcie, ide o modelovanie založené priamo na dátach. Príklady:
+
+\begin{itemize}
+  \item \textit{Empirické združené rozdelenie} – distribučná funkcia $\hat{F}_n(x_1, x_2)$ získaná priamym sčítaním výskytov:
+  \begin{equation}
+  \hat{F}_n(x_1, x_2) = \frac{1}{n} \sum_{i=1}^{n} \mathbb{I}(X_{i1} \leq x_1, X_{i2} \leq x_2)
+  \end{equation}
+  \item \textit{Jadrové vyhladzovanie (kernel smoothing)} – pre odhad hustoty $f(x_1, x_2)$:
+  \begin{equation}
+  \hat{f}_h(x_1, x_2) = \frac{1}{n h_1 h_2} \sum_{i=1}^{n} K\left( \frac{x_1 - X_{i1}}{h_1} \right) K\left( \frac{x_2 - X_{i2}}{h_2} \right)
+  \end{equation}
+  kde $K$ je vyhladzovacia (jadrová) funkcia (napr. Gaussovská) a $h_j$ sú rozsahy vyhladenia.
+
+  \item \textit{Beta vyhladenie empirickej kopule} – namiesto ostrého odhadu pomocou indikačnej funkcie sa využíva vyhladzovanie cez beta rozdelenie. Odhad potom vyzerá ako:
+  \begin{equation}
+    \hat{C}_n^{\beta}(u, v) = \frac{1}{n} \sum_{i=1}^n B(u; r_i, n - r_i + 1) \cdot B(v; s_i, n - s_i + 1)
+  \end{equation}
+  kde $r_i$ a $s_i$ sú poradia $U_i$ a $V_i$ vo vzorke a $B(\cdot; a,b)$ je kumulatívna distribučná funkcia beta rozdelenia.
+  
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}[t]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{nonparametric_copula.png}
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{nonparametric_copula_dens.png}
+    \end{minipage}
+    \caption{Použitie beta vyhladenej empirickej kopule na modelovanie združeného rozdelenia premenných \textit{Dĺžka krídiel} a \textit{Hmotnosť v gramoch} tučniakov (vpravo hustota (PDF): jadrový odhad marginálií, vľavo pseudo-pozorovania), ~\ref{textbf:kernel_smoothing})}
+    \label{fig:empcopula}
+\end{figure}
+
