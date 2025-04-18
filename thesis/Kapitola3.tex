@@ -15,7 +15,7 @@ V tejto kapitole sa zameriame na:
 
 Konkrétne budeme v tejto kapitole pracovať so združenými rozdeleniami náhodných premenných rovnakého typu – teda buď čisto spojitými, alebo čisto diskrétnymi. Budeme rozoberať všeobecné princípy modelovania, analýzy a odhady takýchto rozdelení. Praktické príklady budú vychádzať z regresných a klasifikačných kontextov, kde sa využívajú znalosti o marginálnych a podmienených rozdeleniach. Pre ilustráciu štruktúry dát a závislostí medzi premennými využijeme nástroje popisnej štatistiky a vizualizačné techniky, ktoré sú súčasťou výstupov mnou implementovanej interaktívnej aplikácie. Táto aplikácia predstavuje aplikačnú časť tejto bakalárskej práce a poskytuje praktické vizualizačné a analytické nástroje na skúmanie združených rozdelení pravdepodobnosti, ktoré sú využité aj pri prezentácii výsledkov v tejto kapitole. Ako ilustračný príklad využívame dataset \textit{Palmer Penguins}, ktorý obsahuje morfologické údaje o troch druhoch tučniakov (Adélie, Chinstrap a Gentoo) žijúcich na ostrovoch Antarktídy. Dataset zahŕňa premenné ako \textit{dĺžku} a \textit{hĺbku zobáka}, \textit{dĺžku plutiev}, \textit{hmotnosť} či \textit{pohlavie} jedincov.
 
-Modelovanie zmesi spojitých a diskrétnych náhodných premenných, ako špecifický prípad heterogénnych štruktúr, bude predmetom samostatnej kapitoly, keďže ide o hlavnú problematiku, na ktorú sa v tejto práci chceme zamerať. Avšak bez ohľadu na typ premenných platí, že združené rozdelenie poskytuje kompletný popis ich spoločného správania a tvorí základ pre odvodenie marginálnych a podmienených rozdelení, ako aj závislostí medzi premennými.
+Modelovanie zmesi spojitých a diskrétnych náhodných premenných, ako špecifický prípad heterogénnych štruktúr, bude predmetom samostatnej podkapitoly, keďže ide o hlavnú problematiku, na ktorú sa v tejto práci chceme zamerať. Avšak bez ohľadu na typ premenných platí, že združené rozdelenie poskytuje kompletný popis ich spoločného správania a tvorí základ pre odvodenie marginálnych a podmienených rozdelení, ako aj závislostí medzi premennými.
 
 
 \section{Základy modelovania}\label{sec:joint_zaklady_modelovania}
@@ -335,6 +335,7 @@ Kvantilová regresia (\textit{Quantile Regression}, QR) umožňuje odhadovať \t
 
 V štandardnom lineárnom modeli sa zvyšok rozdelenia popisuje prostredníctvom aditívnej šumovej zložky s konštantným rozptylom (napr. $\varepsilon \sim \mathcal{N}(0, \sigma^2)$). V tejto štruktúre je teda modelovaná stredná hodnota a rozptyl predstavuje samostatný parameter. Naproti tomu v zovšeobecnených lineárnych modeloch (GLM) sa predpokladá, že rozptyl odozvy závisí od strednej hodnoty a vtedy model plne určuje tvar podmieneného rozdelenia.
 
+\bigskip
 \textbf{Výhody kvantilovej regresie oproti klasickej lineárnej regresii:}
 \begin{itemize}
   \item Zachytáva \textit{heteroskedasticitu}, teda zmenu variability odozvy vzhľadom na hodnoty prediktorov.
@@ -351,7 +352,7 @@ Na nasledujúcom obrázku môžeme pozorovať kvantilové funkcie pre vybrané k
     \label{fig:cond_quant_mean}
 \end{figure}
 
-\section{Rozklad}\label{sec:rozklad_kopule}
+\section{Rozklad rozdelenia spojitých premenných}\label{sec:rozklad_kopule}
 
 Modelovanie spojitého viacrozmerného náhodného vektora nie je vždy efektívne, ak sa snažíme zachytiť spoločné správanie jeho zložiek prostredníctvom jednej parametrickej triedy združeného rozdelenia. Tento prístup totiž neumožňuje samostatne modelovať štruktúru závislosti a vlastností jednotlivých premenných.
 
@@ -484,7 +485,7 @@ Pre porovnanie jednotlivých typov kopúl sme si spravili nasledujúce simuláci
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.95\linewidth]{parametric_copulas.png}
-    \caption{Simulácie náhodných výberov}
+    \caption{Parametrické kopule: Simulácie náhodných výberov}
     \label{fig:parametric_copulas}
 \end{figure}
 
@@ -500,49 +501,12 @@ C_n(u, v) = \frac{1}{n} \sum_{i=1}^{n} \mathbf{1}\left( \hat{U}^{(i)} \leq u,\ \
 
 kde $\left(\hat{U}^{(i)}, \hat{V}^{(i)}\right)$ sú \textit{pseudo-pozorovania}, teda dáta transformované pomocou empirických distribučných funkcií (ECDF) na interval $[0,1]$.
 
-\section{Odhad}\label{sec:odhad}
-
-V predchádzajúcich častiach sme sa venovali teoretickému rámcu združených rozdelení pravdepodobnosti a ich dekompozícii pomocou marginálnych rozdelení a kopúl. V tejto časti sa zameriame na praktický aspekt — teda ako možno parametre týchto modelov odhadnúť zo vzorky dát, pričom sa opäť obmedzíme na dvojrozmerné prípady. Predpokladáme, že rozdelenie náhodného vektora $\vec{X} = (X_1, X_2)$ patrí do známej parametrickej triedy rozdelení s parametrami $\theta \in \Theta$.
-
-Na tento účel sa najčastejšie používajú tri základné prístupy:
-
-\subsection{Metóda momentov}\label{subsection:moments_method}
-
-Metóda momentov vychádza z priameho vzťahu medzi teoretickými momentami rozdelenia a jeho parametrami. Tieto momenty sa nahradia empirickými momentami (z výberu) a výsledný súbor rovníc sa vyrieši vzhľadom na neznáme parametre.
-
-Táto metóda má výhodu v jednoduchej implementácii a nízkych výpočtových nárokoch. Na druhej strane, nie vždy existuje jednoznačný alebo analytický vzťah medzi momentami a parametrami, čo obmedzuje jej použiteľnosť. Navyše, výsledné odhady nemajú vo všeobecnosti optimálne vlastnosti ako napríklad minimálnu varianciu.
-
-\subsection{Metóda maximálnej vierohodnosti (Maximum Likelihood, ML)}\label{subsection:max_likelihood}
-
-Tento prístup odhaduje parametre $\theta$ maximalizáciou logaritmickej vierohodnostnej funkcie, ktorá vyjadruje pravdepodobnosť výskytu pozorovanej vzorky vzhľadom na daný model. Formálne:
-
-\begin{equation}
-\hat{\theta} = \arg\max_{\theta \in \Theta} \frac{1}{n} \sum_{i=1}^{n} \ln f(X_{i1}, X_{i2} \mid \theta)
-\end{equation}
-
-Metóda maximálnej vierohodnosti vedie k odhadom, ktoré sú:
-\begin{itemize}
-  \item \textit{konzistentné} – konvergujú v pravdepodobnosti ku skutočnej hodnote parametra pre $n \to \infty$,
-  \item \textit{nevychýlené (angl. unbiased)} – v priemere odhadujú pravú hodnotu,
-  \item \textit{efektívne} – majú najmenší možný rozptyl,
-  \item \textit{asymptoticky normálne rozdelené}.
-\end{itemize}
-
-Nevýhodou tejto metódy je jej vyššia výpočtová náročnosť, závislosť od počiatočných hodnôt a možná vychýlenosť pri malých výberoch.
-
-\subsection{Metóda najmenších štvorcov}\label{subsec:least_squares}
-
-Táto metóda vychádza z minimalizácie vzdialenosti medzi teoretickou distribučnou funkciou modelu a jej empirickým odhadom. Napríklad vo forme:
-
-\begin{equation}
-\hat{\theta} = \arg\min_{\theta \in \Theta} \sum_{i=1}^{n} \left( F(X_{i1}, X_{i2} \mid \theta) - \hat{F}_n(X_{i1}, X_{i2}) \right)^2
-\end{equation}
-
-Metóda najmenších štvorcov je univerzálnejšia a často sa používa tam, kde nie je možné jednoducho odvodiť vierohodnostnú funkciu. Napriek tomu však nemusí poskytovať také dobré vlastnosti odhadov ako ML.
-
-\vspace{1em}
-
-Každý z vyššie uvedených prístupov má svoje opodstatnenie a vhodnosť ich použitia závisí od typu rozdelenia, počtu pozorovaní a účelu analýzy.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\linewidth]{nonparametric_copula.png}
+    \caption{Empirická kopula: Pseudo-pozorovania premenných \textit{Dĺžka krídiel} a \textit{Hmotnosť v gramoch} tučniakov}
+    \label{fig:nonparametric_copula}
+\end{figure}
 
 \section{Modelovanie}\label{sec:modelovanie}
 
@@ -609,7 +573,7 @@ Rovnako ako v jednorozmernom prípade, \textit{neparametrické prístupy} nevyž
     \centering
     \begin{minipage}[t]{0.48\linewidth}
         \centering
-        \includegraphics[width=\linewidth]{nonparametric_copula.png}
+        \includegraphics[width=\linewidth]{nonparametric_copula_beta.png}
     \end{minipage}
     \hfill
     \begin{minipage}[t]{0.48\linewidth}
@@ -619,4 +583,8 @@ Rovnako ako v jednorozmernom prípade, \textit{neparametrické prístupy} nevyž
     \caption{Použitie beta vyhladenej empirickej kopule na modelovanie združeného rozdelenia premenných \textit{Dĺžka krídiel} a \textit{Hmotnosť v gramoch} tučniakov (vpravo hustota (PDF): jadrový odhad marginálií, vľavo pseudo-pozorovania), ~\ref{textbf:kernel_smoothing})}
     \label{fig:empcopula}
 \end{figure}
+
+
+\section{Modelovanie rozdelenia zmiešaného náhodného vektora}\label{sec:joint_mixture_modeling}
+
 

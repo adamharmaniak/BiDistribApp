@@ -268,71 +268,7 @@ Y = \boldsymbol{\phi}(X)^\top \boldsymbol{\beta} + \varepsilon,
 \end{equation}
 kde $\boldsymbol{\phi}(X) = (1, \phi_1(X), \ldots, \phi_p(X))^\top$ je vektor bázových funkcií a $\boldsymbol{\beta}$ vektor parametrov modelu. Táto reprezentácia zahŕňa nielen klasickú lineárnu regresiu (kde $\phi_j(X) = X_j$), ale aj jej zovšeobecnené formy, ako napríklad \textit{polynomiálnu regresiu} alebo \textit{regresiu s interakciami}. Výber vhodného stupňa bázových funkcií je kľúčový – príliš nízky stupeň nemusí vystihnúť závislosť, zatiaľ čo príliš vysoký môže viesť k tzv. pretečeniu (angl. \textit{overfitting}).
 
-\smallskip
-\noindent
-\textbf{Transformácia odozvy} 
-
-V niektorých prípadoch môže byť vhodné transformovať závislú premennú $Y$ pred samotným modelovaním. Typické dôvody na to sú:
-
-\begin{itemize}
-  \item \textit{Linearizácia} funkčného vzťahu medzi $Y$ a $X$ (napr. exponenciálne alebo logaritmické transformácie),
-  \item \textit{Symetrizácia rozdelenia šumu} $\varepsilon$ – napr. pri výrazne šikmých rozdeleniach.
-\end{itemize}
-Transformácie tak môžu zlepšiť splnenie predpokladov lineárneho modelu a zvýšiť presnosť odhadov aj interpretovateľnosť výsledkov.
-
-\smallskip
-\noindent
-\textbf{Kódovanie kvalitatívnych premenných}
-
-Ak medzi prediktormi $X$ figurujú aj \textit{kvalitatívne (kategoriálne)} premenné, je potrebné ich previesť na číselnú formu. Najčastejšie sa využíva tzv. \textit{indikátorové (dummy) kódovanie}, pri ktorom sa pre každú kategóriu (okrem referenčnej) vytvorí binárna premenná s hodnotami $\{0, 1\}$. Takto je možné zaradiť aj nominálne a ordinálne premenné do lineárneho modelu.
-
-Formálne možno pre kategóriálnu premennú $Z$ nad množinou kategórií $\mathcal{C} = \{c_1, c_2, \dots, c_K\}$ definovať \textbf{indikátorové (bázové) funkcie} nasledovne:
-\begin{equation}
-\phi_j(z) := \mathbb{I}\{z = c_j\}, \quad \text{pre } j = 1, 2, \dots, K-1
-\end{equation}
-kde $\mathbb{I}\{\cdot\}$ je \textit{indikátorová funkcia}, ktorá nadobúda hodnotu 1, ak je podmienka splnená, inak 0.
-
-Prakticky to znamená, že ak máme napríklad premennú \textit{Farba} s tromi kategóriami: \textit{červená, modrá} a \textit{zelená}, potom môžeme vytvoriť dve binárne premenné:
-\begin{align*}
-\phi_1(\text{Farba}) &= \mathbb{I}\{\text{Farba} = \text{modrá}\}, \\
-\phi_2(\text{Farba}) &= \mathbb{I}\{\text{Farba} = \text{zelená}\}.
-\end{align*}
-Kategória \textit{červená} v tomto prípade slúži ako \textit{referenčná kategória} a je implicitne obsiahnutá v nulových hodnotách oboch premenných $\phi_1$ a $\phi_2$.
-
-Vložením týchto indikátorových premenných do regresného modelu umožňujeme modelu zohľadniť vplyv rôznych kategórií bez porušenia číselnej povahy regresného výpočtu.
-
-\smallskip
-\noindent
-\textbf{Maticová reprezentácia a odhad parametrov}
-
-Ak pozorujeme $n$ realizácií premenných, môžeme sústavu rovníc pozorovaní pre regresný model zapísať v maticovej forme ako:
-\begin{equation}
-\mathbf{y} = \mathbf{X} \boldsymbol{\beta} + \boldsymbol{\varepsilon},
-\end{equation}
-kde:
-\begin{itemize}
-  \item $\mathbf{y}$ je $(n \times 1)$ vektor pozorovaných hodnôt odozvy,
-  \item $\mathbf{X}$ je $(n \times p)$ matica plánu, ktorej riadky obsahujú hodnoty bázových funkcií pre každé pozorovanie,
-  \item $\boldsymbol{\beta}$ je $(p \times 1)$ vektor neznámych parametrov,
-  \item $\boldsymbol{\varepsilon}$ je vektor náhodných chýb.
-\end{itemize}
-Parametre $\boldsymbol{\beta}$ sa najčastejšie odhadujú pomocou metódy najmenších štvorcov (OLS), ktorá minimalizuje súčet štvorcov rezíduí:
-\[
-\hat{\boldsymbol{\beta}} = (\mathbf{X}^\top \mathbf{X})^{-1} \mathbf{X}^\top \mathbf{Y}.
-\]
-
-\smallskip
-\noindent
-Napokon, existuje aj trieda modelov, pre ktoré nie je možné nájsť transformáciu, ktorá by ich previedla na lineárny tvar vzhľadom na parametre. Tieto modely označujeme ako \textit{nelineárne regresné modely} a na ich odhad sa využívajú špecializované numerické metódy – napríklad \textit{nelineárna metóda najmenších štvorcov}, založená na iteračných algoritmoch (ako napr. Newtonova metóda).
-
-Podľa toho, ako je vzťah medzi prediktormi a odozvou definovaný, je možné rozlišovať rôzne druhy regresných modelov, ako napríklad:
-\begin{itemize}
-  \item \textit{Lineárna regresia}
-  \item \textit{Polynomiálna regresia n-tého stupňa}
-  \item \textit{Exponenciálna regresia}
-\end{itemize}
-
-\subsection{Lineárny regresný model}
+\subsubsection{Lineárny regresný model}
 \label{subsec:linear_regression}
 
 Lineárna regresia predstavuje základný a zároveň veľmi užitočný prístup v štatistickom modelovaní. Napriek svojej jednoduchosti si zachováva vysokú interpretovateľnosť, robustnosť a je východiskom pre zložitejšie modely, ktoré ju častokrát zovšeobecňujú.
@@ -345,62 +281,7 @@ Y = \beta_0 + \beta_1 X + \varepsilon
 
 kde $\beta_0$ je intercept (priesečník s osou $Y$), $\beta_1$ je smernica regresnej priamky (sklon) a $\varepsilon$ je náhodná zložka – chybový člen so strednou hodnotou nula a konštantným rozptylom $\sigma^2$, nezávislá od $X$.
 
-\subsubsection{Odhad parametrov}
-
-Odhady parametrov $\hat{\beta}_0$ a $\hat{\beta}_1$ získame pomocou metódy najmenších štvorcov (OLS) minimalizáciou súčtu štvorcov rezíduí:
-
-\begin{equation}
-RSS = \sum_{i=1}^{n} \left( y_i - \hat{y}_i \right)^2 = \sum_{i=1}^{n} \left( y_i - \hat{\beta}_0 - \hat{\beta}_1 x_i \right)^2
-\end{equation}
-
-Kde rezíduá predstavujú rozdiel medzi skutočnými a predikovanými hodnotami: $\hat{\varepsilon}_i = y_i - \hat{y}_i$.
-
-Optimálne odhady parametrov sú:
-
-\begin{align}
-\hat{\beta}_1 &= \frac{\sum_{i=1}^{n}(x_i - \bar{x})(y_i - \bar{y})}{\sum_{i=1}^{n}(x_i - \bar{x})^2} \\
-\hat{\beta}_0 &= \bar{y} - \hat{\beta}_1 \bar{x}
-\end{align}
-
-kde $\bar{x}$ a $\bar{y}$ sú výberové priemery vysvetľujúcej a závislej premennej.
-
-\subsubsection{Odhad rozptylu a intervaly spoľahlivosti}
-
-Rozptyl chybového člena $\sigma^2$ odhadujeme ako:
-
-\begin{equation}
-\hat{\sigma}^2 = \frac{RSS}{n - 2}
-\end{equation}
-
-Na základe toho možno odvodiť štandardné chyby pre odhady parametrov a konštruovať intervaly spoľahlivosti:
-
-\begin{equation}
-\hat{\beta}_j \pm t_{1 - \alpha/2}(n - 2) \cdot SE(\hat{\beta}_j)
-\end{equation}
-
-Tieto intervaly poskytujú rozsah hodnôt, ktoré by parameter mohol nadobúdať s danou úrovňou istoty (napr. 95\%).
-
-\subsubsection{Vyhodnotenie presnosti modelu}
-
-Presnosť regresného modelu možno hodnotiť pomocou reziduálneho rozptylu alebo pomocou koeficientu determinácie $R^2$, ktorý vyjadruje podiel vysvetlenej variability modelom:
-
-\begin{equation}
-R^2 = 1 - \frac{RSS}{TSS}
-\end{equation}
-
-kde $TSS = \sum_{i=1}^{n}(y_i - \bar{y})^2$ je celková suma štvorcov. Hodnota $R^2 \in [0, 1]$ vyjadruje, ako dobre model vystihuje pozorované dáta. Zároveň sa $R^2$ zhoduje s druhou mocninou Pearsonovho korelačného koeficientu medzi $X$ a $Y$.
-
-Ďalšou bežne používanou mierou kvality modelu je \textit{stredná kvadratická chyba} (Mean Squared Error, MSE), ktorá predstavuje priemernú kvadratickú vzdialenosť medzi skutočnými a predikovanými hodnotami:
-
-\begin{equation}
-\mathrm{MSE} = \frac{1}{n} \sum_{i=1}^{n} (y_i - \hat{y}_i)^2
-\end{equation}
-
-kde $y_i$ sú skutočné a $\hat{y}_i$ predikované hodnoty. MSE teda vyjadruje priemerné zvyškové chyby modelu. Je úzko príbuzná so sumou štvorcov rezíduí (RSS), pretože $\mathrm{MSE} = \frac{RSS}{n}$. V niektorých kontextoch sa pre korekciu počtu stupňov voľnosti namiesto $n$ používa $n - p$, čím vzniká tzv. \textit{odhadnutý rozptyl rezíduí}.
-
-Nižšie hodnoty MSE indikujú lepšiu aproximáciu dát modelom, hoci treba brať do úvahy aj mierku odozvovej premennej, pretože MSE je citlivá na rozsah hodnôt.
-
-\subsection{Všeobecná polynomiálna regresia n-tého stupňa}
+\subsubsection{Polynomiálna regresia n-tého stupňa}
 \label{subsec:polynomial_regression}
 
 Polynomiálna regresia predstavuje rozšírenie lineárnej regresie, ktoré umožňuje modelovať nelineárne vzťahy medzi premennými. Namiesto priameho vzťahu medzi $X$ a $Y$ sa tu predpokladá, že závislá premenná $Y$ je nejakou polynomiálnou funkciou nezávislej premennej $X$.
@@ -413,11 +294,66 @@ Y = \beta_0 + \beta_1 X + \beta_2 X^2 + \dots + \beta_n X^n + \varepsilon
 
 kde $\beta_0, \beta_1, \dots, \beta_n$ sú regresné koeficienty a $\varepsilon$ je náhodná chyba.
 
-Aj keď model obsahuje mocniny premennej $X$, ide stále o lineárny model vo vzťahu k parametrom $\beta_i$. Preto je možné odhadnúť tieto parametre pomocou metódy najmenších štvorcov podobne ako pri klasickej lineárnej regresii.
-
 Polynomiálna regresia je užitočná v situáciách, keď pozorované dáta vykazujú zakrivenie, ktoré nie je možné zachytiť štandardne pomocou priamky.
 
-\subsection{Exponenciálna regresia}
+\subsection{Odhad parametrov modelu}\label{subsec:odhad_parametrov_modelu}
+
+Odhad parametrov $\boldsymbol{\beta}$ sa v lineárnych modeloch realizuje metódou najmenších štvorcov (OLS), kde minimalizujeme reziduálny súčet štvorcov:
+\begin{equation}
+\hat{\boldsymbol{\beta}} = \arg\min_{\boldsymbol{\beta}} \| \vec{y} - \mathbf{X} \boldsymbol{\beta} \|^2.
+\end{equation}
+Riešenie je dané vzťahom:
+\begin{equation}
+\hat{\boldsymbol{\beta}} = (\mathbf{X}^\top \mathbf{X})^{-1} \mathbf{X}^\top \vec{y},
+\end{equation}
+kde $\mathbf{X}$ je matica s riadkami $\boldsymbol{\phi}(X_i)$.
+
+\subsection{Odhad rozptylu a intervaly spoľahlivosti}
+
+Po odhade parametrov vieme odhadnúť aj rozptyl šumovej zložky:
+\begin{equation}
+\hat{\sigma}^2 = \frac{1}{n - p - 1} \sum_{i=1}^{n} (y_i - \hat{y}_i)^2.
+\end{equation}
+
+Z toho vieme odvodiť štandardné chyby odhadov a konštruovať intervaly spoľahlivosti pre každý koeficient:
+\begin{equation}
+\hat{\beta}_j \pm t_{1 - \alpha/2}(n - p - 1) \cdot \mathrm{SE}(\hat{\beta}_j),
+\end{equation}
+pričom štandardná chyba sa odvodí z diagonálnych prvkov matice:
+\[
+\mathrm{Var}(\hat{\boldsymbol{\beta}}) = \hat{\sigma}^2 (\mathbf{X}^\top \mathbf{X})^{-1}.
+\]
+
+\subsection{Vyhodnotenie presnosti modelu}\label{subsec:presnost_modelu}
+
+\paragraph{Koeficient determinácie $R^2$:} 
+Miera vysvetlenej variability modelom:
+\begin{equation}
+R^2 = 1 - \frac{RSS}{TSS} = \frac{ESS}{TSS},
+\end{equation}
+kde $TSS = \sum (y_i - \bar{y})^2$, $RSS = \sum (y_i - \hat{y}_i)^2$ a $ESS$ je vysvetlená suma štvorcov (angl. \textit{explained sum of squares}).
+
+\paragraph{Stredná kvadratická chyba (Mean Squared Error, MSE):}
+Predstavuje kvadratickú vzdialenosť medzi skutočnými a predikovanými hodnotami:
+
+\begin{equation}
+\mathrm{MSE} = \frac{1}{n} \sum_{i=1}^n (y_i - \hat{y}_i)^2.
+\end{equation}
+
+Pre \textit{odhadnutý rozptyl rezíduí} možno zmeniť $n$ na $n - p - 1$.
+
+
+\subsection{Transformácia odozvy}
+
+V niektorých prípadoch môže byť vhodné transformovať závislú premennú $Y$ pred samotným modelovaním. Typické dôvody na to sú:
+
+\begin{itemize}
+  \item \textit{Linearizácia} funkčného vzťahu medzi $Y$ a $X$ (napr. exponenciálne alebo logaritmické transformácie),
+  \item \textit{Symetrizácia rozdelenia šumu} $\varepsilon$ – napr. pri výrazne šikmých rozdeleniach.
+\end{itemize}
+Transformácie tak môžu zlepšiť splnenie predpokladov lineárneho modelu a zvýšiť presnosť odhadov aj interpretovateľnosť výsledkov.
+
+\subsubsection{Exponenciálna regresia}
 \label{subsec:exponential_regression}
 
 Exponenciálna regresia je nelineárny regresný model, ktorý sa používa na opis vzťahu, pri ktorom sa hodnota závislej premennej $Y$ mení exponenciálne v závislosti od nezávislej premennej $X$. Takýto model je vhodný najmä v prípadoch, keď sa údaje vyznačujú rastom alebo poklesom, ktorý sa zrýchľuje alebo spomaľuje.
@@ -442,9 +378,48 @@ Na odhad parametrov je bežným prístupom logaritmická transformácia, ktorou 
 \ln(Y) = \ln(\alpha) + \beta X + \varepsilon
 \end{equation}
 
-Po tejto transformácii je možné použiť metódu najmenších štvorcov podobne ako pri lineárnej regresii.
-
 Exponenciálna regresia sa uplatňuje najmä v oblasti prírodných vied, epidemiológie, finančného modelovania a všade tam, kde procesy prebiehajú s exponenciálnym charakterom (napr. populačný rast, rádioaktívny rozpad, úrokovanie, šírenie infekcie a pod.).
+
+\subsection{Kódovanie kvalitatívnych premenných}
+
+Ak medzi prediktormi $X$ figurujú aj \textit{kvalitatívne (kategoriálne)} premenné, je potrebné ich previesť na číselnú formu. Najčastejšie sa využíva tzv. \textit{indikátorové (dummy) kódovanie}, pri ktorom sa pre každú kategóriu (okrem referenčnej) vytvorí binárna premenná s hodnotami $\{0, 1\}$. Takto je možné zaradiť aj nominálne a ordinálne premenné do lineárneho modelu.
+
+Formálne možno pre kategóriálnu premennú $Z$ nad množinou kategórií $\mathcal{C} = \{c_1, c_2, \dots, c_K\}$ definovať \textbf{indikátorové (bázové) funkcie} nasledovne:
+\begin{equation}
+\phi_j(z) := \mathbb{I}\{z = c_j\}, \quad \text{pre } j = 1, 2, \dots, K-1
+\end{equation}
+kde $\mathbb{I}\{\cdot\}$ je \textit{indikátorová funkcia}, ktorá nadobúda hodnotu 1, ak je podmienka splnená, inak 0.
+
+Prakticky to znamená, že ak máme napríklad premennú \textit{Farba} s tromi kategóriami: \textit{červená, modrá} a \textit{zelená}, potom môžeme vytvoriť dve binárne premenné:
+\begin{align*}
+\phi_1(\text{Farba}) &= \mathbb{I}\{\text{Farba} = \text{modrá}\}, \\
+\phi_2(\text{Farba}) &= \mathbb{I}\{\text{Farba} = \text{zelená}\}.
+\end{align*}
+Kategória \textit{červená} v tomto prípade slúži ako \textit{referenčná kategória} a je implicitne obsiahnutá v nulových hodnotách oboch premenných $\phi_1$ a $\phi_2$.
+
+Vložením týchto indikátorových premenných do regresného modelu umožňujeme modelu zohľadniť vplyv rôznych kategórií bez porušenia číselnej povahy regresného výpočtu.
+
+\subsection{Maticová reprezentácia a odhad parametrov}
+
+Ak pozorujeme $n$ realizácií premenných, môžeme sústavu rovníc pozorovaní pre regresný model zapísať v maticovej forme ako:
+\begin{equation}
+\vec y = \mathbf{X} \boldsymbol{\beta} + \boldsymbol{\varepsilon},
+\end{equation}
+kde:
+\begin{itemize}
+  \item $\vec y$ je $(n \times 1)$ vektor pozorovaných hodnôt odozvy,
+  \item $\mathbf{X}$ je $(n \times p)$ matica plánu, ktorej riadky obsahujú hodnoty bázových funkcií pre každé pozorovanie,
+  \item $\boldsymbol{\beta}$ je $(p \times 1)$ vektor neznámych parametrov,
+  \item $\boldsymbol{\varepsilon}$ je vektor náhodných chýb.
+\end{itemize}
+Parametre $\boldsymbol{\beta}$ sa najčastejšie odhadujú pomocou metódy najmenších štvorcov (OLS), ktorá minimalizuje súčet štvorcov rezíduí:
+\[
+\hat{\boldsymbol{\beta}} = (\mathbf{X}^\top \mathbf{X})^{-1} \mathbf{X}^\top \vec y.
+\]
+
+\smallskip
+\noindent
+Napokon, existuje aj trieda modelov, pre ktoré nie je možné nájsť transformáciu, ktorá by ich previedla na lineárny tvar vzhľadom na parametre. Tieto modely označujeme ako \textit{nelineárne regresné modely} a na ich odhad sa využívajú špecializované numerické metódy – napríklad \textit{nelineárna metóda najmenších štvorcov}, založená na iteračných algoritmoch (ako napr. Newtonova metóda).
 
 \section{Klasifikačné metódy}\label{sec:classification}
 
