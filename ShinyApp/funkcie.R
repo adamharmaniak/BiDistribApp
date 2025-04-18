@@ -563,6 +563,17 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
     z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
     z_matrix <- t(z_matrix)
     
+    model_summary <- tibble::tibble(
+      Parameter = c(
+        paste0("Mean (", continuous_vars[1], ")"),
+        paste0("SD (", continuous_vars[1], ")"),
+        paste0("Mean (", continuous_vars[2], ")"),
+        paste0("SD (", continuous_vars[2], ")"),
+        "Pearson correlation"
+      ),
+      Value = c(mean_x, sd_x, mean_y, sd_y, cor_val)
+    )
+    
     if (plot_type == "3D") {
       # 3D Vizualizacia
       fig_3d <- plot_ly(
@@ -587,7 +598,8 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
         plot = fig_3d,
         x_vals = x_vals,
         y_vals = y_vals,
-        z_matrix = z_matrix
+        z_matrix = z_matrix,
+        model_summary = model_summary
       ))
       
     } else if (plot_type == "2D") {
@@ -622,7 +634,7 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
         (scatter_plot + density_y) +
         plot_layout(widths = c(4, 1), heights = c(1, 4))
       
-      return(final_plot_2d)
+      return(list(final_plot_2d, model_summary = model_summary))
     }
   }
   
@@ -860,7 +872,7 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     marginal_cdf_function <- function(value, mean, sd, index) {
       density_type <- marginal_densities[index]
       
-      if (density_type == "dnorm" || density_type == "log_dnorm") {
+      if (density_type == "normal" || density_type == "log_normal") {
         return(pnorm(value, mean = mean, sd = sd))
       } else if (density_type == "t") {
         df <- max(nrow(data) - 1, 2)
@@ -900,9 +912,9 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     marginal_density_function <- function(value, mean, sd, index) {
       density_type <- marginal_densities[index]
       
-      if (density_type == "dnorm") {
+      if (density_type == "normal") {
         return(dnorm(value, mean = mean, sd = sd))
-      } else if (density_type == "log_dnorm") {
+      } else if (density_type == "log_normal") {
         return(exp(dnorm(value, mean = mean, sd = sd, log = TRUE)))
       } else if (density_type == "t") {
         df <- max(nrow(data) - 1, 2)
@@ -1005,12 +1017,12 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     marginal_cdf_function <- function(value, mean, sd, index) {
       density_type <- marginal_densities[index]
       
-      if (density_type == "dnorm" || density_type == "log_dnorm") {
+      if (density_type == "normal" || density_type == "log_normal") {
         return(pnorm(value, mean = mean, sd = sd))
       } else if (density_type == "t") {
         df <- max(nrow(data) - 1, 2)
         return(pt((value - mean) / sd, df = df))
-      } else if (density_type == "kde") {
+      } else if (density_type == "KDE") {
         dens <- density(data[[continuous_vars[index]]], n = 512)
         dx <- dens$x
         dy <- dens$y
@@ -1051,14 +1063,14 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     # Funkcia na vypocet marginalnej hustoty
     marginal_density_function <- function(value, mean, sd, index) {
       density_type <- marginal_densities[index]
-      if (density_type == "dnorm") {
+      if (density_type == "normal") {
         return(dnorm(value, mean = mean, sd = sd))
-      } else if (density_type == "log_dnorm") {
+      } else if (density_type == "log_normal") {
         return(exp(dnorm(value, mean = mean, sd = sd, log = TRUE)))
       } else if (density_type == "t") {
         df <- max(nrow(data) - 1, 2)
         return(dt((value - mean) / sd, df = df) / sd)
-      } else if (density_type == "kde") {
+      } else if (density_type == "KDE") {
         dens <- density(data[[continuous_vars[index]]], n = 512)
         approx_fun <- approxfun(dens$x, dens$y, rule = 2)
         return(approx_fun(value))
@@ -1147,8 +1159,14 @@ discrete_joint_distribution <- function(data, discrete_vars, plot_type, abort_si
   tab <- as.data.frame(table(data[, discrete_vars]))
   tab$Probability <- tab$Freq / sum(tab$Freq)
   
-  tab[[discrete_vars[1]]] <- as.numeric(as.factor(tab[[discrete_vars[1]]]))
-  tab[[discrete_vars[2]]] <- as.numeric(as.factor(tab[[discrete_vars[2]]]))
+  tab[[discrete_vars[1]]] <- factor(tab[[discrete_vars[1]]])
+  tab[[discrete_vars[2]]] <- factor(tab[[discrete_vars[2]]])
+  
+  tab$x_pos <- as.numeric(tab[[discrete_vars[1]]])
+  tab$y_pos <- as.numeric(tab[[discrete_vars[2]]])
+  
+  x_labels <- levels(tab[[discrete_vars[1]]])
+  y_labels <- levels(tab[[discrete_vars[2]]])
   
   if (plot_type == "2D") {
     marginal_x <- tab %>%
@@ -1184,12 +1202,12 @@ discrete_joint_distribution <- function(data, discrete_vars, plot_type, abort_si
     return(final_plot_2d)
     
   } else if (plot_type == "3D") {
-    # 3D Vizualizacia
     fig_3d <- plot_ly()
+    
     for (i in 1:nrow(tab)) {
       fig_3d <- fig_3d %>% add_trace(
-        x = rep(tab[[discrete_vars[1]]][i], 2),
-        y = rep(tab[[discrete_vars[2]]][i], 2),
+        x = rep(tab$x_pos[i], 2),
+        y = rep(tab$y_pos[i], 2),
         z = c(0, tab$Probability[i]),
         type = "scatter3d",
         mode = "lines",
@@ -1199,8 +1217,8 @@ discrete_joint_distribution <- function(data, discrete_vars, plot_type, abort_si
     }
     
     fig_3d <- fig_3d %>% add_trace(
-      x = tab[[discrete_vars[1]]],
-      y = tab[[discrete_vars[2]]],
+      x = tab$x_pos,
+      y = tab$y_pos,
       z = tab$Probability,
       type = "scatter3d",
       mode = "markers",
@@ -1210,8 +1228,12 @@ discrete_joint_distribution <- function(data, discrete_vars, plot_type, abort_si
     
     fig_3d <- fig_3d %>% layout(
       scene = list(
-        xaxis = list(title = paste0(discrete_vars[1], " (X)")),
-        yaxis = list(title = paste0(discrete_vars[2], " (Y)")),
+        xaxis = list(title = paste0(discrete_vars[1], " (X)"),
+                     tickvals = 1:length(x_labels),
+                     ticktext = x_labels),
+        yaxis = list(title = paste0(discrete_vars[2], " (Y)"),
+                     tickvals = 1:length(y_labels),
+                     ticktext = y_labels),
         zaxis = list(title = "P(X, Y)")
       )
     )
@@ -1236,7 +1258,7 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
       stop("Nebol zadany typ grafu na vykreslenie.")
     }
     result <- discrete_joint_distribution(data, discrete_vars, plot_type, abort_signal)
-    print(result)
+    return(result)
   } else if (length(selected_variables) == 2 && length(discrete_vars) == 0) {
     if (use_copula == FALSE) {
       if (is.null(plot_type)){
@@ -1262,7 +1284,7 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
       stop("Nebol zadany typ grafu na vykreslenie.")
     }
     result <- mixture_joint_distribution(data, discrete_vars, continuous_vars, model_type, bw, plot_type, abort_signal)
-    print(result)
+    return(result)
   }
 }
 

@@ -268,12 +268,12 @@ server <- function(input, output, session) {
               condition = "input.density_model_type == 'parametric'",
               selectInput(
                 "marginal_density_1", "Marginal density (X):",
-                choices = c("dnorm", "log_dnorm", "t"),
+                choices = c("normal", "log_normal", "t"),
                 selected = isolate(input$marginal_density_1)
               ),
               selectInput(
                 "marginal_density_2", "Marginal density (Y):",
-                choices = c("dnorm", "log_dnorm", "t"),
+                choices = c("normal", "log_normal", "t"),
                 selected = isolate(input$marginal_density_2)
               )
             ),
@@ -282,12 +282,12 @@ server <- function(input, output, session) {
               condition = "input.density_model_type == 'hybrid'",
               selectInput(
                 "marginal_density_1", "Marginal density (X):",
-                choices = c("dnorm", "log_dnorm", "t", "kde"),
+                choices = c("normal", "log_normal", "t", "KDE"),
                 selected = isolate(input$marginal_density_1)
               ),
               selectInput(
                 "marginal_density_2", "Marginal density (Y):",
-                choices = c("dnorm", "log_dnorm", "t", "kde"),
+                choices = c("normal", "log_normal", "t", "KDE"),
                 selected = isolate(input$marginal_density_2)
               )
             )
