@@ -2044,9 +2044,23 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
   response_name <- attr(df, "response_var")
   predictor_name <- attr(df, "predictor_var")
   
-  # Rozdelenie na sekcie pre podmienene hustoty
-  breaks <- seq(min(df$predictor, na.rm = TRUE), max(df$predictor, na.rm = TRUE), length.out = n_breaks + 1)
-  df$section <- cut(df$predictor, breaks = breaks, include.lowest = TRUE)
+  # Zistenie typu prediktora
+  var_types <- identify_variables(df)
+  predictor_is_discrete <- "predictor" %in% var_types$Diskretne
+  
+  # Ak je prediktor diskretny (kategorie)
+  if (predictor_is_discrete) {
+    
+    df$predictor_cat <- df$predictor
+    df$predictor <- as.numeric(factor(df$predictor_cat))
+    unique_pred_vals <- sort(unique(df$predictor))
+    df$section <- factor(df$predictor, levels = unique_pred_vals)
+    
+  } else {
+    # Spojity prediktor – delenie na sekcie
+    breaks <- seq(min(df$predictor, na.rm = TRUE), max(df$predictor, na.rm = TRUE), length.out = n_breaks + 1)
+    df$section <- cut(df$predictor, breaks = breaks, include.lowest = TRUE)
+  }
   
   # Hustoty pre kazdu sekciu
   density_data <- do.call(rbind, lapply(split(df, df$section), function(sub_df) {
@@ -2111,8 +2125,16 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
       title = paste("Podmienené hustoty pre", response_name, "podľa", predictor_name),
       x = paste(predictor_name, "(Prediktor)"),
       y = paste(response_name, "(Spojitá odozva)")
-    ) +
-    geom_vline(xintercept = breaks, linetype = "dashed", color = "grey50")
+    )
+    
+  if (predictor_is_discrete) {
+    p <- p + scale_x_continuous(
+      breaks = unique(df$predictor),
+      labels = levels(factor(df$predictor_cat))
+    )
+  } else {
+    p <- p + geom_vline(xintercept = breaks, linetype = "dashed", color = "grey50")
+  }
   
   # Podmienene hustoty
   if (!is.null(density_data) && nrow(density_data) > 0) {
@@ -2125,38 +2147,39 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
     warning("Nebolo mozne vypocitat hustoty pre ziadnu sekciu!")
   }
   
-  # Vygenerovanie rovnomernej sekvencie pre plynulé vykreslenie
-  x_seq <- seq(min(df$predictor, na.rm = TRUE), max(df$predictor, na.rm = TRUE), length.out = 200)
-  new_data <- data.frame(predictor = x_seq)
-  
-  # Stredna hodnota regresie
-  if (mean_curve) {
-    mean_formula <- as.formula(paste("response ~ poly(predictor, ", mean_poly_degree, ", raw = TRUE)"))
-    mean_model <- lm(mean_formula, data = df)
-    mean_pred <- predict(mean_model, newdata = new_data)
+  if (!predictor_is_discrete) {
+    x_seq <- seq(min(df$predictor, na.rm = TRUE), max(df$predictor, na.rm = TRUE), length.out = 200)
+    new_data <- data.frame(predictor = x_seq)
     
-    p <- p + geom_line(
-      data = data.frame(predictor = x_seq, mean_pred = mean_pred),
-      aes(x = predictor, y = mean_pred),
-      color = "blue", size = 1.2
-    )
-  }
-  
-  # Kvantilove krivky
-  if (!is.null(quantiles)) {
-    for (q in quantiles) {
-      quantile_formula <- as.formula(paste("response ~ poly(predictor, ", quantile_poly_degree, ", raw = TRUE)"))
-      rq_fit <- quantreg::rq(quantile_formula, tau = q, data = df)
-      quantile_pred <- predict(rq_fit, newdata = new_data)
+    if (mean_curve) {
+      mean_formula <- as.formula(paste("response ~ poly(predictor, ", mean_poly_degree, ", raw = TRUE)"))
+      mean_model <- lm(mean_formula, data = df)
+      mean_pred <- predict(mean_model, newdata = new_data)
       
       p <- p + geom_line(
-        data = data.frame(predictor = x_seq, quantile_pred = quantile_pred),
-        aes(x = predictor, y = quantile_pred),
-        color = "purple", linetype = "dashed"
+        data = data.frame(predictor = x_seq, mean_pred = mean_pred),
+        aes(x = predictor, y = mean_pred),
+        color = "blue", size = 1.2
       )
     }
     
-    p <- p + guides(color = guide_legend(title = "Hustota (typ)"))
+    if (!is.null(quantiles)) {
+      for (q in quantiles) {
+        quantile_formula <- as.formula(paste("response ~ poly(predictor, ", quantile_poly_degree, ", raw = TRUE)"))
+        rq_fit <- quantreg::rq(quantile_formula, tau = q, data = df)
+        quantile_pred <- predict(rq_fit, newdata = new_data)
+        
+        p <- p + geom_line(
+          data = data.frame(predictor = x_seq, quantile_pred = quantile_pred),
+          aes(x = predictor, y = quantile_pred),
+          color = "purple", linetype = "dashed"
+        )
+      }
+    }
+  } else {
+    if (mean_curve || !is.null(quantiles)) {
+      message("Pre diskrétny prediktor sa regresné a kvantilové krivky nezobrazujú.")
+    }
   }
   
   return(p)
@@ -2167,16 +2190,26 @@ plot_conditional_discrete_densities <- function(df, n_breaks, density_scaling, o
   response_name <- attr(df, "response_var")
   predictor_name <- attr(df, "predictor_var")
   
-  if (is.factor(df$response)) {
-    df$response <- as.numeric(as.character(df$response))
+  var_types <- identify_variables(df)
+  predictor_is_discrete <- "predictor" %in% var_types$Diskretne
+  
+  df$response_cat <- df$response
+  response_levels <- levels(factor(df$response_cat))
+  df$response <- as.numeric(factor(df$response_cat, levels = response_levels))
+  
+  breaks <- NULL
+  
+  if (predictor_is_discrete) {
+    df$predictor_cat <- df$predictor
+    df$predictor <- as.numeric(factor(df$predictor_cat))
+    unique_pred_vals <- sort(unique(df$predictor))
+    df$section <- factor(df$predictor, levels = unique_pred_vals)
+  } else {
+    breaks <- seq(min(df$predictor, na.rm = TRUE),
+                  max(df$predictor, na.rm = TRUE),
+                  length.out = n_breaks + 1)
+    df$section <- cut(df$predictor, breaks = breaks, include.lowest = TRUE)
   }
-  
-  # Rozdelenie prediktora na sekcie
-  breaks <- seq(min(df$predictor, na.rm = TRUE),
-                max(df$predictor, na.rm = TRUE),
-                length.out = n_breaks + 1)
-  
-  df$section <- cut(df$predictor, breaks = breaks, include.lowest = TRUE)
   
   # Vypocet pravdepodobnostnych funkcii v jednotlivych sekciach
   density_data <- do.call(rbind, lapply(split(df, df$section), function(sub_df) {
@@ -2212,14 +2245,27 @@ plot_conditional_discrete_densities <- function(df, n_breaks, density_scaling, o
   
   # Vykreslenie grafu
   p <- ggplot(df, aes(x = predictor, y = as.numeric(response))) +
-    geom_jitter(width = 0.1, height = 0.1, alpha = 0.6, color = "darkorange") +
+    geom_jitter(width = 0.1, height = 0.1, alpha = 0.5, color = "orange") +
     theme_bw() +
     labs(
       title = paste("Podmienené pravdepodobnostné funkcie pre", response_name, "podľa", predictor_name),
       x = paste(predictor_name, "(Prediktor)"),
       y = paste(response_name, "(Diskrétna odozva)")
     ) +
-    geom_vline(xintercept = breaks, linetype = "dashed", color = "grey50")
+    geom_vline(xintercept = breaks, linetype = "dashed", color = "grey50") +
+    scale_y_continuous(
+      breaks = seq_along(response_levels),
+      labels = response_levels
+    )
+  
+  if (predictor_is_discrete) {
+    p <- p + scale_x_continuous(
+      breaks = unique(df$predictor),
+      labels = levels(factor(df$predictor_cat))
+    )
+  } else {
+    p <- p + geom_vline(xintercept = breaks, linetype = "dashed", color = "grey50")
+  }
   
   # Podmienene pravdepodobnostne funkcie
   if (!is.null(density_data) && nrow(density_data) > 0) {
