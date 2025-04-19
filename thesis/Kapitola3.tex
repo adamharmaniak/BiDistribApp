@@ -522,6 +522,12 @@ Parametrické modelovanie predpokladá, že združené rozdelenie pravdepodobnos
   f_{\mu, \Sigma}(x_1, x_2) = \frac{1}{2\pi |\Sigma|^{1/2}} \exp\left( -\frac{1}{2} (\vec{x} - \vec{\mu})^\top \Sigma^{-1} (\vec{x} - \vec{\mu}) \right),
   \end{equation}
   kde $\vec{\mu} = (\mu_1, \mu_2)^\top$ a $\Sigma$ je symetrická pozitívne definitná kovariančná matica.
+
+   \item \textit{Združené t-rozdelenie} – všeobecnejšie rozdelenie so „zhrubnutými chvostami“ oproti Gaussovskému. Hustota dvojrozmerného t-rozdelenia s $\nu$ stupňami voľnosti je daná:
+  \begin{equation}
+  f_{\nu, \mu, \Sigma}(x_1, x_2) = \frac{\Gamma\left(\frac{\nu + 2}{2}\right)}{\Gamma\left(\frac{\nu}{2}\right)\nu\pi |\Sigma|^{1/2}} \left[ 1 + \frac{1}{\nu} (\vec{x} - \vec{\mu})^\top \Sigma^{-1} (\vec{x} - \vec{\mu}) \right]^{-\frac{\nu + 2}{2}},
+  \end{equation}
+  kde $\vec{\mu}$ a $\Sigma$ sú stredná hodnota a kovariančná matica analogicky ako pri normálnom rozdelení, a $\nu > 0$ sú stupne voľnosti.
   
   \item \textit{Kopulové modely} – založené na dekompozícii rozdelenia na marginálne rozdelenia $F_1, F_2$ a kopulu $C$, kde sa parametrická forma týka výberu konkrétnej triedy kopuly (napr. Gaussovská, Claytonova, Gumbelova, t-kopula).
 \end{itemize}
@@ -587,4 +593,150 @@ Rovnako ako v jednorozmernom prípade, \textit{neparametrické prístupy} nevyž
 
 \section{Modelovanie rozdelenia zmiešaného náhodného vektora}\label{sec:joint_mixture_modeling}
 
+V mnohých praktických aplikáciách sa stretávame so situáciami, kde niektoré komponenty náhodného vektora sú diskrétne, zatiaľ čo iné sú spojité. Takéto modely označujeme ako \textit{zmiešané náhodné vektory} (angl. \textit{mixed-type random vectors}). Typickým príkladom sú meteorologické, poisťovacie alebo simulačné modely, kde napr. výskyt udalosti je diskrétny, ale jej rozsah je spojitý. 
+
+Modelovanie týchto štruktúr je komplikované najmä preto, že štandardné pravdepodobnostné modely predpokladajú homogénny typ premenných (všetky spojité alebo všetky diskrétne).
+
+\subsection{Podmienené rozdelenie}
+
+\subsubsection{Hustota}
+
+Podmienená hustota spojitej premennej vzhľadom na kategóriu sa vypočíta ako:
+
+\begin{equation}
+f_{C \mid D}(c \mid d) = \frac{f_{D,C}(d, c)}{\Pr(D = d)},
+\end{equation}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{cond_dens_mix_contresp.png}
+    \caption{Podmienená hustota (parametrická: normálne rozdelenie) spojitej premennej \textit{Hmotnosť v gramoch} vzhľadom na diskrétnu premennú \textit{Druh} tučniakov}
+    \label{fig:cond_dens_mix_contresp}
+\end{figure}
+
+Podmienenú pravdepodobnostnú funkciu kategórie vzhľadom na spojitú hodnotu počítame nasledovne:
+
+\begin{equation}
+\Pr(D = d \mid C = c) = \frac{\Pr(D = d) \cdot f_{C \mid D}(c \mid d)}{f_C(c)}.
+\end{equation}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{cond_dens_mix_discresp.png}
+    \caption{Podmienená pravdepodobnostná funkcia diskrétnej premennej \textit{Druh} vzhľadom na spojitú premennú \textit{Hmotnosť v gramoch} tučniakov}
+    \label{fig:cond_dens_mix_contresp}
+\end{figure}
+
+\subsubsection{Stredná hodnota a kvantilová funkcia}
+
+Podmienená stredná hodnota spojitej premennej vzhľadom na kategóriu $D = d$ je definovaná ako:
+
+\begin{equation}
+\mathbb{E}[C \mid D = d] = \int_{\mathbb{R}} c \cdot f_{C \mid D}(c \mid d) \, dc,
+\end{equation}
+
+Kvantilová funkcia spojitej premennej $C$ podmienená kategóriou $D = d$:
+
+\begin{equation}
+Q_C^{(d)}(q) := \inf \left\{ c \in \mathbb{R} \mid \int_{-\infty}^c f_{C \mid D}(t \mid d) \, dt \geq q \right\}.
+\end{equation}
+
+Podmienená stredná hodnota diskrétnej premennej vzhľadom na hodnotu spojitej:
+
+\begin{equation}
+\mathbb{E}[D \mid C = c] = \sum_{d=1}^{K} d \cdot \Pr(D = d \mid C = c),
+\end{equation}
+
+Kvantilová funkcia diskrétnej premennej $D$ vzhľadom na $C = c$:
+
+\begin{equation}
+Q_D^{(c)}(q) := \min \left\{ d \in \{1, \ldots, K\} \mid \sum_{j=1}^{d} \Pr(D = j \mid C = c) \geq q \right\}.
+\end{equation}
+
+
+
+\subsection{Združená hustota}
+\label{subsec:conditional_mixture_strategy}
+
+\subsubsection{Stratifikované modelovanie pomocou zmesi podmienených hustôt}\label{subsubsec:stratif_joint_density}
+
+Pri modelovaní \textit{združenej hustoty} zmiešaného náhodného vektora $(D, C)$, kde $D$ je diskrétna (kategoriálna) premenná a $C$ je spojitá, je často využívaná tzv. \textit{stratégia podmienených hustôt}. Táto stratégia vychádza z nasledovného rozkladu združenej hustoty pravdepodobnosti:
+
+\begin{equation}
+f_{D,C}(d, c) = \Pr(D = d) \cdot f_{C \mid D}(c \mid d).
+\end{equation}
+
+Z toho následne vyplýva \textit{marginálna hustota spojitej premennej} ako vážený súčet:
+
+\begin{equation}
+f_C(c) = \sum_{d=1}^{K} \Pr(D = d) \cdot f_{C \mid D}(c \mid d),
+\end{equation}
+
+pričom váhy $\Pr(D = d)$ zodpovedajú výskytom jednotlivých kategórií v dátach a $f_{C \mid D}(c \mid d)$ predstavuje podmienenú hustotu spojitej premennej v rámci danej kategórie.
+
+Analogicky môžeme získať aj \textit{marginálnu pravdepodobnostnú funkciu diskrétnej premennej} $D$ integráciou združenej hustoty nad spojitou premennou $C$:
+
+\begin{equation}
+\Pr(D = d) = \int_{\mathbb{R}} f_{D,C}(d, c) \, dc,
+\end{equation}
+
+kde $f_{D,C}(d, c)$ je združená hustota zmiešaného náhodného vektora $(D, C)$. Tento vzťah vyjadruje pravdepodobnosť výskytu kategórie $d$ ako celkovú pravdepodobnosť v spojitom priestore $C$ pre dané $D = d$.
+
+\bigskip
+
+Prístup, ktorý si v tejto podkapitole stručne popíšeme, bol systematicky opísaný v práci od ~\textcite{pleisMixtureDissertation}, kde je pod názvom \textit{general location model} (GLOM) prezentovaný ako vhodný spôsob modelovania zmiešaného vektora pomocou zmesi podmienených Gaussových (prípadne aj iných) rozdelení. V každej diskrétnej triede sa predpokladá odlišné parametrické rozdelenie spojitej zložky, avšak je možné použiť aj jadrové vyhladzovanie ako neparametrický prístup, a združená hustota sa potom zostavuje ako ich vážená kombinácia.
+
+Danú stratégiu možno implementovať nasledovne:
+\begin{itemize}
+  \item Diskrétna premenná $D$ je kódovaná ako faktor s $K$ kategóriami.
+  \item Pre každú kategóriu $d = 1, \dots, K$ sa vypočíta podmienená hustota $f_{C \mid D}(c \mid d)$ – buď neparametricky (jadrovým vyhladzovaním), alebo pomocou parametrov napríklad normálneho alebo Studentovho $t$-rozdelenia.
+  \item Každá hustota je následne vážená podľa výskytu kategórie $\Pr(D = d)=\pi_d$ v dátach (empirická pravdepodobnosť).
+  \item Výsledná hustota $f_C(c)$ je tak zmesou hustôt podmienených tried.
+\end{itemize}
+
+Táto stratégia zodpovedá konštrukcii konečnej zmesi:
+
+\begin{equation}
+f_C(c) = \sum_{d=1}^{K} \pi_d \cdot f_{C|D=d}(c), \quad \text{kde } \sum_{d=1}^{K} \pi_d = 1.
+\end{equation}
+
+Tento prístup má niekoľko výhod:
+\begin{itemize}
+  \item Zachováva jemnú štruktúru závislosti medzi $C$ a $D$, bez potreby nepresného binárneho kódovania.
+  \item Vyhýba sa problémom pri použití spojitých kopúl na kombináciu diskrétnych a spojitých rozdelení.
+  \item Prirodzená interpretácia generatívneho modelu: najprv sa vygeneruje kategória $D = d$, následne sa podľa nej vyberie podmienené rozdelenie $C$.
+\end{itemize}
+
+Na druhej strane, použitie tejto stratégie predpokladá, že pre každú kategóriu $D = d$ je možné spoľahlivo odhadnúť parametre rozdelenia spojitej premennej. V prípade veľmi malých kategórií môže byť však tento odhad nestabilný.
+
+\bigskip
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}[t]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{joint_mixture_density_2D.png}
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{joint_mixture_density_3D.png}
+    \end{minipage}
+    \caption{Stratifikované modelovanie združenej hustoty pravdepodobnosti premenných \textit{Druh} a \textit{Hmotnosť v gramoch} tučniakov (vľavo graf: Pozorovania + Marginálie, vpravo graf: Združená hustota (parametricky: normálne rozdelenie))}
+    \label{fig:stratified_modelling_mix_density}
+\end{figure}
+
+\subsubsection{Modelovanie pomocou kopúl}\label{copula_joint_density}
+
+Jedným z nástrojov, ktoré umožňujú spojiť rozdielne typy premenných v spoločnom modeli, sú \textit{kopule}. V prípade, že je premenná $D$ kategoriálna a $C$ spojitá, môžeme modelovať podmienenú závislosť tak, že každá trieda $D = d$ má vlastné marginálne rozdelenie $f_{C \mid D = d}(c)$ a tieto sa následne spoja pomocou kopule $\mathbb{C}$.
+
+Avšak kopule, ktoré poznáme sú spojité a teda ak chceme nejakú z nich použiť (napr. Gaussovu), dostávame sa k niekoľkým problémom:
+
+\begin{itemize}
+  \item \textit{Problémy na hraniciach} – diskrétne premenné nemajú spojitú distribučnú funkciu, čo vedie k nejednoznačnosti transformácie na jednotkový interval.
+  \item \textit{Strata informácie} – binarizácia alebo kódovanie kategoriálnej premennej vedie k strate jemnej štruktúry závislosti.
+  \item \textit{Interpretácia} – štruktúra závislosti medzi kategoriálnou a spojitou premennou je pri tomto prístupe ťažko interpretovateľná.
+\end{itemize}
+
+Z týchto dôvodov sa v aplikáciách uplatňujú rôzne stratégie, ako napríklad \textit{conditional copula modeling}, ktorým sa však v tejto práci venovať nebudeme.
 

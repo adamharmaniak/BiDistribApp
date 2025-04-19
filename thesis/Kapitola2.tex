@@ -281,18 +281,18 @@ Y = \beta_0 + \beta_1 X + \varepsilon
 
 kde $\beta_0$ je intercept (priesečník s osou $Y$), $\beta_1$ je smernica regresnej priamky (sklon) a $\varepsilon$ je náhodná zložka – chybový člen so strednou hodnotou nula a konštantným rozptylom $\sigma^2$, nezávislá od $X$.
 
-\subsubsection{Polynomiálna regresia n-tého stupňa}
+\subsubsection{Polynomiálna regresia m-tého stupňa}
 \label{subsec:polynomial_regression}
 
 Polynomiálna regresia predstavuje rozšírenie lineárnej regresie, ktoré umožňuje modelovať nelineárne vzťahy medzi premennými. Namiesto priameho vzťahu medzi $X$ a $Y$ sa tu predpokladá, že závislá premenná $Y$ je nejakou polynomiálnou funkciou nezávislej premennej $X$.
 
-Model polynomiálnej regresie $n$-tého stupňa má tvar:
+Model polynomiálnej regresie $m$-tého stupňa má tvar:
 
 \begin{equation}
-Y = \beta_0 + \beta_1 X + \beta_2 X^2 + \dots + \beta_n X^n + \varepsilon
+Y = \beta_0 + \beta_1 X + \beta_2 X^2 + \dots + \beta_m X^m + \varepsilon
 \end{equation}
 
-kde $\beta_0, \beta_1, \dots, \beta_n$ sú regresné koeficienty a $\varepsilon$ je náhodná chyba.
+kde $\beta_0, \beta_1, \dots, \beta_m$ sú regresné koeficienty a $\varepsilon$ je náhodná chyba.
 
 Polynomiálna regresia je užitočná v situáciách, keď pozorované dáta vykazujú zakrivenie, ktoré nie je možné zachytiť štandardne pomocou priamky.
 
@@ -463,17 +463,17 @@ Logistická regresia patrí medzi základné diskriminatívne klasifikačné met
 Namiesto priameho modelovania pravdepodobnosti pomocou lineárnej funkcie, ktorá by mohla produkovať neinterpretovateľné hodnoty, teda mimo intervalu $(0,1)$, sa v logistickej regresii lineárna funkcia transformuje pomocou tzv. \textit{logit transformácie}, ktorá modeluje logaritmus šance (odds), že $Y = c_1$:
 
 \begin{equation}
-\log\left( \frac{p(x)}{1 - p(x)} \right) = b_0 + b_1 x
+\log\left( \frac{p(x)}{1 - p(x)} \right) = \beta_0 + \beta_1 x
 \end{equation}
 
-kde $p(x) = \mathrm{Pr}(Y=c_1\mid X=x)$ je hľadaná pravdepodobnosť a $b_0$, $b_1$ sú regresné koeficienty.
+kde $p(x) = \mathrm{Pr}(Y=c_1\mid X=x)$ je hľadaná pravdepodobnosť a $\beta_0$, $\beta_1$ sú regresné koeficienty.
 
 \textbf{Logistická funkcia}
 
 Po úprave môžeme pravdepodobnosť $p(x)$ vyjadriť pomocou tzv. logistickej funkcie:
 
 \begin{equation}
-p(x) = \frac{e^{b_0 + b_1 x}}{1 + e^{b_0 + b_1 x}}
+p(x) = \frac{e^{\beta_0 + \beta_1 x}}{1 + e^{\beta_0 + \beta_1 x}}
 \end{equation}
 
 Táto funkcia zabezpečuje, že výsledná pravdepodobnosť sa vždy nachádza v intervale $(0,1)$. Klasifikačné rozhodnutie je potom založené na prahu – obvykle platí, že ak $p(x) > 0.5$, potom pozorovanie priraďujeme do triedy $c_1$.
@@ -483,17 +483,17 @@ Táto funkcia zabezpečuje, že výsledná pravdepodobnosť sa vždy nachádza v
 Podiel pravdepodobnosti a jej doplnku sa nazýva \textit{šanca (odds)}:
 
 \begin{equation}
-\text{odds}(x) = \frac{p(x)}{1 - p(x)} = e^{b_0 + b_1 x}
+\text{odds}(x) = \frac{p(x)}{1 - p(x)} = e^{\beta_0 + \beta_1 x}
 \end{equation}
 
-Z toho vyplýva, že jednotkový nárast $x$ spôsobí, že šanca sa násobí o $e^{b_1}$. Ak $b_1 > 0$, pravdepodobnosť triedy $c_1$ rastie so zvyšujúcou sa hodnotou $x$.
+Z toho vyplýva, že jednotkový nárast $x$ spôsobí, že šanca sa násobí o $e^{\beta_1}$. Ak $\beta_1 > 0$, pravdepodobnosť triedy $c_1$ rastie so zvyšujúcou sa hodnotou $x$.
 
 \textbf{Odhad parametrov}
 
-Parametre modelu $b_0$, $b_1$ sa zvyčajne odhadujú pomocou \textit{metódy maximálnej vierohodnosti}, ktorá maximalizuje pravdepodobnosť pozorovaných výstupov vzhľadom na zvolený model. Vierohodnostná funkcia, ktorá vychádza z hustoty Bernoulliho rozdelenia (špeciálny prípad binomického, pre jediný pokus) je definovaná ako:
+Parametre modelu $\beta_0$, $\beta_1$ sa zvyčajne odhadujú pomocou \textit{metódy maximálnej vierohodnosti}, ktorá maximalizuje pravdepodobnosť pozorovaných výstupov vzhľadom na zvolený model. Vierohodnostná funkcia, ktorá vychádza z hustoty Bernoulliho rozdelenia (špeciálny prípad binomického, pre jediný pokus) je definovaná ako:
 
 \begin{equation}
-L(b_0, b_1) = \prod_{i=1}^{n} p(x_i)^{y_i} (1 - p(x_i))^{1 - y_i}
+L(\beta_0, \beta_1) = \prod_{i=1}^{n} p(x_i)^{y_i} (1 - p(x_i))^{1 - y_i}
 \end{equation}
 
 Pre jednoduchšiu manipuláciu sa často používa log-vierohodnostná funkcia. Vzhľadom na jej nelineárny tvar sa parametre hľadajú pomocou iteratívnych numerických metód, napr. Newtonovho postupu alebo váženej metódy najmenších štvorcov (IRLS).
@@ -506,13 +506,13 @@ Multinomická logistická regresia (MLR) je rozšírením binárnej logistickej 
 Model predpokladá, že pravdepodobnosť prislúchajúca každej triede $c_k$ je daná:
 
 \begin{equation}
-\mathrm{Pr}(Y = c_k \mid X = x) = \frac{e^{b_{k0} + b_{k1} x}}{1 + \sum\limits_{l=1}^{K-1} e^{b_{l0} + b_{l1} x}}, \quad \text{pre } k = 1, \dots, K-1
+\mathrm{Pr}(Y = c_k \mid X = x) = \frac{e^{\beta_{k0} + \beta_{k1} x}}{1 + \sum\limits_{l=1}^{K-1} e^{\beta_{l0} + \beta_{l1} x}}, \quad \text{pre } k = 1, \dots, K-1
 \end{equation}
 
 a pre referenčnú triedu $c_K$ platí:
 
 \begin{equation}
-\mathrm{Pr}(Y = c_K \mid X = x) = \frac{1}{1 + \sum\limits_{l=1}^{K-1} e^{b_{l0} + b_{l1} x}}
+\mathrm{Pr}(Y = c_K \mid X = x) = \frac{1}{1 + \sum\limits_{l=1}^{K-1} e^{\beta_{l0} + \beta_{l1} x}}
 \end{equation}
 
 Každá trieda, okrem referenčnej, má svoj vlastný vektor parametrov, pričom výber referenčnej triedy ovplyvňuje interpretáciu koeficientov, avšak nie výsledné predikcie.
