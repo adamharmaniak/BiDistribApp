@@ -11,6 +11,8 @@ server <- function(input, output, session) {
   loaded_data <- reactiveVal(NULL)
   abort_requested <- reactiveVal(FALSE)
   clicked_points <- reactiveVal(data.frame(x = numeric(), y = numeric()))
+  model_result_summary <- reactiveVal(NULL)
+  regression_model_result <- reactiveVal(NULL)
   
   observe({
     if (input$main_tabs == "classification" &&
@@ -585,6 +587,12 @@ server <- function(input, output, session) {
         abort_signal = abort_requested
       )
       
+      if (is.list(result) && "summary" %in% names(result)) {
+        model_result_summary(result$summary)
+      } else {
+        model_result_summary(NULL)
+      }
+      
       # Rozhodnutie podla typu vystupu
       if (is.data.frame(result)) {
         output$model_outputs_combined <- renderUI({
@@ -708,10 +716,36 @@ server <- function(input, output, session) {
         }
         
         output$model_outputs_combined <- renderUI({
-          tagList(
-            rendered_outputs,
-            uiOutput("model_outputs_cuts")
+          tagList(rendered_outputs)
+        })
+        
+        output$model_summary_ui <- renderUI({
+          summary_ui <- NULL
+          if (!is.null(model_result_summary())) {
+            summary_ui <- list(
+              h4("Summary Table"),
+              div(
+                style = "max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 5px;",
+                gt_output("summary_table")
+              )
             )
+          }
+          
+          cuts_ui <- NULL
+          if (isTRUE(input$density_cut) && exists("last_density_result", envir = .GlobalEnv)) {
+            cuts_ui <- list(
+              h4("Density Cuts Table"),
+              div(
+                style = "max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 5px;",
+                tableOutput("cut_slices_table")
+              )
+            )
+          }
+          
+          tagList(
+            summary_ui,
+            cuts_ui
+          )
         })
       }
       
@@ -787,6 +821,11 @@ server <- function(input, output, session) {
     )
   })
   
+  output$summary_table <- gt::render_gt({
+    req(model_result_summary())
+    model_result_summary()
+  })
+  
   densityVarConfig <- reactive({
     types <- selected_density_types()
     
@@ -859,6 +898,14 @@ server <- function(input, output, session) {
     )
   })
   
+  output$regression_summary <- gt::render_gt({
+    req(regression_model_result())
+    req(regression_model_result()$mean_result)
+    req(regression_model_result()$mean_result$summary)
+    
+    regression_model_result()$mean_result$summary
+  })
+  
   observeEvent(input$run_regression_model, {
     req(input$reg_response, input$reg_predictor)
     
@@ -917,6 +964,20 @@ server <- function(input, output, session) {
         discrete_model_type = discrete_model_type
       )
       
+      regression_model_result(result)
+      
+      if (!is.null(result$quantile_result$summaries)) {
+        for (q in names(result$quantile_result$summaries)) {
+          local({
+            quantile_key <- q
+            output_id <- paste0("quantile_summary_", quantile_key)
+            output[[output_id]] <- gt::render_gt({
+              result$quantile_result$summaries[[quantile_key]]$gt
+            })
+          })
+        }
+      }
+      
       output$model_outputs_regression <- renderPlot({
         result$combined_plot
       })
@@ -934,6 +995,37 @@ server <- function(input, output, session) {
           r2_label <- h5(paste("Presnosť modelu (R²):",
                                round(result$mean_result$r_squared * 100, 2), "%"))
           ui_elements <- append(ui_elements, list(r2_label))
+        }
+        
+        # Summary pre strednu hodnotu
+        if (!is.null(result$mean_result$summary)) {
+          output$regression_summary <- gt::render_gt({
+            result$mean_result$summary
+          })
+          
+          summary_block <- list(
+            h4("Summary Table – Mean"),
+            div(
+              style = "max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 5px;",
+              gt_output("regression_summary")
+            )
+          )
+          ui_elements <- append(ui_elements, summary_block)
+        }
+        
+        # Summary pre kvantily
+        if (!is.null(result$quantile_result$summaries)) {
+          quantile_tables <- lapply(names(result$quantile_result$summaries), function(q) {
+            list(
+              tags$hr(),
+              h4(paste("Summary Table – Quantile τ =", q)),
+              div(
+                style = "max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 5px;",
+                gt_output(outputId = paste0("quantile_summary_", q))
+              )
+            )
+          })
+          ui_elements <- append(ui_elements, quantile_tables)
         }
         
         tagList(ui_elements)

@@ -2,6 +2,61 @@ source("global.R")
 
 # Funkcie
 
+apply_dark_gt_theme <- function(gt_tbl, highlight_rows = NULL, highlight_color = "#ffe0b2") {
+  gt_tbl <- gt_tbl %>%
+    # Základné nastavenia tmavého štýlu
+    gt::tab_options(
+      table.background.color = "#2b2b2b",
+      column_labels.background.color = "#2b2b2b",
+      heading.background.color = "#2b2b2b",
+      table.font.color = "white",
+      data_row.padding = gt::px(6),
+      row.striping.background_color = "#3a3a3a"
+    ) %>%
+    
+    # Štýl titulku
+    gt::tab_style(
+      style = list(gt::cell_text(color = "white")),
+      locations = gt::cells_title(groups = "title")
+    ) %>%
+    
+    # Štýl podtitulku
+    gt::tab_style(
+      style = list(gt::cell_text(color = "gray")),
+      locations = gt::cells_title(groups = "subtitle")
+    ) %>%
+    
+    # Štýl hlavičiek stĺpcov
+    gt::tab_style(
+      style = list(
+        gt::cell_fill(color = "#2b2b2b"),
+        gt::cell_text(color = "white", weight = "bold")
+      ),
+      locations = gt::cells_column_labels(columns = gt::everything())
+    )
+  
+  # Zvýraznenie vybraných riadkov, ak sú zadané
+  if (!is.null(highlight_rows)) {
+    gt_tbl <- gt_tbl %>%
+      gt::tab_style(
+        style = gt::cell_fill(color = highlight_color),
+        locations = gt::cells_body(
+          columns = gt::everything(),
+          rows = highlight_rows
+        )
+      ) %>%
+      gt::tab_style(
+        style = gt::cell_text(weight = "bold", color = "black"),
+        locations = gt::cells_body(
+          columns = gt::everything(),
+          rows = highlight_rows
+        )
+      )
+  }
+  
+  return(gt_tbl)
+}
+
 identify_variables <- function(data) {
   variable_types <- sapply(data, function(col) {
     if (is.factor(col) || is.character(col) || (is.numeric(col) && length(unique(col)) < 10)) {
@@ -106,6 +161,33 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
     
     message("Kontrola normovania zmesi hustoty: Celkovy integral = ", round(total_integral, 4))
     
+    # Suhrnna tabulka
+    summary_tbl <- tibble::tibble(
+      Parameter = c(
+        "Number of Categories", "Names of Categories", "Weights", 
+        "Bandwidth (bw)", "Total Integral (Sum)"
+      ),
+      Value = c(
+        length(categories),
+        paste(categories, collapse = ", "),
+        paste(paste0(names(category_probs), ": ", round(as.numeric(category_probs), 3)), collapse = "; "),
+        round(global_bw, 4),
+        round(total_integral, 4)
+      )
+    )
+    
+    summary_table_gt <- apply_dark_gt_theme(
+      gt::gt(summary_tbl) %>%
+        gt::tab_header(
+          title = gt::md("**Model Summary**"),
+          subtitle = "Kernel Density Estimation"
+        ) %>%
+        gt::cols_width(Parameter ~ px(220), Value ~ px(420)) %>%
+        gt::opt_row_striping() %>%
+        gt::opt_table_font(font = "Arial"),
+      
+      highlight_rows = summary_tbl$Parameter %in% c("Bandwidth (bw)")
+    )
     
     if (plot_type == "3D") {
       # 3D Vizualizacia
@@ -117,11 +199,14 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
       ) %>%
         layout(scene = list(
           xaxis = list(title = continuous_vars),
-          yaxis = list(title = discrete_vars),
+          yaxis = list(title = discrete_vars, type = "category"),
           zaxis = list(title = 'Hustota')
         ))
       
-      return(fig_3d)
+      return(list(
+        plot = fig_3d,
+        summary = summary_table_gt
+      ))
       
     } else if (plot_type == "2D") {
       # 2D Vizualizacia
@@ -158,7 +243,10 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
         (scatter_plot + y_bar) +
         plot_layout(widths = c(4, 1), heights = c(1, 4))
       
-      return(final_plot_2d)
+      return(list(
+        plot = final_plot_2d,
+        summary = summary_table_gt
+      ))
       
     }
   }
@@ -223,6 +311,46 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
     
     message("Kontrola normovania zmesi hustoty: Celkovy integral = ", round(total_integral, 4))
     
+    # Vypocet statistik pre sumarizaciu
+    summary_stats_normal <- data %>%
+      group_by(.data[[discrete_vars]]) %>%
+      summarise(
+        Mean = round(mean(.data[[continuous_vars]], na.rm = TRUE), 2),
+        SD = round(sd(.data[[continuous_vars]], na.rm = TRUE), 2),
+        .groups = "drop"
+      )
+    category_means <- paste(summary_stats_normal[[discrete_vars]], ": ", summary_stats_normal$Mean, sep = "", collapse = "; ")
+    category_sds   <- paste(summary_stats_normal[[discrete_vars]], ": ", summary_stats_normal$SD, sep = "", collapse = "; ")
+    
+    # Sumarizacna tabulka
+    summary_tbl <- tibble::tibble(
+      Parameter = c(
+        "Number of Categories", "Names of Categories", "Weights", 
+        "Category Means", "Category SDs", "Total Integral (Sum)"
+      ),
+      Value = c(
+        length(categories),
+        paste(categories, collapse = ", "),
+        paste(paste0(names(category_probs), ": ", round(as.numeric(category_probs), 3)), collapse = "; "),
+        category_means,
+        category_sds,
+        round(total_integral, 4)
+      )
+    )
+    
+    summary_table_gt <- apply_dark_gt_theme(
+      gt::gt(summary_tbl) %>%
+        gt::tab_header(
+          title = gt::md("**Model Summary**"),
+          subtitle = "Normal Distribution Density"
+        ) %>%
+        gt::cols_width(Parameter ~ px(220), Value ~ px(420)) %>%
+        gt::opt_row_striping() %>%
+        gt::opt_table_font(font = "Arial"),
+      
+      highlight_rows = summary_tbl$Parameter %in% c("Category Means", "Category SDs")
+    )
+    
     if (plot_type == "3D") {
       # 3D Vizualizacia
       fig_3d <- plot_ly(
@@ -238,11 +366,14 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
       ) %>%
         layout(scene = list(
           xaxis = list(title = continuous_vars),
-          yaxis = list(title = discrete_vars),
+          yaxis = list(title = discrete_vars, type = "category"),
           zaxis = list(title = 'Hustota')
         ))
       
-      return(fig_3d)
+      return(list(
+        plot = fig_3d,
+        summary = summary_table_gt
+      ))
       
     } else if (plot_type == "2D") {
       # 2D Vizualizacia
@@ -299,7 +430,10 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
         (scatter_plot + y_bar) +
         plot_layout(widths = c(4, 1), heights = c(1, 4))
       
-      return(final_plot_2d)
+      return(list(
+        plot = final_plot_2d,
+        summary = summary_table_gt
+      ))
       
     }
   }
@@ -367,6 +501,51 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
     
     message("Kontrola normovania zmesi t-hustoty: Celkovy integral = ", round(total_integral_t, 4))
     
+    # Vypocet štatistík pre sumarizáciu
+    summary_stats_t <- data %>%
+      group_by(.data[[discrete_vars]]) %>%
+      summarise(
+        Mean = round(mean(.data[[continuous_vars]], na.rm = TRUE), 2),
+        SD = round(sd(.data[[continuous_vars]], na.rm = TRUE), 2),
+        DF = n() - 1,
+        .groups = "drop"
+      )
+    
+    # Vytvorenie textových reťazcov pre každú kategóriu
+    category_means <- paste(summary_stats_t[[discrete_vars]], ": ", summary_stats_t$Mean, sep = "", collapse = "; ")
+    category_sds   <- paste(summary_stats_t[[discrete_vars]], ": ", summary_stats_t$SD, sep = "", collapse = "; ")
+    category_dfs   <- paste(summary_stats_t[[discrete_vars]], ": ", summary_stats_t$DF, sep = "", collapse = "; ")
+    
+    # Sumarizacna tabulka
+    summary_tbl_t <- tibble::tibble(
+      Parameter = c(
+        "Number of Categories", "Names of Categories", "Weights",
+        "Category Means", "Category SDs", "Degrees of Freedom",
+        "Total Integral (Sum)"
+      ),
+      Value = c(
+        length(categories),
+        paste(categories, collapse = ", "),
+        paste(paste0(names(category_probs), ": ", round(as.numeric(category_probs), 3)), collapse = "; "),
+        category_means,
+        category_sds,
+        category_dfs,
+        round(total_integral_t, 4)
+      )
+    )
+    
+    summary_table_gt <- apply_dark_gt_theme(
+      gt::gt(summary_tbl_t) %>%
+        gt::tab_header(
+          title = gt::md("**Model Summary**"),
+          subtitle = "Student t-distribution Density"
+        ) %>%
+        gt::cols_width(Parameter ~ px(220), Value ~ px(480)) %>%
+        gt::fmt_markdown(columns = "Value") %>%
+        gt::opt_row_striping() %>%
+        gt::opt_table_font(font = "Arial"),
+      highlight_rows = grepl("Degrees of Freedom", summary_tbl_t$Parameter)
+    )
     
     if (plot_type == "3D") {
       # 3D Vizualizacia
@@ -383,11 +562,14 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
       ) %>%
         layout(scene = list(
           xaxis = list(title = continuous_vars),
-          yaxis = list(title = discrete_vars),
+          yaxis = list(title = discrete_vars, type = "category"),
           zaxis = list(title = 'Hustota')
         ))
       
-      return(fig_3d_t)
+      return(list(
+        plot = fig_3d_t,
+        summary = summary_table_gt
+      ))
       
     } else if (plot_type == "2D") {
       # 2D Vizualizacia
@@ -444,8 +626,10 @@ mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, mod
         (scatter_plot_t + y_bar_t) +
         plot_layout(widths = c(4, 1), heights = c(1, 4))
       
-      return(final_plot_2d_t)
-      
+      return(list(
+        plot = final_plot_2d_t,
+        summary = summary_table_gt
+      ))
     }
   }
 }
@@ -464,6 +648,31 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
     y_vals <- kde_result$y
     z_matrix <- kde_result$z
     z_matrix <- t(z_matrix)
+    
+    summary_tbl <- tibble::tibble(
+      Parameter = c(
+        "Variables", "Bandwidth Method", 
+        "Z-matrix Dimensions"
+      ),
+      Value = c(
+        paste(continuous_vars, collapse = ", "),
+        "Default (MASS::kde2d)",
+        paste(dim(z_matrix), collapse = " x ")
+      )
+    )
+    
+    summary_table_gt <- apply_dark_gt_theme(
+      gt::gt(summary_tbl) %>%
+        gt::tab_header(
+          title = gt::md("**Model Summary**"),
+          subtitle = "Bivariate Kernel Density Estimation"
+        ) %>%
+        gt::cols_width(Parameter ~ px(220), Value ~ px(420)) %>%
+        gt::opt_row_striping() %>%
+        gt::opt_table_font(font = "Arial"),
+      
+      highlight_rows = NULL
+    )
     
     if (plot_type == "3D") {
       fig_3d <- plot_ly(
@@ -486,6 +695,7 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
       
       return(list(
         plot = fig_3d,
+        summary = summary_table_gt,
         x_vals = x_vals,
         y_vals = y_vals,
         z_matrix = z_matrix
@@ -525,7 +735,7 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
         (scatter_plot + density_y) +
         plot_layout(widths = c(4, 1), heights = c(1, 4))
       
-      return(final_plot_2d)
+      return(list(plot = final_plot_2d, summary = summary_table_gt))
     }
   }
   
@@ -574,6 +784,22 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
       Value = c(mean_x, sd_x, mean_y, sd_y, cor_val)
     )
     
+    highlight_rows <- which(grepl("Pearson", model_summary$Parameter))
+    
+    summary_table_gt <- apply_dark_gt_theme(
+      gt::gt(model_summary) %>%
+        gt::tab_header(
+          title = gt::md("**Model Summary**"),
+          subtitle = "Bivariate Normal Distribution"
+        ) %>%
+        gt::cols_width(Parameter ~ px(220), Value ~ px(420)) %>%
+        gt::opt_row_striping() %>%
+        gt::opt_table_font(font = "Arial"),
+      
+      highlight_rows = NULL,
+      highlight_color = NULL
+    )
+    
     if (plot_type == "3D") {
       # 3D Vizualizacia
       fig_3d <- plot_ly(
@@ -599,7 +825,7 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
         x_vals = x_vals,
         y_vals = y_vals,
         z_matrix = z_matrix,
-        model_summary = model_summary
+        summary = summary_table_gt
       ))
       
     } else if (plot_type == "2D") {
@@ -634,7 +860,7 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
         (scatter_plot + density_y) +
         plot_layout(widths = c(4, 1), heights = c(1, 4))
       
-      return(list(final_plot_2d, model_summary = model_summary))
+      return(list(final_plot_2d, summary = summary_table_gt))
     }
   }
   
@@ -684,6 +910,35 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
     z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
     z_matrix <- t(z_matrix)
     
+    summary_tbl_t <- tibble::tibble(
+      Parameter = c(
+        paste0("Mean (", continuous_vars[1], ")"),
+        paste0("SD (", continuous_vars[1], ")"),
+        paste0("Mean (", continuous_vars[2], ")"),
+        paste0("SD (", continuous_vars[2], ")"),
+        "Pearson correlation",
+        "Determinant of Σ",
+        "Degrees of freedom"
+      ),
+      Value = c(mean_x, sd_x, mean_y, sd_y, cor_val, det_Sigma, df)
+    )
+    
+    #highlight_rows <- which(grepl("Pearson|Determinant|Degrees", summary_tbl_t$Parameter))
+    
+    summary_table_gt_t <- apply_dark_gt_theme(
+      gt::gt(summary_tbl_t) %>%
+        gt::tab_header(
+          title = gt::md("**Model Summary**"),
+          subtitle = "Bivariate Student t-distribution"
+        ) %>%
+        gt::cols_width(Parameter ~ px(240), Value ~ px(400)) %>%
+        gt::opt_row_striping() %>%
+        gt::opt_table_font(font = "Arial"),
+      
+      highlight_rows = NULL,
+      highlight_color = NULL
+    )
+    
     if (plot_type == "3D") {
       # 3D Vizualizacia
       fig_3d <- plot_ly(
@@ -708,7 +963,8 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
         plot = fig_3d,
         x_vals = x_vals,
         y_vals = y_vals,
-        z_matrix = z_matrix
+        z_matrix = z_matrix,
+        summary = summary_table_gt_t
       ))
       
     } else if (plot_type == "2D") {
@@ -743,7 +999,7 @@ continuous_joint_distribution <- function(data, continuous_vars, model_type, plo
         (scatter_plot + density_y) +
         plot_layout(widths = c(4, 1), heights = c(1, 4))
       
-      return(final_plot_2d)
+      return(list(final_plot_2d, summary = summary_table_gt_t))
       
     }
   }
@@ -806,6 +1062,33 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     
     if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
     
+    summary_tbl <- tibble::tibble(
+      Parameter = c(
+        paste0("Marginal Density X (", continuous_vars[1], ")"),
+        paste0("Marginal Density Y (", continuous_vars[2], ")"),
+        "Copula Type",
+        "Copula Smoothing",
+        "Copula Fitted Method"
+      ),
+      Value = c(
+        "KDE", "KDE",
+        copula_type, "beta", "empCopula (empirical data)"
+      )
+    )
+    
+    # Vytvorenie zakladnej tabulky
+    base_table <- gt::gt(summary_tbl) %>%
+      gt::tab_header(
+        title = gt::md("**Model Summary**"),
+        subtitle = paste0("KDE + ", copula_type, " copula")
+      ) %>%
+      gt::cols_width(Parameter ~ px(260), Value ~ px(460)) %>%
+      gt::opt_row_striping() %>%
+      gt::opt_table_font(font = "Arial")
+    
+    summary_table_gt <- base_table %>%
+      apply_dark_gt_theme(highlight_rows = NULL, highlight_color = NULL)
+    
     if (plot_type == "3D") {
       fig_3d <- plot_ly(
         x = ~x_vals, y = ~y_vals, z = ~z_matrix,
@@ -825,7 +1108,8 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
         plot = fig_3d,
         x_vals = x_vals,
         y_vals = y_vals,
-        z_matrix = z_matrix
+        z_matrix = z_matrix,
+        summary = summary_table_gt
       ))
       
     } else if (plot_type == "2D") {
@@ -857,7 +1141,7 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
         (scatter_plot + density_y) +
         plot_layout(widths = c(4, 1), heights = c(1, 4))
       
-      return(final_plot_2d)
+      return(list(plot = final_plot_2d, summary = summary_table_gt))
     }
   }
   
@@ -941,6 +1225,47 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     grid$z <- mapply(copula_density_function, grid$x, grid$y)
     z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
     
+    summary_tbl <- tibble::tibble(
+      Parameter = c(
+        paste0("Marginal Model X (", continuous_vars[1], ")"),
+        paste0("Mean (", continuous_vars[1], ")"),
+        paste0("SD (", continuous_vars[1], ")"),
+        paste0("Marginal Model Y (", continuous_vars[2], ")"),
+        paste0("Mean (", continuous_vars[2], ")"),
+        paste0("SD (", continuous_vars[2], ")"),
+        "Copula Type",
+        "Fitted Copula Family",
+        "Fitted Copula Parameter"
+      ),
+      Value = c(
+        marginal_densities[1],
+        round(mean_x, 4),
+        round(sd_x, 4),
+        marginal_densities[2],
+        round(mean_y, 4),
+        round(sd_y, 4),
+        copula_type,
+        class(copula_model_fitted),
+        round(copula_model_fitted@parameters, 4)
+      )
+    )
+    
+    # Riadky na zvyraznenie
+    #highlight_marginals <- which(grepl("Marginal Model|Mean|SD", summary_tbl$Parameter))
+    #highlight_copula <- which(grepl("Copula", summary_tbl$Parameter))
+    
+    # Zakladna tabulka
+    base_table <- gt::gt(summary_tbl) %>%
+      gt::tab_header(
+        title = gt::md("**Model Summary**"),
+        subtitle = paste0("Parametric + ", copula_type, " Copula")
+      ) %>%
+      gt::cols_width(Parameter ~ px(260), Value ~ px(460)) %>%
+      gt::opt_row_striping() %>%
+      gt::opt_table_font(font = "Arial")
+    
+    summary_table_gt <- base_table %>%
+      apply_dark_gt_theme(highlight_rows = NULL, highlight_color = NULL)
     
     if (plot_type == "3D") {
       # 3D Vizualizacia
@@ -962,7 +1287,8 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
         plot = fig_3d,
         x_vals = x_vals,
         y_vals = y_vals,
-        z_matrix = z_matrix
+        z_matrix = z_matrix,
+        summary = summary_table_gt
       ))
       
     } else if (plot_type == "2D") {
@@ -1001,7 +1327,7 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
         (scatter_plot + density_y) +
         plot_layout(widths = c(4, 1), heights = c(1, 4))
       
-      return(final_plot_2d)
+      return(list(plot = final_plot_2d, summary = summary_table_gt))
       
     }
   }
@@ -1097,6 +1423,81 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     grid$z <- mapply(copula_density_function, grid$x, grid$y)
     z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
     
+    marginal_summary <- function(var_name, density_type, mean_val, sd_val, index) {
+      df <- max(nrow(data) - 1, 2)
+      if (density_type == "normal") {
+        return(tibble::tibble(
+          Component = paste("Marginal", var_name),
+          Type = "Normal",
+          Parameters = paste0("Mean = ", round(mean_val, 4), "; SD = ", round(sd_val, 4))
+        ))
+      } else if (density_type == "log_normal") {
+        return(tibble::tibble(
+          Component = paste("Marginal", var_name),
+          Type = "Log-Normal",
+          Parameters = paste0("Mean = ", round(mean_val, 4), "; SD = ", round(sd_val, 4))
+        ))
+      } else if (density_type == "t") {
+        return(tibble::tibble(
+          Component = paste("Marginal", var_name),
+          Type = "Student-t",
+          Parameters = paste0("Mean = ", round(mean_val, 4),
+                              "; SD = ", round(sd_val, 4),
+                              "; df = ", df)
+        ))
+      } else if (density_type == "KDE") {
+        return(tibble::tibble(
+          Component = paste("Marginal", var_name),
+          Type = "Kernel Density Estimate",
+          Parameters = "bw = KDE-based (automatic)"
+        ))
+      } else {
+        return(tibble::tibble(
+          Component = paste("Marginal", var_name),
+          Type = density_type,
+          Parameters = "Unknown"
+        ))
+      }
+    }
+    
+    # Získaj parametre marginál
+    marg1 <- marginal_summary(continuous_vars[1], marginal_densities[1], mean_x, sd_x, 1)
+    marg2 <- marginal_summary(continuous_vars[2], marginal_densities[2], mean_y, sd_y, 2)
+    
+    # Získaj popis kopuly
+    copula_parameters <- tryCatch({
+      paste(capture.output(show(copula_model_fitted)), collapse = "<br>")
+    }, error = function(e) {
+      "Empirical copula (no parameters)"
+    })
+    
+    copula_summary <- tibble::tibble(
+      Component = "Copula",
+      Type = copula_type,
+      Parameters = copula_parameters
+    )
+    
+    summary_tbl <- dplyr::bind_rows(marg1, marg2, copula_summary)
+    
+    
+    base_table <- summary_tbl %>%
+      gt::gt() %>%
+      gt::tab_header(
+        title = gt::md("**Model Summary**"),
+        subtitle = "Hybrid Copula Model"
+      ) %>%
+      gt::cols_width(Component ~ px(200), Type ~ px(200), Parameters ~ px(420)) %>%
+      gt::cols_label(Parameters = gt::html("Parameters")) %>%
+      gt::fmt_markdown(columns = "Parameters") %>%
+      gt::opt_row_striping() %>%
+      gt::opt_table_font(font = "Arial")
+    
+    summary_table_gt <- apply_dark_gt_theme(
+      gt_tbl = base_table,
+      highlight_rows = NULL,
+      highlight_color = NULL
+    )
+    
     if (plot_type == "3D") {
       fig_3d <- plot_ly(
         x = ~x_vals, y = ~y_vals, z = ~z_matrix,
@@ -1116,7 +1517,8 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
         plot = fig_3d,
         x_vals = x_vals,
         y_vals = y_vals,
-        z_matrix = z_matrix
+        z_matrix = z_matrix,
+        summary = summary_table_gt
       ))
       
     } else if (plot_type == "2D") {
@@ -1149,7 +1551,7 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
         (scatter_plot + density_y) +
         plot_layout(widths = c(4, 1), heights = c(1, 4))
       
-      return(final_plot_2d)
+      return(list(plot = final_plot_2d, summary = summary_table_gt))
     }
   }
 }
@@ -1167,6 +1569,56 @@ discrete_joint_distribution <- function(data, discrete_vars, plot_type, abort_si
   
   x_labels <- levels(tab[[discrete_vars[1]]])
   y_labels <- levels(tab[[discrete_vars[2]]])
+  
+  total_prob <- sum(tab$Probability)
+  
+  joint_values_lines <- paste(
+    apply(tab[, discrete_vars], 1, paste, collapse = " | "),
+    ": ",
+    round(tab$Probability, 4)
+  )
+  
+  joint_values_md <- paste0("```\n", paste(joint_values_lines, collapse = "\n"), "\n```")
+  
+  summary_tbl <- tibble::tibble(
+    Parameter = c(
+      "Model Type",
+      "Variable X", "Variable Y",
+      "Levels in X", "Levels in Y",
+      "Number of States (X,Y)",
+      "PMF Values",
+      "Total Probability"
+    ),
+    Value = c(
+      "discrete",
+      discrete_vars[1],
+      discrete_vars[2],
+      length(x_labels),
+      length(y_labels),
+      nrow(tab),
+      joint_values_md,
+      round(total_prob, 4)
+    )
+  )
+  
+  #highlight_row_ids <- which(summary_tbl$Parameter == "PMF Values")
+  
+  base_table <- summary_tbl %>%
+    gt::gt() %>%
+    gt::tab_header(
+      title = gt::md("**Model Summary**"),
+      subtitle = "Probability Mass Function"
+    ) %>%
+    gt::cols_width(Parameter ~ px(200), Value ~ px(500)) %>%
+    gt::fmt_markdown(columns = "Value") %>%
+    gt::opt_row_striping() %>%
+    gt::opt_table_font(font = "Arial")
+  
+  summary_table_gt <- apply_dark_gt_theme(
+    gt_tbl = base_table,
+    highlight_rows = NULL,
+    highlight_color = NULL
+  )
   
   if (plot_type == "2D") {
     marginal_x <- tab %>%
@@ -1199,7 +1651,10 @@ discrete_joint_distribution <- function(data, discrete_vars, plot_type, abort_si
       (scatter_plot + marginal_y_plot) +
       plot_layout(widths = c(4, 1), heights = c(1, 4))
     
-    return(final_plot_2d)
+    return(list(
+      plot = final_plot_2d,
+      summary = summary_table_gt
+    ))
     
   } else if (plot_type == "3D") {
     fig_3d <- plot_ly()
@@ -1238,7 +1693,10 @@ discrete_joint_distribution <- function(data, discrete_vars, plot_type, abort_si
       )
     )
     
-    return(fig_3d)
+    return(list(
+      plot = fig_3d,
+      summary = summary_table_gt
+    ))
   }
 }
 
@@ -1292,53 +1750,118 @@ model_conditional_mean <- function(data, selected_variables, mean_method = "line
   response_name <- selected_variables[1]
   predictor_name <- selected_variables[2]
   
-  variable_types <- identify_variables(data)
-  
   response <- data[[response_name]]
   predictor <- data[[predictor_name]]
-  
   x_seq <- seq(min(predictor), max(predictor), length.out = 200)
   
-  # Fitovanie modelu pre E[Y|X]
+  fit <- NULL
+  r_squared <- NULL
+  mse <- NULL
+  model_formula <- NULL
+  param_summary <- NULL
+  basis_function <- NA
+  hyperparams <- NA
+  
+  # Fitovanie modelu podla zvolenej metody
   if (mean_method == "loess") {
     fit <- loess(response ~ predictor, span = 0.75)
     fitted_values <- predict(fit)
-    # R^2 pre loess – manuálne
     ss_res <- sum((response - fitted_values)^2)
     ss_tot <- sum((response - mean(response))^2)
     r_squared <- 1 - ss_res / ss_tot
+    mse <- mean((response - fitted_values)^2)
+    basis_function <- "LOESS"
+    hyperparams <- "span = 0.75"
+    
   } else if (mean_method == "gam") {
-    fit <- gam(response ~ s(predictor))
+    fit <- mgcv::gam(response ~ s(predictor))
     r_squared <- summary(fit)$r.sq
+    mse <- mean((response - predict(fit))^2)
+    basis_function <- "Spline smoother (s())"
+    
   } else if (mean_method == "spline") {
     fit <- lm(response ~ bs(predictor, df = 5))
-    r_squared <- summary(fit)$r.squared
+    summary_fit <- summary(fit)
+    r_squared <- summary_fit$r.squared
+    mse <- mean((response - predict(fit))^2)
+    basis_function <- "B-spline"
+    hyperparams <- "df = 5"
+    param_summary <- broom::tidy(fit)
+    
   } else if (mean_method == "linear") {
     fit <- lm(response ~ predictor)
-    r_squared <- summary(fit)$r.squared
+    summary_fit <- summary(fit)
+    r_squared <- summary_fit$r.squared
+    mse <- mean((response - predict(fit))^2)
+    basis_function <- "Linear"
+    param_summary <- broom::tidy(fit)
+    
   } else if (mean_method == "poly") {
     fit <- lm(response ~ poly(predictor, degree = poly_mean_degree, raw = TRUE))
-    r_squared <- summary(fit)$r.squared
+    summary_fit <- summary(fit)
+    r_squared <- summary_fit$r.squared
+    mse <- mean((response - predict(fit))^2)
+    basis_function <- "Polynomial"
+    hyperparams <- paste("degree =", poly_mean_degree)
+    param_summary <- broom::tidy(fit)
+    
   } else if (mean_method == "exp") {
     fit <- nls(response ~ a * exp(b * predictor), start = list(a = 1, b = 0.01))
     fitted_values <- predict(fit)
-    # R^2 manuálne
     ss_res <- sum((response - fitted_values)^2)
     ss_tot <- sum((response - mean(response))^2)
     r_squared <- 1 - ss_res / ss_tot
+    mse <- mean((response - fitted_values)^2)
+    basis_function <- "Exponential"
+    param_summary <- broom::tidy(fit)
+    
   } else {
     stop("Neplatný mean_method!")
   }
   
   mean_pred <- predict(fit, newdata = data.frame(predictor = x_seq))
   
-  # Konkrétny bod na x
-  if (is.null(specific_x)) {
-    specific_x <- median(predictor, na.rm = TRUE)
-  }
+  if (is.null(specific_x)) specific_x <- median(predictor, na.rm = TRUE)
   specific_mean <- predict(fit, newdata = data.frame(predictor = specific_x))
   
-  # Vizualizácia
+  # Vystupna tabulka
+  summary_tbl <- tibble::tibble(
+    Parameter = c(
+      "Model Type", "Basis Function", "Hyperparameters",
+      "R-squared", "MSE", "X (specific)", "E[Y|X = x]"
+    ),
+    Value = c(
+      mean_method,
+      basis_function,
+      ifelse(is.na(hyperparams), "-", hyperparams),
+      round(r_squared, 4),
+      round(mse, 4),
+      round(specific_x, 2),
+      round(specific_mean, 2)
+    )
+  )
+  
+  if (!is.null(param_summary)) {
+    param_tbl <- param_summary %>%
+      dplyr::transmute(
+        Parameter = paste0("β_", term),
+        Value = paste0(round(estimate, 4), " ± ", round(std.error, 4))
+      )
+    summary_tbl <- bind_rows(summary_tbl, param_tbl)
+  }
+  
+  summary_table_gt <- apply_dark_gt_theme(
+    gt::gt(summary_tbl) %>%
+      gt::tab_header(
+        title = gt::md(paste0("**Mean Model Summary**")),
+        subtitle = "Conditional Mean Function"
+      ) %>%
+      gt::cols_width(Parameter ~ px(240), Value ~ px(460)) %>%
+      gt::opt_row_striping() %>%
+      gt::opt_table_font(font = "Arial")
+  )
+  
+  # Vizualizacia
   p <- ggplot(data, aes_string(x = predictor_name, y = response_name)) +
     geom_point(alpha = 0.4, color = "orange") +
     geom_line(aes(x = x_seq, y = mean_pred), color = "blue", size = 1.2) +
@@ -1358,64 +1881,96 @@ model_conditional_mean <- function(data, selected_variables, mean_method = "line
     conditional_mean = data.frame(X = x_seq, E_Y_given_X = mean_pred),
     specific_x = specific_x,
     specific_mean = specific_mean,
-    r_squared = r_squared
+    r_squared = r_squared,
+    summary = summary_table_gt
   ))
 }
 
 model_conditional_quantiles <- function(data, selected_variables, quantile_method = "linear", poly_quant_degree = NULL, quantiles = 0.5, specific_x = NULL) {
-  
   response_name <- selected_variables[1]
   predictor_name <- selected_variables[2]
-  
-  variable_types <- identify_variables(data)
   
   response <- data[[response_name]]
   predictor <- data[[predictor_name]]
   
   x_seq <- seq(min(predictor), max(predictor), length.out = 200)
   
-  # Vypocet kvantilov
   quantile_preds <- list()
+  specific_quantiles <- list()
+  summary_tables <- list()
   
   for (q in quantiles) {
     if (quantile_method == "linear") {
       rq_fit <- rq(response ~ predictor, tau = q)
+      formula_str <- "Y ~ X"
+      params <- broom::tidy(rq_fit)
+      metrics <- broom::glance(rq_fit)
     } else if (quantile_method == "poly") {
-      rq_fit <- rq(response ~ poly(predictor, degree = poly_quant_degree, raw = TRUE), tau = q)
+      rq_fit <- rq(response ~ poly(predictor, degree = poly_quant_degree), tau = q)
+      formula_str <- paste0("Y ~ poly(X, degree = ", poly_quant_degree, ")")
+      params <- broom::tidy(rq_fit)
+      metrics <- broom::glance(rq_fit)
     } else if (quantile_method == "spline") {
       rq_fit <- rq(response ~ ns(predictor, df = 4), tau = q)
+      formula_str <- "Y ~ ns(X, df = 4)"
+      params <- broom::tidy(rq_fit)
+      metrics <- broom::glance(rq_fit)
     } else {
       stop("Neplatný quantile_method!")
     }
     
+    # Predikcie
     quantile_preds[[as.character(q)]] <- predict(rq_fit, newdata = data.frame(predictor = x_seq))
-  }
-  
-  if (is.null(specific_x)) {
-    specific_x <- median(predictor, na.rm = TRUE)
-  }
-  
-  # Konkretne kvantily pre specific_x
-  specific_quantiles <- list()
-  
-  for (q in quantiles) {
-    if (quantile_method == "linear") {
-      rq_fit <- rq(response ~ predictor, tau = q)
-    } else if (quantile_method == "poly") {
-      rq_fit <- rq(response ~ poly(predictor, degree = poly_quant_degree, raw = TRUE), tau = q)
-    } else if (quantile_method == "spline") {
-      rq_fit <- rq(response ~ ns(predictor, df = 4), tau = q)
-    }
-    
     specific_quantiles[[as.character(q)]] <- predict(rq_fit, newdata = data.frame(predictor = specific_x))
+    
+    # Suhrnna tabulka
+    param_summary <- tibble::tibble(
+      Parameter = paste0("β_", params$term),
+      Value = if ("std.error" %in% colnames(params)) {
+        paste0(round(params$estimate, 4), " ± ", round(params$std.error, 4))
+      } else {
+        paste0(round(params$estimate, 4), " ± N/A")
+      }
+    )
+    
+    eval_metrics <- tibble::tibble(
+      Parameter = c("Null deviance", "Residual deviance", "AIC"),
+      Value = as.character(round(c(
+        metrics$null.deviance %||% NA,
+        metrics$deviance %||% NA,
+        metrics$AIC %||% NA
+      ), 4))
+    )
+    
+    model_info <- tibble::tibble(
+      Parameter = c("Quantile Level", "Method", "Basis Function"),
+      Value = as.character(c(q, quantile_method, formula_str))
+    )
+    
+    combined_tbl <- bind_rows(model_info, param_summary, eval_metrics)
+    
+    summary_tables[[as.character(q)]] <- list(
+      data = combined_tbl,
+      gt = apply_dark_gt_theme(
+        combined_tbl %>%
+          gt::gt() %>%
+          gt::tab_header(
+            title = gt::md(paste0("**Quantile Model Summary (τ = ", q, ")**")),
+            subtitle = "Conditional Quantile Function"
+          ) %>%
+          gt::cols_width(Parameter ~ gt::px(240), Value ~ gt::px(460)) %>%
+          gt::opt_row_striping() %>%
+          gt::opt_table_font(font = "Arial")
+      )
+    )
   }
   
+  # Vizualizacia
   plot_data <- data.frame(X = x_seq)
   for (q in quantiles) {
     plot_data[[paste0("Quantile_", q)]] <- quantile_preds[[as.character(q)]]
   }
   
-  # Vizualizacia
   p <- ggplot(data, aes_string(x = predictor_name, y = response_name)) +
     geom_point(alpha = 0.4, color = "orange") +
     labs(
@@ -1447,7 +2002,8 @@ model_conditional_quantiles <- function(data, selected_variables, quantile_metho
     plot = p,
     conditional_quantiles = dplyr::select(plot_data, X, dplyr::starts_with("Quantile_")),
     specific_x = specific_x,
-    specific_quantiles = specific_quantiles
+    specific_quantiles = specific_quantiles,
+    summaries = summary_tables
   ))
 }
 
@@ -1479,7 +2035,37 @@ model_discrete_predictor <- function(data, selected_variables, discrete_model_ty
     stop("Neplatný model_type. Použi 'lm' alebo 'glm_log'.")
   }
   
-  # --- Boxplot ---
+  # Zakladne odhady pre kazdu kategoriu
+  est <- broom::tidy(fit)
+  param_tbl <- tibble::tibble(
+    Parameter = paste0("β_", est$term),
+    Value = paste0(round(est$estimate, 4), " ± ",
+                   ifelse("std.error" %in% names(est),
+                          round(est$std.error, 4), "N/A"))
+  )
+  
+  # Sumarizacna tabulka
+  summary_tbl <- tibble::tibble(
+    Parameter = c("Model Type", "Link Function", "R-squared"),
+    Value = c(
+      discrete_model_type,
+      if (discrete_model_type == "glm_log") "log link" else "identity link",
+      round(r_squared, 4)
+    )
+  )
+  
+  summary_table_gt <- apply_dark_gt_theme(
+    gt::gt(summary_tbl) %>%
+      gt::tab_header(
+        title = gt::md("**Discrete Predictor Summary**"),
+        subtitle = "Conditional Mean Function"
+      ) %>%
+      gt::cols_width(Parameter ~ gt::px(240), Value ~ gt::px(460)) %>%
+      gt::opt_row_striping() %>%
+      gt::opt_table_font(font = "Arial")
+  )
+  
+  # Boxplot
   plot <- ggplot(df, aes(x = factor(!!as.name(predictor_name)), y = !!as.name(response_name))) +
     geom_boxplot(outlier.shape = NA, fill = "gold", alpha = 0.4) +
     stat_summary(fun = mean, geom = "point", color = "darkblue", size = 3) +
@@ -1494,7 +2080,8 @@ model_discrete_predictor <- function(data, selected_variables, discrete_model_ty
   return(list(
     model = fit,
     r_squared = r_squared,
-    plot = plot
+    plot = plot,
+    summary = summary_table_gt
   ))
 }
 
@@ -1553,7 +2140,11 @@ combine_conditional_models <- function(data, selected_variables, mean_method = "
     
     return(list(
       combined_plot = discrete_result$plot,
-      mean_result = list(model = discrete_result$model, r_squared = discrete_result$r_squared),
+      mean_result = list(
+        model = discrete_result$model,
+        r_squared = discrete_result$r_squared,
+        summary = discrete_result$summary
+      ),
       quantile_result = NULL
     ))
   }
@@ -1715,7 +2306,14 @@ plot_classification_1D_combined <- function(data, response_name, predictor_name,
     data[[response_name]] <- as.factor(data[[response_name]])
   }
   
-  data[[response_name]] <- factor(data[[response_name]], levels = sort(as.numeric(levels(data[[response_name]]))))
+  # Ulozenie originalnych levels
+  if (!is.factor(data[[response_name]])) {
+    data[[response_name]] <- factor(data[[response_name]])
+  }
+  
+  response_levels <- sort(unique(as.character(data[[response_name]])))
+  data[[response_name]] <- factor(data[[response_name]], levels = response_levels)
+  
   classes <- levels(data[[response_name]])
   n_classes <- length(classes)
   
@@ -1745,7 +2343,20 @@ plot_classification_1D_combined <- function(data, response_name, predictor_name,
   
   if (method == "logistic" && length(classes) > 2) {
     probs <- predict(model, newdata = grid, type = "probs") %>% as.data.frame()
-    grid$pred_class <- apply(probs, 1, function(row) names(row)[which.max(row)])
+    
+    true_class_names <- if (!is.null(model$lev)) {
+      model$lev
+    } else {
+      response_levels
+    }
+    
+    if (all(colnames(probs) %in% as.character(seq_along(true_class_names)))) {
+      colnames(probs) <- true_class_names
+    }
+    
+    grid$pred_class <- apply(probs, 1, function(row) {
+      names(row)[which.max(row)]
+    })
     grid$pred_class <- factor(grid$pred_class, levels = classes)
     
     probs[[predictor_name]] <- grid[[predictor_name]]
@@ -1823,7 +2434,7 @@ plot_classification_1D_combined <- function(data, response_name, predictor_name,
     }
   }
   
-  data[[response_name]] <- factor(data[[response_name]], levels = sort(as.numeric(levels(data[[response_name]]))))
+  #data[[response_name]] <- factor(data[[response_name]], levels = sort(as.numeric(levels(data[[response_name]]))))
   # Skutocne hodnoty + rozhodovacia hranica
   p2 <- ggplot() +
     scale_y_discrete(limits = classes) +
@@ -1880,7 +2491,7 @@ classification_model <- function(data, response_name, predictor_names, method = 
     unique_values <- length(unique(response))
     if (unique_values <= 10) {
       message(paste("Odozva", response_name, "ma", unique_values, "unikatnych hodnot. Konverzia na faktor..."))
-      response <- as.numeric(as.factor(response))
+      response <- factor(response)
       data[[response_name]] <- response
     } else {
       stop(paste("Odozva", response_name, "nie je diskretna! Musi byt faktor alebo mat konecny pocet kategorii."))

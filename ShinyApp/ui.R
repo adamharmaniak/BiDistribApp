@@ -26,6 +26,13 @@ ui <- fluidPage(
         style = "padding: 10px; margin-bottom: 30px;",
         uiOutput("model_outputs_combined")
       ),
+      
+      div(
+        id = "model_summary",
+        style = "padding: 10px; margin-bottom: 30px;",
+        uiOutput("model_summary_ui")
+      ),
+      
       uiOutput("variable_info_ui")
     )
   )

@@ -18,6 +18,7 @@ library(ggridges)
 library(shiny)
 library(shinythemes)
 library(rlang)
+library(gt)
 
 
 # Dokumentacia
