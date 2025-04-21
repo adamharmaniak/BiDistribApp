@@ -2627,21 +2627,71 @@ classification_model <- function(data, response_name, predictor_names, method = 
   accuracy <- sum(preds == response) / length(preds)
   confusion_mat <- table(Predikovane = preds, Skutocne = response)
   
+  # Vystupna sumarizacna tabulka
+  param_rows <- list()
+  metrics <- tibble::tibble(
+    Parameter = c("Model Type", "Accuracy"),
+    Value = as.character(c(method, round(accuracy, 4)))
+  )
+  
+  if (method == "logistic") {
+    metrics <- add_row(metrics, Parameter = "Response Type", Value = ifelse(length(levels(response)) == 2, "Binary", "Multinomial"))
+    
+    if (length(levels(response)) == 2) {
+      coefs <- broom::tidy(model)
+      param_rows <- coefs %>%
+        dplyr::transmute(
+          Parameter = paste0("β_", term),
+          Value = paste0(round(estimate, 4), " ± ", round(std.error, 4))
+        )
+    } else {
+      coefs <- broom::tidy(model)
+      param_rows <- coefs %>%
+        dplyr::transmute(
+          Parameter = paste0("β_", term, " (", y.level, ")"),
+          Value = paste0(round(estimate, 4), " ± ", ifelse(is.na(std.error), "N/A", round(std.error, 4)))
+        )
+    }
+    
+  } else if (method %in% c("lda", "qda")) {
+    metrics <- add_row(metrics, Parameter = "Response Type", Value = "Multiclass")
+    metrics <- add_row(metrics, Parameter = "Degrees of Freedom", Value = paste(model$df))
+    
+  } else if (method == "knn") {
+    metrics <- add_row(metrics, Parameter = "Hyperparameter (k)", Value = as.character(model$k))
+  }
+  
+  if (length(param_rows) == 0) {
+    param_rows <- tibble::tibble(Parameter = character(), Value = character())
+  }
+  
+  summary_tbl <- dplyr::bind_rows(metrics, param_rows)
+  
+  summary_gt <- apply_dark_gt_theme(
+    gt::gt(summary_tbl) %>%
+      gt::tab_header(
+        title = gt::md("**Classification Model Summary**"),
+        subtitle = paste("Method:", toupper(method))
+      ) %>%
+      gt::cols_width(Parameter ~ gt::px(260), Value ~ gt::px(460)) %>%
+      gt::opt_row_striping() %>%
+      gt::opt_table_font(font = "Arial")
+  )
+  
+  # Vystup
   result <- list(
     model = model,
     predictions = preds,
     accuracy = accuracy,
-    confusion_matrix = confusion_mat
+    confusion_matrix = confusion_mat,
+    summary_gt = summary_gt
   )
   
   if (length(predictor_names) == 1) {
     result$decision_plot <- plot_classification_1D_combined(
       data, response_name, predictor_names[1], model, method
     )
-    
   } else if (length(predictor_names) == 2) {
-    # Ak su 2 prediktory => graf rozhodovacich hranic
-    
     result$decision_plot <- plot_decision_boundary(
       data, response_name, predictor_names, model, method
     )
@@ -2728,6 +2778,31 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
     }
   }))
   
+  # Sumarizacna tabulka
+  section_stats <- df %>%
+    dplyr::group_by(section) %>%
+    dplyr::summarise(
+      Count = dplyr::n(),
+      Mean = round(mean(response, na.rm = TRUE), 4),
+      SD = round(sd(response, na.rm = TRUE), 4),
+      Min = round(min(response, na.rm = TRUE), 4),
+      Max = round(max(response, na.rm = TRUE), 4),
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(Section = as.character(section)) %>%
+    dplyr::select(Section, Count, Mean, SD, Min, Max)
+  
+  summary_gt <- apply_dark_gt_theme(
+    gt::gt(section_stats) %>%
+      gt::tab_header(
+        title = gt::md("**Estimated Conditional Densities**"),
+        subtitle = paste("Descriptive statistics by section for", response_name)
+      ) %>%
+      gt::cols_width(everything() ~ gt::px(140)) %>%
+      gt::opt_row_striping() %>%
+      gt::opt_table_font(font = "Arial")
+  )
+  
   # Zakladny graf
   p <- ggplot(df, aes(x = predictor, y = response)) +
     geom_point(alpha = 0.6, color = "darkorange") +
@@ -2793,10 +2868,15 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
     }
   }
   
-  return(p)
+  return(list(
+    plot = p,
+    summary_gt = summary_gt
+  ))
 }
 
 plot_conditional_discrete_densities <- function(df, n_breaks, density_scaling, ordinal) {
+  
+  summary_gt <- NULL
   
   response_name <- attr(df, "response_var")
   predictor_name <- attr(df, "predictor_var")
@@ -2829,16 +2909,22 @@ plot_conditional_discrete_densities <- function(df, n_breaks, density_scaling, o
     
     # Pravdepodobnosti kategorii odozvy v ramci tejto sekcie
     prob_table <- prop.table(table(sub_df$response))
+    response_labels <- response_levels[as.integer(names(prob_table))] 
     
     # Y su hodnoty odozvy, X su dlzky ciar podla pravdepodobnosti
     y_vals <- as.numeric(levels(factor(names(prob_table))))
+    #y_vals <- as.integer(names(prob_table))
     
-    x_start <- max(sub_df$predictor, na.rm = TRUE)
+    section_range <- range(sub_df$predictor, na.rm = TRUE)
+    x_center <- mean(section_range)
+    
+    x_start <- x_center
     x_end <- x_start + (as.numeric(prob_table) * density_scaling)
     
     # Vysledny dataframe pre geom_segment + body
     df_segment <- data.frame(
       y = y_vals,
+      Category = response_labels,
       x_start = x_start,
       x_end = x_end,
       prob = as.numeric(prob_table),
@@ -2851,8 +2937,6 @@ plot_conditional_discrete_densities <- function(df, n_breaks, density_scaling, o
   if (is.null(density_data)) {
     warning("Nebolo mozne vypocitat ziadne pravdepodobnosti!")
   }
-  
-  print(density_data)
   
   # Vykreslenie grafu
   p <- ggplot(df, aes(x = predictor, y = as.numeric(response))) +
@@ -2921,7 +3005,32 @@ plot_conditional_discrete_densities <- function(df, n_breaks, density_scaling, o
     }
   }
   
-  return(p)
+  if (!is.null(density_data) && nrow(density_data) > 0) {
+    probability_summary <- density_data %>%
+      dplyr::mutate(
+        Section = as.character(section),
+        Probability = round(prob, 4)
+      ) %>%
+      dplyr::select(Section, Category, Probability) %>%
+      tidyr::pivot_wider(names_from = Category, values_from = Probability, values_fill = 0)
+  
+    summary_gt <- apply_dark_gt_theme(
+      gt::gt(probability_summary) %>%
+        gt::tab_header(
+          title = gt::md("**Estimated Conditional Probabilities**"),
+          subtitle = "Across predictor sections"
+        ) %>%
+        gt::cols_label(.list = setNames(paste0("Y = ", colnames(probability_summary)[-1]), colnames(probability_summary)[-1])) %>%
+        gt::cols_width(everything() ~ gt::px(140)) %>%
+        gt::opt_table_font(font = "Arial")
+    )
+  }
+  
+  return(list(
+    plot = p,
+    probability_table = density_data,
+    summary_gt = summary_gt
+  ))
 }
 
 plot_conditional_densities <- function(data, selected_variables, n_breaks = 5, density_scaling = 2000, ordinal = FALSE, mean_curve = TRUE, quantiles = NULL, mean_poly_degree = 1, quantile_poly_degree = 1, normal_density = TRUE, empirical_density = TRUE, bw_scale = NULL) {

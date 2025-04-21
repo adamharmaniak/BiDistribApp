@@ -13,6 +13,8 @@ server <- function(input, output, session) {
   clicked_points <- reactiveVal(data.frame(x = numeric(), y = numeric()))
   model_result_summary <- reactiveVal(NULL)
   regression_model_result <- reactiveVal(NULL)
+  classification_model_result <- reactiveVal()
+  conditional_discrete_result <- reactiveVal()
   
   observe({
     if (input$main_tabs == "classification" &&
@@ -1118,22 +1120,47 @@ server <- function(input, output, session) {
         k = k_val
       )
       
+      classification_model_result(result)
+      
       output$model_outputs_classification <- renderPlot({
         result$decision_plot
       })
       
       output$model_outputs_combined <- renderUI({
-        tagList(
+        ui_elements <- list(
           h4("Prediction Model"),
           plotOutput("model_outputs_classification"),
-          h5(paste("Presnosť modelu:", round(result$accuracy * 100, 2), "%")),
-          tableOutput("confusion_matrix_table")
+          h5(paste("Presnosť modelu:", round(result$accuracy * 100, 2), "%"))
         )
+        
+        if (!is.null(result$summary_gt)) {
+          summary_block <- list(
+            h4("Summary Table – Classification Model"),
+            div(
+              style = "max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 5px;",
+              gt_output("classification_summary")
+            )
+          )
+          ui_elements <- append(ui_elements, summary_block)
+        }
+        
+        ui_elements <- append(ui_elements, list(
+          h4("Confusion Matrix"),
+          tableOutput("confusion_matrix_table")
+        ))
+        
+        tagList(ui_elements)
       })
       
       output$confusion_matrix_table <- renderTable({
         result$confusion_matrix
       }, rownames = TRUE)
+      
+      output$classification_summary <- gt::render_gt({
+        req(classification_model_result())
+        req(classification_model_result()$summary_gt)
+        classification_model_result()$summary_gt
+      })
       
     }, error = function(e) {
       showNotification(paste("Chyba:", e$message), type = "error")
@@ -1180,6 +1207,11 @@ server <- function(input, output, session) {
     )
   })
   
+  output$discrete_density_summary <- gt::render_gt({
+    req(conditional_discrete_result()$summary_gt)
+    conditional_discrete_result()$summary_gt
+  })
+  
   observeEvent(input$run_conditional_density, {
     req(input$cond_response, input$cond_predictor)
     
@@ -1202,10 +1234,7 @@ server <- function(input, output, session) {
     normal_density <- input$normal_density
     empirical_density <- input$empirical_density
     ordinal <- input$ordinal
-    bw_scale <- NULL
-    if (isTRUE(input$manual_bw_scale)) {
-      bw_scale <- input$bw_scale
-    }
+    bw_scale <- if (isTRUE(input$manual_bw_scale)) input$bw_scale else NULL
     
     if (!normal_density && !empirical_density && cond_response_type() == "spojita") {
       showNotification("At least one density type (normal or empirical) must be selected.", type = "error")
@@ -1213,26 +1242,61 @@ server <- function(input, output, session) {
     }
     
     tryCatch({
-      plot <- plot_conditional_densities(
-        data = data,
-        selected_variables = selected_vars,
-        n_breaks = n_breaks,
-        density_scaling = density_scaling,
-        ordinal = ordinal,
-        mean_curve = mean_curve,
-        quantiles = quantiles,
-        mean_poly_degree = mean_poly_degree,
-        quantile_poly_degree = quant_poly_degree,
-        normal_density = normal_density,
-        empirical_density = empirical_density,
-        bw_scale = bw_scale
-      )
+      if (cond_response_type() == "spojita") {
+        result <- plot_conditional_densities(
+          data = data,
+          selected_variables = selected_vars,
+          n_breaks = n_breaks,
+          density_scaling = density_scaling,
+          ordinal = ordinal,
+          mean_curve = mean_curve,
+          quantiles = quantiles,
+          mean_poly_degree = mean_poly_degree,
+          quantile_poly_degree = quant_poly_degree,
+          normal_density = normal_density,
+          empirical_density = empirical_density,
+          bw_scale = bw_scale
+        )
+        
+        output$model_outputs_conditional <- renderPlot({ result$plot })
+        
+        output$conditional_density_summary <- gt::render_gt({
+          result$summary_gt
+        })
+        
+      } else if (cond_response_type() == "diskretna") {
+        result <- plot_conditional_discrete_densities(
+          df = data.frame(
+            predictor = data[[input$cond_predictor]],
+            response = data[[input$cond_response]]
+          ) %>%
+            `attr<-`("response_var", input$cond_response) %>%
+            `attr<-`("predictor_var", input$cond_predictor),
+          n_breaks = n_breaks,
+          density_scaling = density_scaling,
+          ordinal = ordinal
+        )
+        
+        conditional_discrete_result(result)
+        
+        output$model_outputs_conditional <- renderPlot({ result$plot })
+        
+        output$discrete_density_summary <- gt::render_gt({
+          req(conditional_discrete_result()$summary_gt)
+          conditional_discrete_result()$summary_gt
+        })
+      }
       
-      output$model_outputs_conditional <- renderPlot({ plot })
       output$model_outputs_combined <- renderUI({
         tagList(
           h4("Conditional Densities Plot"),
-          plotOutput("model_outputs_conditional")
+          plotOutput("model_outputs_conditional"),
+          tags$hr(),
+          h4("Summary Table – Conditional Densities"),
+          div(
+            style = "max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 5px;",
+            gt_output(if (cond_response_type() == "spojita") "conditional_density_summary" else "discrete_density_summary")
+          )
         )
       })
       
