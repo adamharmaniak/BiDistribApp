@@ -677,7 +677,7 @@ pričom váhy $\Pr(D = d)$ zodpovedajú výskytom jednotlivých kategórií v d�
 Analogicky môžeme získať aj \textit{marginálnu pravdepodobnostnú funkciu diskrétnej premennej} $D$ integráciou združenej hustoty nad spojitou premennou $C$:
 
 \begin{equation}
-\Pr(D = d) = \int_{\mathbb{R}} f_{D,C}(d, c) \, dc,
+\Pr(D = d) = \pi_d = \int_{\mathbb{R}} f_{D,C}(d, c) \, dc,
 \end{equation}
 
 kde $f_{D,C}(d, c)$ je združená hustota zmiešaného náhodného vektora $(D, C)$. Tento vzťah vyjadruje pravdepodobnosť výskytu kategórie $d$ ako celkovú pravdepodobnosť v spojitom priestore $C$ pre dané $D = d$.
@@ -690,7 +690,7 @@ Danú stratégiu možno implementovať nasledovne:
 \begin{itemize}
   \item Diskrétna premenná $D$ je kódovaná ako faktor s $K$ kategóriami.
   \item Pre každú kategóriu $d = 1, \dots, K$ sa vypočíta podmienená hustota $f_{C \mid D}(c \mid d)$ – buď neparametricky (jadrovým vyhladzovaním), alebo pomocou parametrov napríklad normálneho alebo Studentovho $t$-rozdelenia.
-  \item Každá hustota je následne vážená podľa výskytu kategórie $\Pr(D = d)=\pi_d$ v dátach (empirická pravdepodobnosť).
+  \item Každá hustota je následne vážená podľa výskytu kategórie $\pi_d$ v dátach (empirická pravdepodobnosť).
   \item Výsledná hustota $f_C(c)$ je tak zmesou hustôt podmienených tried.
 \end{itemize}
 
@@ -728,15 +728,18 @@ Na druhej strane, použitie tejto stratégie predpokladá, že pre každú kateg
 
 \subsubsection{Modelovanie pomocou kopúl}\label{copula_joint_density}
 
-Jedným z nástrojov, ktoré umožňujú spojiť rozdielne typy premenných v spoločnom modeli, sú \textit{kopule}. V prípade, že je premenná $D$ kategoriálna a $C$ spojitá, môžeme modelovať podmienenú závislosť tak, že každá trieda $D = d$ má vlastné marginálne rozdelenie $f_{C \mid D = d}(c)$ a tieto sa následne spoja pomocou kopule $\mathbb{C}$.
+Jedným z nástrojov, ktoré umožňujú spojiť rozdielne typy premenných v spoločnom modeli, sú \textit{kopule}.
 
-Avšak kopule, ktoré poznáme sú spojité a teda ak chceme nejakú z nich použiť (napr. Gaussovu), dostávame sa k niekoľkým problémom:
+Avšak kopule, ktoré bežne používame (napr. Gaussova alebo t-kopula), sú definované nad spojitými distribučnými funkciami. Pokiaľ aspoň jedna z marginálnych distribúcií nie je spojitá, ako v našom prípade, prestáva platiť jednoznačnosť dekompozície podľa \textit{Sklarovej vety} a výsledná kopula nie je na celom priestore jednoznačne určená.
 
+To vedie k viacerým problémom:
 \begin{itemize}
   \item \textit{Problémy na hraniciach} – diskrétne premenné nemajú spojitú distribučnú funkciu, čo vedie k nejednoznačnosti transformácie na jednotkový interval.
   \item \textit{Strata informácie} – binarizácia alebo kódovanie kategoriálnej premennej vedie k strate jemnej štruktúry závislosti.
   \item \textit{Interpretácia} – štruktúra závislosti medzi kategoriálnou a spojitou premennou je pri tomto prístupe ťažko interpretovateľná.
 \end{itemize}
 
-Z týchto dôvodov sa v aplikáciách uplatňujú rôzne stratégie, ako napríklad \textit{conditional copula modeling}, ktorým sa však v tejto práci venovať nebudeme.
+Z týchto dôvodov sa v aplikáciách uplatňujú alternatívne stratégie ako napríklad \textit{conditional copula modeling}, kde sa predpokladá, že rozdelenie spojitej premennej $C$ vzhľadom na diskrétnu premennú $D = d$ má vlastnú kopulu (alebo marginálne rozdelenie aj s vlastnou kopulou), a teda sa modelujú podmienené distribúcie $\mathbb{C}_d$ osobitne pre každú triedu $d$~\parencite{pleisMixtureDissertation}. Tento prístup zároveň umožňuje riešiť problém nejednoznačnosti tým, že sa každá trieda modeluje ako samostatný „blok“ so špecifickou štruktúrou závislosti.
+
+Podrobnejšie rozpracovanie týchto techník (vrátane napr. latentného modelovania diskrétnych premenných alebo zohľadnenia ordinality) však presahuje rámec tejto práce a preto sa im ďalej venovať nebudeme.
 
