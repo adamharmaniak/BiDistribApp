@@ -2317,168 +2317,101 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
   response_name <- attr(df, "response_var")
   predictor_name <- attr(df, "predictor_var")
   
-  # Zistenie typu prediktora
-  var_types <- identify_variables(df)
-  predictor_is_discrete <- "predictor" %in% var_types$Diskretne
+  x <- df$predictor
+  y <- df$response
   
-  # Ak je prediktor diskretny (kategorie)
-  if (predictor_is_discrete) {
-    
-    df$predictor_cat <- df$predictor
-    df$predictor <- as.numeric(factor(df$predictor_cat))
-    unique_pred_vals <- sort(unique(df$predictor))
-    df$section <- factor(df$predictor, levels = unique_pred_vals)
-    
-  } else {
-    # Spojity prediktor – delenie na sekcie
-    breaks <- seq(min(df$predictor, na.rm = TRUE), max(df$predictor, na.rm = TRUE), length.out = n_breaks + 1)
-    df$section <- cut(df$predictor, breaks = breaks, include.lowest = TRUE)
-  }
+  # Vytvorenie gridu pre zdruzenu hustotu
+  x_seq <- seq(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = 100)
+  y_seq <- seq(min(y, na.rm = TRUE), max(y, na.rm = TRUE), length.out = 100)
   
-  # Hustoty pre kazdu sekciu
-  density_data <- do.call(rbind, lapply(split(df, df$section), function(sub_df) {
-    if (nrow(sub_df) < 3) return(NULL)
-    
-    output <- list()
-    x_max <- max(sub_df$predictor, na.rm = TRUE)
-    
-    if (empirical_density) {
-      if (is.null(bw_scale)) {
-        emp_density <- density(sub_df$response, n = 50, bw = "nrd0")
-      } else {
-        local_range <- abs(max(sub_df$response, na.rm = TRUE) - min(sub_df$response, na.rm = TRUE))
-        bw_effective <- bw_scale * local_range
-        
-        if (is.na(bw_effective) || bw_effective <= 0) {
-          return(NULL)
-        }
-        
-        emp_density <- density(sub_df$response, n = 50, bw = bw_effective)
-      }
-      
-      df_emp <- data.frame(
-        x = x_max - emp_density$y * density_scaling,
-        y = emp_density$x,
-        section = unique(sub_df$section),
-        type = "non-parametric"
-      )
-      output[[length(output) + 1]] <- df_emp
-    }
-    
-    if (normal_density) {
-      y_vals <- sub_df$response
-      y_mean <- mean(y_vals, na.rm = TRUE)
-      sd_y <- sd(y_vals, na.rm = TRUE)
-      if (sd_y < 1e-6) sd_y <- 1e-6
-      
-      xs <- seq(y_mean - 3 * sd_y, y_mean + 3 * sd_y, length.out = 50)
-      norm_density <- dnorm(xs, mean = y_mean, sd = sd_y)
-      
-      df_theo <- data.frame(
-        x = x_max - norm_density * density_scaling,
-        y = xs,
-        section = unique(sub_df$section),
-        type = "parametric"
-      )
-      output[[length(output) + 1]] <- df_theo
-    }
-    
-    if (length(output) == 0) {
-      return(NULL)
-    } else {
-      return(do.call(rbind, output))
-    }
-  }))
+  dens2d <- MASS::kde2d(x, y, n = 100)
   
-  # Sumarizacna tabulka
-  section_stats <- df %>%
-    dplyr::group_by(section) %>%
-    dplyr::summarise(
-      Count = dplyr::n(),
-      Mean = round(mean(response, na.rm = TRUE), 4),
-      SD = round(sd(response, na.rm = TRUE), 4),
-      Min = round(min(response, na.rm = TRUE), 4),
-      Max = round(max(response, na.rm = TRUE), 4),
-      .groups = "drop"
-    ) %>%
-    dplyr::mutate(Section = as.character(section)) %>%
-    dplyr::select(Section, Count, Mean, SD, Min, Max)
+  # Rezy hustotou
+  breaks <- seq(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = n_breaks + 2)[-c(1, n_breaks + 2)]
   
-  summary_gt <- apply_dark_gt_theme(
-    gt::gt(section_stats) %>%
-      gt::tab_header(
-        title = gt::md("**Estimated Conditional Densities**"),
-        subtitle = paste("Descriptive statistics by section for", response_name)
-      ) %>%
-      gt::cols_width(everything() ~ gt::px(140)) %>%
-      gt::opt_row_striping() %>%
-      gt::opt_table_font(font = "Arial")
-  )
+  density_data <- lapply(breaks, function(xi) {
+    col_idx <- which.min(abs(dens2d$x - xi))
+    dens_slice <- dens2d$z[, col_idx]
+    
+    if (max(dens_slice, na.rm = TRUE) == 0) return(NULL)
+    
+    scale_factor <- density_scaling / max(dens2d$z, na.rm = TRUE)
+    dens_scaled <- dens_slice * scale_factor
+    
+    data.frame(
+      x_left  = xi - dens_scaled,
+      y       = dens2d$y,
+      section = as.factor(round(xi, 2))
+    )
+  }) %>% dplyr::bind_rows()
   
   # Zakladny graf
   p <- ggplot(df, aes(x = predictor, y = response)) +
     geom_point(alpha = 0.6, color = "darkorange") +
+    geom_vline(xintercept = breaks, linetype = "dashed", color = "grey50") +
+    geom_path(data = density_data, aes(x = x_left, y = y, group = section), color = "red", linewidth = 1) +
     theme_bw() +
     labs(
       title = paste("Podmienené hustoty pre", response_name, "podľa", predictor_name),
-      x = paste(predictor_name, "(Prediktor)"),
-      y = paste(response_name, "(Spojitá odozva)")
+      x = paste0(predictor_name, " (Prediktor)"),
+      y = paste0(response_name, " (Spojitá odozva)")
     )
-    
-  if (predictor_is_discrete) {
-    p <- p + scale_x_continuous(
-      breaks = unique(df$predictor),
-      labels = levels(factor(df$predictor_cat))
-    )
-  } else {
-    p <- p + geom_vline(xintercept = breaks, linetype = "dashed", color = "grey50")
+  
+  # Stredna hodnota
+  if (mean_curve) {
+    fit <- lm(response ~ poly(predictor, mean_poly_degree, raw = TRUE), data = df)
+    mean_pred <- predict(fit, newdata = data.frame(predictor = x_seq))
+    p <- p + geom_line(data = data.frame(x = x_seq, y = mean_pred),
+                       aes(x = x, y = y), color = "blue", linewidth = 1.2)
   }
   
-  # Podmienene hustoty
-  if (!is.null(density_data) && nrow(density_data) > 0) {
-    p <- p + geom_path(
-      data = density_data,
-      aes(x = x, y = y, group = interaction(section, type), color = type),
-      size = 1
-    )
-  } else {
-    warning("Nebolo mozne vypocitat hustoty pre ziadnu sekciu!")
+  # Kvantilove funkcie
+  if (!is.null(quantiles)) {
+    for (q in quantiles) {
+      rq_fit <- quantreg::rq(response ~ poly(predictor, quantile_poly_degree, raw = TRUE), tau = q, data = df)
+      q_pred <- predict(rq_fit, newdata = data.frame(predictor = x_seq))
+      p <- p + geom_line(data = data.frame(x = x_seq, y = q_pred),
+                         aes(x = x, y = y), color = "purple", linetype = "dashed")
+    }
   }
   
-  if (!predictor_is_discrete) {
-    x_seq <- seq(min(df$predictor, na.rm = TRUE), max(df$predictor, na.rm = TRUE), length.out = 200)
-    new_data <- data.frame(predictor = x_seq)
+  # Sumarizacna tabuľka – lokalna statistika v okoli kazdeho rezu
+  epsilon <- 0.02 * diff(range(x))  # 2 % z rozsahu ako "okolie" rezu
+  
+  summary_table <- lapply(breaks, function(xi) {
+    subset_y <- df$response[abs(df$predictor - xi) <= epsilon]
     
-    if (mean_curve) {
-      mean_formula <- as.formula(paste("response ~ poly(predictor, ", mean_poly_degree, ", raw = TRUE)"))
-      mean_model <- lm(mean_formula, data = df)
-      mean_pred <- predict(mean_model, newdata = new_data)
-      
-      p <- p + geom_line(
-        data = data.frame(predictor = x_seq, mean_pred = mean_pred),
-        aes(x = predictor, y = mean_pred),
-        color = "blue", size = 1.2
-      )
+    if (length(subset_y) == 0) {
+      return(data.frame(
+        Break = round(xi, 2),
+        Count = 0,
+        Mean = NA,
+        SD = NA,
+        Min = NA,
+        Max = NA
+      ))
     }
     
-    if (!is.null(quantiles)) {
-      for (q in quantiles) {
-        quantile_formula <- as.formula(paste("response ~ poly(predictor, ", quantile_poly_degree, ", raw = TRUE)"))
-        rq_fit <- quantreg::rq(quantile_formula, tau = q, data = df)
-        quantile_pred <- predict(rq_fit, newdata = new_data)
-        
-        p <- p + geom_line(
-          data = data.frame(predictor = x_seq, quantile_pred = quantile_pred),
-          aes(x = predictor, y = quantile_pred),
-          color = "purple", linetype = "dashed"
-        )
-      }
-    }
-  } else {
-    if (mean_curve || !is.null(quantiles)) {
-      message("Pre diskrétny prediktor sa regresné a kvantilové krivky nezobrazujú.")
-    }
-  }
+    data.frame(
+      Break = round(xi, 2),
+      Count = length(subset_y),
+      Mean = round(mean(subset_y, na.rm = TRUE), 4),
+      SD = round(sd(subset_y, na.rm = TRUE), 4),
+      Min = round(min(subset_y, na.rm = TRUE), 4),
+      Max = round(max(subset_y, na.rm = TRUE), 4)
+    )
+  }) %>% dplyr::bind_rows()
+  
+  summary_gt <- apply_dark_gt_theme(
+    gt::gt(summary_table) %>%
+      gt::tab_header(
+        title = gt::md("**Estimated Conditional Densities**"),
+        subtitle = paste("Local stats in ±", round(epsilon, 2), "around each cut for", response_name)
+      ) %>%
+      gt::cols_width(everything() ~ gt::px(130)) %>%
+      gt::opt_row_striping() %>%
+      gt::opt_table_font(font = "Arial")
+  )
   
   return(list(
     plot = p,

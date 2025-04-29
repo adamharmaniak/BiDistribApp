@@ -6,7 +6,8 @@ options(shiny.maxRequestSize = 100 * 1024^2)
 server <- function(input, output, session) {
   quantile_inputs <- reactiveVal()
   class_predictors <- reactiveVal(c())
-  cond_quantile_inputs <- reactiveVal(list(0.5))
+  quantile_inputs <- reactiveVal(list(0.05))
+  cond_quantile_inputs <- reactiveVal(list(0.05))
   cond_response_type <- reactiveVal(NULL)
   loaded_data <- reactiveVal(NULL)
   abort_requested <- reactiveVal(FALSE)
@@ -881,13 +882,16 @@ server <- function(input, output, session) {
     }
   })
   
-  quantile_inputs <- reactiveVal(list(0.5))
-  
   observeEvent(input$add_quantile, {
     req(quantile_inputs())
     current <- quantile_inputs()
-    new <- c(current, 0.5)
-    quantile_inputs(new)
+    new_value <- switch(
+      as.character(length(current) + 1),
+      "1" = 0.05,
+      "2" = 0.95,
+      0.5
+    )
+    quantile_inputs(c(current, new_value))
   })
   
   observeEvent(input$remove_quantile, {
@@ -901,13 +905,22 @@ server <- function(input, output, session) {
     req(quantile_inputs())
     
     inputs <- quantile_inputs()
+    print(inputs)
     
     tagList(
       lapply(seq_along(inputs), function(i) {
         numericInput(
           inputId = paste0("quant_", i),
           label = paste0("Quantile ", i),
-          value = inputs[[i]],
+          value = if (!is.null(inputs[[i]])) {
+            inputs[[i]]
+          } else if (i == 1) {
+            0.05
+          } else if (i == 2) {
+            0.95
+          } else {
+            0.5
+          },
           min = 0.01, max = 0.99, step = 0.01
         )
       })
@@ -1183,7 +1196,13 @@ server <- function(input, output, session) {
   # Podmienene hustoty
   observeEvent(input$add_cond_quantile, {
     current <- cond_quantile_inputs()
-    cond_quantile_inputs(c(current, 0.5))
+    new_value <- switch(
+      as.character(length(current) + 1),
+      "1" = 0.05,
+      "2" = 0.95,
+      0.5
+    )
+    cond_quantile_inputs(c(current, new_value))
   })
   
   observeEvent(input$remove_cond_quantile, {
@@ -1195,7 +1214,7 @@ server <- function(input, output, session) {
   
   observeEvent(input$quantile_curve, {
     if (!isTRUE(input$quantile_curve)) {
-      cond_quantile_inputs(list(0.5))
+      cond_quantile_inputs(list(0.05))
     }
   })
   
@@ -1208,7 +1227,15 @@ server <- function(input, output, session) {
         numericInput(
           inputId = paste0("cond_quant_", i),
           label = paste0("Quantile ", i),
-          value = inputs[[i]],
+          value = if (!is.null(inputs[[i]])) {
+            inputs[[i]]
+          } else if (i == 1) {
+            0.05
+          } else if (i == 2) {
+            0.95
+          } else {
+            0.5
+          },
           min = 0.01, max = 0.99, step = 0.01
         )
       }),
