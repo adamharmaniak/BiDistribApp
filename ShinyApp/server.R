@@ -160,9 +160,9 @@ server <- function(input, output, session) {
     if (is.null(model_type)) return(NULL)
     
     choices <- switch(model_type,
-                      "parametric" = c("Clayton", "Gumbel", "Frank"),
-                      "hybrid" = c("Clayton", "Gumbel", "Joe", "empirical"),
-                      "nonparametric" = c("empirical"),
+                      "parametric" = c("Clayton", "Gumbel", "Frank", "Joe", "t"),
+                      "hybrid" = c("Clayton", "Gumbel", "Frank", "Joe", "t", "empirical (beta)"),
+                      "nonparametric" = c("empirical (beta)"),
                       NULL
     )
     
@@ -1143,8 +1143,7 @@ server <- function(input, output, session) {
       output$model_outputs_combined <- renderUI({
         ui_elements <- list(
           h4("Prediction Model"),
-          plotOutput("model_outputs_classification"),
-          h5(paste("Presnosť modelu:", round(result$accuracy * 100, 2), "%"))
+          plotOutput("model_outputs_classification")
         )
         
         if (!is.null(result$summary_gt)) {

@@ -498,7 +498,7 @@ render_continuous_density <- function(model_output, data, plot_type = "2D") {
   ))
 }
 
-model_continuous_density_copula <- function(data, continuous_vars, model_type = "nonparametric", copula_type = "empirical", marginal_densities = NULL, abort_signal = NULL) {
+model_continuous_density_copula <- function(data, continuous_vars, model_type = "nonparametric", copula_type = "empirical (beta)", marginal_densities = NULL, abort_signal = NULL) {
   
   if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
   
@@ -522,10 +522,10 @@ model_continuous_density_copula <- function(data, continuous_vars, model_type = 
     u2 <- kde_y_cdf(data[[continuous_vars[2]]])
     empirical_data <- pobs(cbind(u1, u2))
     
-    if (copula_type == "empirical") {
+    if (copula_type == "empirical (beta)") {
       copula_model_fitted <- empCopula(empirical_data, smoothing = "beta")
     } else {
-      stop("Unsupported copula_type. Only 'empirical' is allowed here.")
+      stop("Unsupported copula_type. Only 'empirical (beta)' is allowed here.")
     }
     
     if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
@@ -586,20 +586,22 @@ model_continuous_density_copula <- function(data, continuous_vars, model_type = 
     u1 <- marginal_cdf_function(data[[continuous_vars[1]]], mean_x, sd_x, 1)
     u2 <- marginal_cdf_function(data[[continuous_vars[2]]], mean_y, sd_y, 2)
     
-    if (copula_type == "Clayton") {
-      copula_model <- claytonCopula(param = 2, dim = 2)
-    } else if (copula_type == "Gumbel") {
-      copula_model <- gumbelCopula(param = 2, dim = 2)
-    } else if (copula_type == "Frank") {
-      copula_model <- frankCopula(param = 5, dim = 2)
-    } else if (copula_type == "Joe") {
-      copula_model <- joeCopula(param = 2, dim = 2)
-    } else {
-      stop("Zadaný 'copula_type' nie je podporovaný. Použi: 'Clayton', 'Gumbel', 'Frank', 'Joe'.")
-    }
+    copula_model <- switch(
+      copula_type,
+      "Clayton" = claytonCopula(param = 2, dim = 2),
+      "Gumbel"  = gumbelCopula(param = 2, dim = 2),
+      "Frank"   = frankCopula(param = 5, dim = 2),
+      "Joe"     = joeCopula(param = 2, dim = 2),
+      "t"       = tCopula(dim = 2, df = 4, df.fixed = FALSE),
+      stop("Zadaný 'copula_type' nie je podporovaný. Použi: 'Clayton', 'Gumbel', 'Frank', 'Joe', 't'.")
+    )
     
     copula_fit <- fitCopula(copula_model, pobs(cbind(u1, u2)), method = "ml")
     copula_model_fitted <- copula_fit@copula
+    
+    copula_params <- copula_fit@estimate
+    rho_fitted <- copula_params[1]
+    df_fitted <- if (inherits(copula_model_fitted, "tCopula")) copula_params[2] else NA
     
     x_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
     y_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
@@ -644,6 +646,8 @@ model_continuous_density_copula <- function(data, continuous_vars, model_type = 
       marginal_densities = marginal_densities,
       copula_type = copula_type,
       model_type = model_type,
+      rho_copula = rho_fitted,
+      df_copula = df_fitted,
       vector_type = "continuous_copula"
     ))
   }
@@ -686,14 +690,15 @@ model_continuous_density_copula <- function(data, continuous_vars, model_type = 
     u1 <- marginal_cdf_function(data[[continuous_vars[1]]], mean_x, sd_x, 1)
     u2 <- marginal_cdf_function(data[[continuous_vars[2]]], mean_y, sd_y, 2)
     
-    if (copula_type == "empirical") {
+    if (copula_type == "empirical (beta)") {
       copula_model_fitted <- empCopula(pobs(cbind(u1, u2)), smoothing = "beta")
     } else {
       copula_model <- switch(copula_type,
-                             Clayton = claytonCopula(param = 2, dim = 2),
-                             Gumbel = gumbelCopula(param = 2, dim = 2),
-                             Frank = frankCopula(param = 5, dim = 2),
-                             Joe = joeCopula(param = 2, dim = 2),
+                             "Clayton" = claytonCopula(param = 2, dim = 2),
+                             "Gumbel" = gumbelCopula(param = 2, dim = 2),
+                             "Frank" = frankCopula(param = 5, dim = 2),
+                             "Joe" = joeCopula(param = 2, dim = 2),
+                             "t" = tCopula(dim = 2, df = 4, df.fixed = FALSE),
                              NULL
       )
       
@@ -703,6 +708,10 @@ model_continuous_density_copula <- function(data, continuous_vars, model_type = 
       
       copula_fit <- fitCopula(copula_model, pobs(cbind(u1, u2)), method = "ml")
       copula_model_fitted <- copula_fit@copula
+      
+      copula_params <- copula_fit@estimate
+      rho_fitted <- copula_params[1]
+      df_fitted <- if (inherits(copula_model_fitted, "tCopula")) copula_params[2] else NA
     }
     
     marginal_density_function <- function(value, mean, sd, index) {
@@ -740,6 +749,14 @@ model_continuous_density_copula <- function(data, continuous_vars, model_type = 
     grid$z <- mapply(copula_density_function, grid$x, grid$y)
     z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
     
+    df_value <- tryCatch({
+      if (inherits(copula_model_fitted, "tCopula")) {
+        copula_model_fitted@df
+      } else {
+        NA
+      }
+    }, error = function(e) NA)
+    
     return(list(
       x_vals = x_vals,
       y_vals = y_vals,
@@ -754,6 +771,8 @@ model_continuous_density_copula <- function(data, continuous_vars, model_type = 
       bw_x = bw_x,
       bw_y = bw_y,
       copula_model_fitted = copula_model_fitted,
+      rho_copula = rho_fitted,
+      df_copula = df_fitted,
       vector_type = "continuous_copula"
     ))
     
@@ -916,6 +935,9 @@ render_continuous_density_copula <- function(model_output, data, model_type = "n
         patchwork::plot_layout(widths = c(4, 1), heights = c(1, 4))
     }
     
+    copula_rho <- round(model_output$rho_copula, 4)
+    copula_df <- if (!is.na(model_output$df_copula)) round(model_output$df_copula, 4) else NA
+    
     summary_tbl <- tibble::tibble(
       Name = c(
         paste0("Marginal Model X (", continuous_vars[1], ")"),
@@ -926,9 +948,9 @@ render_continuous_density_copula <- function(model_output, data, model_type = "n
         paste0("SD (", continuous_vars[2], ")"),
         "Copula Type",
         "Fitted Copula Family",
-        "Fitted Copula Parameter"
+        "Fitted Copula Rho"
       ),
-      Value = c(
+      Value = as.character(c(
         marginal_densities[1],
         round(model_output$mean_x, 4),
         round(model_output$sd_x, 4),
@@ -937,9 +959,17 @@ render_continuous_density_copula <- function(model_output, data, model_type = "n
         round(model_output$sd_y, 4),
         copula_type,
         class(model_output$copula_model_fitted),
-        round(model_output$copula_model_fitted@parameters, 4)
-      )
+        copula_rho
+      ))
     )
+    
+    if (!is.na(copula_df)) {
+      summary_tbl <- dplyr::add_row(
+        summary_tbl,
+        Name = "Degrees of Freedom (t-copula)",
+        Value = as.character(copula_df)
+      )
+    }
     
     summary_table <- gt::gt(summary_tbl) %>%
       gt::tab_header(
@@ -1012,7 +1042,7 @@ render_continuous_density_copula <- function(model_output, data, model_type = "n
     }
     
     ## Summary Table:
-    marginal_summary <- function(var_name, density_type, mean_val, sd_val, index) {
+    marginal_summary <- function(var_name, density_type, mean_val, sd_val, bw_val, index) {
       df <- max(nrow(data) - 1, 2)
       if (density_type == "normal") {
         return(tibble::tibble(
@@ -1036,7 +1066,7 @@ render_continuous_density_copula <- function(model_output, data, model_type = "n
         return(tibble::tibble(
           Component = paste("Marginal", var_name),
           Type = "Kernel Density Estimate",
-          Parameters = paste0("bw = ", round(if (index == 1) model_output$bw_x else model_output$bw_y, 4))
+          Parameters = paste0("bw = ", round(bw_val, 4))
         ))
       } else {
         return(tibble::tibble(
@@ -1047,18 +1077,25 @@ render_continuous_density_copula <- function(model_output, data, model_type = "n
       }
     }
     
-    marg1 <- marginal_summary(continuous_vars[1], marginal_densities[1], model_output$mean_x, model_output$sd_x, 1)
-    marg2 <- marginal_summary(continuous_vars[2], marginal_densities[2], model_output$mean_y, model_output$sd_y, 2)
+    marg1 <- marginal_summary(continuous_vars[1], marginal_densities[1], model_output$mean_x, model_output$sd_x, model_output$bw_x, 1)
+    marg2 <- marginal_summary(continuous_vars[2], marginal_densities[2], model_output$mean_y, model_output$sd_y, model_output$bw_y, 2)
     
     copula_parameters <- tryCatch({
-      paste(capture.output(show(model_output$copula_model_fitted)), collapse = "<br>")
+      if (tolower(model_output$copula_type) == "t") {
+        paste0("rho = ", round(model_output$rho_copula, 4),
+               "; df = ", round(model_output$df_copula, 4))
+      } else {
+        sub(".*Parameters:\\s*", "", 
+            paste(capture.output(show(model_output$copula_model_fitted)), collapse = "<br>")
+        )
+      }
     }, error = function(e) {
       "Empirical copula (no parameters)"
     })
     
     copula_summary <- tibble::tibble(
       Component = "Copula",
-      Type = copula_type,
+      Type = model_output$copula_type,
       Parameters = copula_parameters
     )
     
@@ -2214,7 +2251,23 @@ classification_model <- function(data, response_name, predictor_names, method = 
     
   } else if (method %in% c("lda", "qda")) {
     metrics <- add_row(metrics, Name = "Response Type", Value = "Multiclass")
-    metrics <- add_row(metrics, Name = "Degrees of Freedom", Value = paste(model$df))
+    if (!is.null(model$df)) {
+      metrics <- add_row(metrics, Name = "Degrees of Freedom", Value = as.character(model$df))
+    }
+    
+    for (cls in rownames(model$means)) {
+      for (pred in predictor_names) {
+        mean_val <- model$means[cls, pred]
+        class_data <- data[data[[response_name]] == cls, pred, drop = TRUE]
+        sd_val <- sd(class_data, na.rm = TRUE)
+        
+        param_rows <- dplyr::bind_rows(
+          param_rows,
+          tibble::tibble(Name = paste0("Mean(", pred, ", class ", cls, ")"), Value = as.character(round(mean_val, 4))),
+          tibble::tibble(Name = paste0("SD(", pred, ", class ", cls, ")"), Value = as.character(round(sd_val, 4)))
+        )
+      }
+    }
     
   } else if (method == "knn") {
     metrics <- add_row(metrics, Name = "Hyperparameter (k)", Value = as.character(model$k))
