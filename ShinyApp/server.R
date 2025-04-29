@@ -577,23 +577,23 @@ server <- function(input, output, session) {
     
     clicked_points(data.frame(x = numeric(), y = numeric()))
     tryCatch({
-      result <- model_joint_distribution_density(
-        data = data,
-        selected_variables = selected_vars,
-        model_type = model_type,
-        bw = bw_value,
-        use_copula = use_copula,
-        copula_type = copula_type,
-        marginal_densities = marginal_densities,
-        plot_type = if (length(selected_plot_types) > 0) selected_plot_types[1] else NULL,
-        abort_signal = abort_requested
-      )
-      
-      if (is.list(result) && "summary" %in% names(result)) {
-        model_result_summary(result$summary)
-      } else {
-        model_result_summary(NULL)
-      }
+      withProgress(message = "Calculating density...", value = 0, {
+        incProgress(0.1, detail = "Initializing model...")
+        
+        result <- model_joint_distribution_density(
+          data = data,
+          selected_variables = selected_vars,
+          model_type = model_type,
+          bw = bw_value,
+          use_copula = use_copula,
+          copula_type = copula_type,
+          marginal_densities = marginal_densities,
+          abort_signal = abort_requested
+        )
+        
+        incProgress(1, detail = "Calculation finished. Proceeding with rendering...")
+        Sys.sleep(1.5)
+      })
       
       # Rozhodnutie podla typu vystupu
       if (is.data.frame(result)) {
@@ -613,40 +613,52 @@ server <- function(input, output, session) {
         
         for (plot_type in selected_plot_types) {
           if (plot_type == "2D") {
-            result2D <- model_joint_distribution_density(
-              data = data,
-              selected_variables = selected_vars,
-              model_type = model_type,
-              bw = bw_value,
-              use_copula = use_copula,
-              copula_type = copula_type,
-              marginal_densities = marginal_densities,
-              plot_type = "2D",
-              abort_signal = abort_requested
-            )
+            withProgress(message = "Preparing 2D density plot...", value = 0, {
+                result2D <- render_joint_distribution_density(
+                model_output = result,
+                data = data,
+                plot_type = plot_type,
+                model_type = model_type
+              )
+              
+              incProgress(1, detail = "2D density plot prepared.")
+              Sys.sleep(1.5)
+            })
+            
+            if (is.list(result2D) && "summary" %in% names(result2D)) {
+              model_result_summary(result2D$summary)
+            } else {
+              model_result_summary(NULL)
+            }
             
             output$model_outputs_plot2d <- renderPlot({ result2D })
             rendered_outputs <- append(rendered_outputs, list(plotOutput("model_outputs_plot2d")))
           }
           
           if (plot_type == "3D") {
-            result3D <- model_joint_distribution_density(
-              data = data,
-              selected_variables = selected_vars,
-              model_type = model_type,
-              bw = bw_value,
-              use_copula = use_copula,
-              copula_type = copula_type,
-              marginal_densities = marginal_densities,
-              plot_type = "3D",
-              abort_signal = abort_requested
-            )
+            withProgress(message = "Preparing 3D density plot...", value = 0, {
+                result3D <- render_joint_distribution_density(
+                  model_output = result,
+                  data = data,
+                  plot_type = plot_type,
+                  model_type = model_type
+              )
+              
+              incProgress(1, detail = "3D density plot prepared.")
+              Sys.sleep(1.5)
+            })
             
-            if (isTRUE(input$density_cut) && is.list(result3D)) {
+            if (is.list(result3D) && "summary" %in% names(result3D)) {
+              model_result_summary(result3D$summary)
+            } else {
+              model_result_summary(NULL)
+            }
+            
+            if (isTRUE(input$density_cut) && is.list(result)) {
               assign("last_density_result", list(
-                x_vals = result3D$x_vals,
-                y_vals = result3D$y_vals,
-                z_matrix = result3D$z_matrix
+                x_vals = result$x_vals,
+                y_vals = result$y_vals,
+                z_matrix = result$z_matrix
               ), envir = .GlobalEnv)
               
               output$model_outputs_plot3d <- renderPlotly({
@@ -657,42 +669,42 @@ server <- function(input, output, session) {
                   cuts <- clicked_points()
                   if (nrow(cuts) > 0) {
                     for (i in seq_len(nrow(cuts))) {
-                      x_idx <- which.min(abs(result3D$x_vals - cuts$x[i]))
-                      y_idx <- which.min(abs(result3D$y_vals - cuts$y[i]))
+                      x_idx <- which.min(abs(result$x_vals - cuts$x[i]))
+                      y_idx <- which.min(abs(result$y_vals - cuts$y[i]))
                       
                       # Slice pri fixnom x
                       base_plot <- base_plot %>% add_trace(
-                        x = rep(result3D$x_vals[x_idx], length(result3D$y_vals)),
-                        y = result3D$y_vals,
-                        z = result3D$z_matrix[, x_idx],
+                        x = rep(result$x_vals[x_idx], length(result$y_vals)),
+                        y = result$y_vals,
+                        z = result$z_matrix[, x_idx],
                         type = "scatter3d",
                         mode = "lines",
                         line = list(color = "black", width = 4),
-                        name = paste0("Slice x = ", round(result3D$x_vals[x_idx], 2))
+                        name = paste0("Slice x = ", round(result$x_vals[x_idx], 2))
                       )
                       
                       # Slice pri fixnom y
                       base_plot <- base_plot %>% add_trace(
-                        x = result3D$x_vals,
-                        y = rep(result3D$y_vals[y_idx], length(result3D$x_vals)),
-                        z = result3D$z_matrix[y_idx, ],
+                        x = result$x_vals,
+                        y = rep(result$y_vals[y_idx], length(result$x_vals)),
+                        z = result$z_matrix[y_idx, ],
                         type = "scatter3d",
                         mode = "lines",
                         line = list(color = "snow", width = 4),
-                        name = paste0("Slice y = ", round(result3D$y_vals[y_idx], 2))
+                        name = paste0("Slice y = ", round(result$y_vals[y_idx], 2))
                       )
                       
                       base_plot <- base_plot %>% add_trace(
-                        x = result3D$x_vals[x_idx],
-                        y = result3D$y_vals[y_idx],
-                        z = result3D$z_matrix[y_idx, x_idx],
+                        x = result$x_vals[x_idx],
+                        y = result$y_vals[y_idx],
+                        z = result$z_matrix[y_idx, x_idx],
                         type = "scatter3d",
                         mode = "markers",
                         marker = list(size = 6, color = "magenta"),
                         hoverinfo = "text",
-                        text = paste("x =", round(result3D$x_vals[x_idx], 2),
-                                     "<br>y =", round(result3D$y_vals[y_idx], 2),
-                                     "<br>z =", signif(result3D$z_matrix[x_idx, y_idx], 3)),
+                        text = paste("x =", round(result$x_vals[x_idx], 2),
+                                     "<br>y =", round(result$y_vals[y_idx], 2),
+                                     "<br>z =", signif(result$z_matrix[x_idx, y_idx], 3)),
                         name = paste0("Intersection ", i)
                       )
                     }
@@ -714,6 +726,8 @@ server <- function(input, output, session) {
               })
               rendered_outputs <- append(rendered_outputs, list(plotlyOutput("model_outputs_plot3d")))
             }
+            
+            showNotification("Plots rendering complete!", type = "message", duration = 4)
           }
         }
         

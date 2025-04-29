@@ -91,921 +91,415 @@ printVariables <- function(data) {
   )
 }
 
-mixture_joint_distribution <- function(data, discrete_vars, continuous_vars, model_type, bw, plot_type, abort_signal) {
+model_mixture_density <- function(data, discrete_vars, continuous_vars, model_type = "kernel", bw = NULL, abort_signal = NULL) {
   
-  # Modelovanie hustoty pouzitim jadroveho vyhladzovania
-  if (model_type == "kernel") {
+  # Konverzia diskretnej premennej na faktor
+  data[[discrete_vars]] <- factor(data[[discrete_vars]])
+  categories <- levels(data[[discrete_vars]])
+  
+  category_colors <- setNames(RColorBrewer::brewer.pal(length(categories), "Set1"), categories)
+  
+  # Pravdepodobnosti kategorii
+  category_probs <- prop.table(table(data[[discrete_vars]]))
+  
+  bw_used_list <- list()
+  
+  # Funkcia na vypocet hustoty podla model_type
+  calculate_density <- switch(
+    model_type,
     
-    # Konverzia diskretnej premennej na faktor a zoradenie kategorii
-    data[[discrete_vars]] <- factor(data[[discrete_vars]])
-    categories <- levels(data[[discrete_vars]])
-    
-    # Vytvorenie farebnej mapy pre kategorie
-    category_colors <- setNames(RColorBrewer::brewer.pal(length(categories), "Set1"), categories)
-    
-    # Vypocet pravdepodobnosti pre kazdu kategoriu (váhy v zmesi)
-    category_probs <- prop.table(table(data[[discrete_vars]]))
-    
-    # Vypocet globalneho bw (pre 2D aj 3D)
-    if (is.null(bw)) {
-      global_bw <- bw.nrd0(data[[continuous_vars]])
-    } else {
-      global_bw <- bw
-    }
-    
-    # Funkcia na vypocet hustoty pre 3D s normovanim podľa vahy triedy
-    calculate_density_3D <- function(data, category) {
-      sub_data <- filter(data, .data[[discrete_vars]] == category)
-      
+    "kernel" = function(data, category) {
+      sub_data <- dplyr::filter(data, .data[[discrete_vars]] == category)
       if (nrow(sub_data) > 1) {
-        
-        # Vypocet lokalneho bw pre kazdu kategoriu (ak nie je dane globalne)
-        if (is.null(bw)) {
-          bw_cat <- bw.nrd0(sub_data[[continuous_vars]])
-        } else {
-          bw_cat <- bw
-        }
-        
-        kde_x <- density(sub_data[[continuous_vars]], bw = bw_cat)
-        kde_x_fun <- approxfun(kde_x$x, kde_x$y, rule = 2)
-        
+        bw_use <- if (is.null(bw)) bw.nrd0(sub_data[[continuous_vars]]) else bw
+        bw_used_list[[category]] <<- bw_use
+        kde <- density(sub_data[[continuous_vars]], bw = bw_use)
+        kde_fun <- approxfun(kde$x, kde$y, rule = 2)
         x <- seq(min(data[[continuous_vars]]), max(data[[continuous_vars]]), length.out = 100)
-        x_density <- kde_x_fun(x)
-        
-        # Normovanie hustoty podla pravdepodobnosti kategorie
-        weighted_density <- x_density * category_probs[[category]]
-        
-        return(data.frame(Weight = x, Density = weighted_density, Category = category))
+        density <- kde_fun(x)
+        weighted_density <- density * category_probs[[category]]
+        tibble::tibble(Continuous_Var = x, Density = weighted_density, Discrete_Var = category)
       } else {
-        return(data.frame(Weight = numeric(0), Density = numeric(0), Category = character(0)))
+        tibble::tibble(Continuous_Var = numeric(0), Density = numeric(0), Discrete_Var = character(0))
       }
-    }
+    },
     
-    # Spojenie hustot pre vsetky kategorie
-    density_data <- bind_rows(lapply(categories, function(cat) calculate_density_3D(data, cat)))
-    
-    # Celkove overenie suctu plochy pod hustotou
-    # Trapezove pravidlo na vypocet integralu pre kazdu kategoriu
-    integral_check <- sapply(categories, function(cat) {
-      sub_density <- filter(density_data, Category == cat)
-      if (nrow(sub_density) > 1) {
-        dx <- diff(sub_density$Weight)[1]
-        sum(sub_density$Density) * dx
-      } else {
-        0
-      }
-    })
-    
-    # Sucet plosnych integralov
-    total_integral <- sum(integral_check)
-    
-    message("Kontrola normovania zmesi hustoty: Celkovy integral = ", round(total_integral, 4))
-    
-    # Suhrnna tabulka
-    summary_tbl <- tibble::tibble(
-      Parameter = c(
-        "Number of Categories", "Names of Categories", "Weights", 
-        "Bandwidth (bw)", "Total Integral (Sum)"
-      ),
-      Value = c(
-        length(categories),
-        paste(categories, collapse = ", "),
-        paste(paste0(names(category_probs), ": ", round(as.numeric(category_probs), 3)), collapse = "; "),
-        round(global_bw, 4),
-        round(total_integral, 4)
-      )
-    )
-    
-    summary_table_gt <- apply_dark_gt_theme(
-      gt::gt(summary_tbl) %>%
-        gt::tab_header(
-          title = gt::md("**Model Summary**"),
-          subtitle = "Kernel Density Estimation"
-        ) %>%
-        gt::cols_width(Parameter ~ px(220), Value ~ px(420)) %>%
-        gt::opt_row_striping() %>%
-        gt::opt_table_font(font = "Arial"),
-      
-      highlight_rows = summary_tbl$Parameter %in% c("Bandwidth (bw)")
-    )
-    
-    if (plot_type == "3D") {
-      # 3D Vizualizacia
-      fig_3d <- plot_ly(
-        density_data,
-        x = ~Weight, y = ~Category, z = ~Density,
-        type = 'scatter3d', mode = 'lines',
-        color = ~Category, colors = category_colors, line = list(width = 4)
-      ) %>%
-        layout(scene = list(
-          xaxis = list(title = continuous_vars),
-          yaxis = list(title = discrete_vars, type = "category"),
-          zaxis = list(title = 'Hustota')
-        ))
-      
-      return(list(
-        plot = fig_3d,
-        summary = summary_table_gt
-      ))
-      
-    } else if (plot_type == "2D") {
-      # 2D Vizualizacia
-      data[[discrete_vars]] <- factor(data[[discrete_vars]], levels = categories)
-      
-      scatter_plot <- ggplot(data, aes_string(x = continuous_vars, y = discrete_vars, color = discrete_vars)) +
-        geom_point(size = 3, alpha = 0.7) +
-        labs(x = continuous_vars, y = discrete_vars) +
-        scale_color_manual(values = category_colors) +
-        theme_minimal() +
-        theme(legend.position = "right")
-      
-      # Prepocet, lebo geom_density() neberie priamo bw
-      reference_bw <- bw.nrd0(data[[continuous_vars]])
-      adjust_factor <- global_bw / reference_bw
-      
-      x_density <- ggplot(data, aes_string(x = continuous_vars, fill = discrete_vars, color = discrete_vars)) +
-        geom_density(alpha = 0.5, adjust = adjust_factor) +
-        scale_fill_manual(values = category_colors) +
-        scale_color_manual(values = category_colors) +
-        labs(x = NULL, y = paste("Hustota (", continuous_vars, ")", sep = "")) +
-        theme_minimal() +
-        theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "right")
-      
-      y_bar <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
-        geom_bar(alpha = 0.7) +
-        coord_flip() +
-        scale_fill_manual(values = category_colors) +
-        labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
-        theme_minimal() +
-        theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "right")
-      
-      final_plot_2d <- (x_density + plot_spacer()) /
-        (scatter_plot + y_bar) +
-        plot_layout(widths = c(4, 1), heights = c(1, 4))
-      
-      return(list(
-        plot = final_plot_2d,
-        summary = summary_table_gt
-      ))
-      
-    }
-  }
-  
-  # Modelovanie hustoty ako hustoty normalneho rozdelenia (dnorm)
-  if (model_type == "normal") {
-    
-    # Konverzia diskretnej premennej na faktor a zoradenie kategorii
-    data[[discrete_vars]] <- factor(data[[discrete_vars]])
-    categories <- levels(data[[discrete_vars]])
-    
-    # Pravdepodobnosti vyskytu pre jednotlive kategorie
-    category_probs <- prop.table(table(data[[discrete_vars]]))
-    
-    # Vytvorenie farebnej mapy pre kategorie
-    category_colors <- RColorBrewer::brewer.pal(length(categories), "Set1")
-    names(category_colors) <- categories
-    
-    # Vypocet vazenej hustoty pre kazdu kategoriu
-    calculate_density_3D <- function(data, category) {
-      sub_data <- filter(data, .data[[discrete_vars]] == category)
-      
+    "normal" = function(data, category) {
+      sub_data <- dplyr::filter(data, .data[[discrete_vars]] == category)
       if (nrow(sub_data) > 1) {
         mu <- mean(sub_data[[continuous_vars]])
         sigma <- sd(sub_data[[continuous_vars]])
-        
         x <- seq(min(data[[continuous_vars]]), max(data[[continuous_vars]]), length.out = 100)
         density <- dnorm(x, mean = mu, sd = sigma)
-        
-        # Normovanie hustoty podla vahy kategorie
         weighted_density <- density * category_probs[[category]]
-        
-        return(data.frame(
-          Continuous_Var = x,
-          Density = weighted_density,
-          Discrete_Var = factor(category, levels = categories)
-        ))
+        tibble::tibble(Continuous_Var = x, Density = weighted_density, Discrete_Var = category)
       } else {
-        return(data.frame(
-          Continuous_Var = numeric(0),
-          Density = numeric(0),
-          Discrete_Var = factor(character(0), levels = categories)
-        ))
+        tibble::tibble(Continuous_Var = numeric(0), Density = numeric(0), Discrete_Var = character(0))
       }
-    }
+    },
     
-    # Spojenie hustot pre vsetky kategorie
-    density_data <- bind_rows(lapply(categories, function(cat) calculate_density_3D(data, cat)))
-    
-    # Kontrola celkoveho integralu
-    integral_check <- sapply(categories, function(cat) {
-      sub_density <- filter(density_data, Discrete_Var == cat)
-      if (nrow(sub_density) > 1) {
-        dx <- diff(sub_density$Continuous_Var)[1]
-        sum(sub_density$Density) * dx
-      } else {
-        0
-      }
-    })
-    
-    total_integral <- sum(integral_check)
-    
-    message("Kontrola normovania zmesi hustoty: Celkovy integral = ", round(total_integral, 4))
-    
-    # Vypocet statistik pre sumarizaciu
-    summary_stats_normal <- data %>%
-      group_by(.data[[discrete_vars]]) %>%
-      summarise(
-        Mean = round(mean(.data[[continuous_vars]], na.rm = TRUE), 2),
-        SD = round(sd(.data[[continuous_vars]], na.rm = TRUE), 2),
-        .groups = "drop"
-      )
-    category_means <- paste(summary_stats_normal[[discrete_vars]], ": ", summary_stats_normal$Mean, sep = "", collapse = "; ")
-    category_sds   <- paste(summary_stats_normal[[discrete_vars]], ": ", summary_stats_normal$SD, sep = "", collapse = "; ")
-    
-    # Sumarizacna tabulka
-    summary_tbl <- tibble::tibble(
-      Parameter = c(
-        "Number of Categories", "Names of Categories", "Weights", 
-        "Category Means", "Category SDs", "Total Integral (Sum)"
-      ),
-      Value = c(
-        length(categories),
-        paste(categories, collapse = ", "),
-        paste(paste0(names(category_probs), ": ", round(as.numeric(category_probs), 3)), collapse = "; "),
-        category_means,
-        category_sds,
-        round(total_integral, 4)
-      )
-    )
-    
-    summary_table_gt <- apply_dark_gt_theme(
-      gt::gt(summary_tbl) %>%
-        gt::tab_header(
-          title = gt::md("**Model Summary**"),
-          subtitle = "Normal Distribution Density"
-        ) %>%
-        gt::cols_width(Parameter ~ px(220), Value ~ px(420)) %>%
-        gt::opt_row_striping() %>%
-        gt::opt_table_font(font = "Arial"),
-      
-      highlight_rows = summary_tbl$Parameter %in% c("Category Means", "Category SDs")
-    )
-    
-    if (plot_type == "3D") {
-      # 3D Vizualizacia
-      fig_3d <- plot_ly(
-        density_data,
-        x = ~Continuous_Var,
-        y = ~Discrete_Var,
-        z = ~Density,
-        type = 'scatter3d',
-        mode = 'lines',
-        color = ~Discrete_Var,
-        colors = category_colors,
-        line = list(width = 4)
-      ) %>%
-        layout(scene = list(
-          xaxis = list(title = continuous_vars),
-          yaxis = list(title = discrete_vars, type = "category"),
-          zaxis = list(title = 'Hustota')
-        ))
-      
-      return(list(
-        plot = fig_3d,
-        summary = summary_table_gt
-      ))
-      
-    } else if (plot_type == "2D") {
-      # 2D Vizualizacia
-      grouped_stats <- data %>%
-        group_by(.data[[discrete_vars]]) %>%
-        summarise(
-          mean_x = mean(.data[[continuous_vars]], na.rm = TRUE),
-          sd_x = sd(.data[[continuous_vars]], na.rm = TRUE),
-          .groups = "drop"
-        )
-      
-      x_vals <- seq(min(data[[continuous_vars]], na.rm = TRUE),
-                    max(data[[continuous_vars]], na.rm = TRUE),
-                    length.out = 100)
-      
-      # Hustoty pre kazdu kategoriu s vazenim pravdepodobnosti
-      density_data_2d <- grouped_stats %>%
-        mutate(prob = category_probs[as.character(.data[[discrete_vars]])]) %>%
-        expand_grid(x = x_vals) %>%
-        mutate(y = dnorm(x, mean = mean_x, sd = sd_x) * prob)
-      
-      scatter_plot <- ggplot(data, aes_string(x = continuous_vars, y = discrete_vars, color = discrete_vars)) +
-        geom_point(size = 3, alpha = 0.7) +
-        labs(x = continuous_vars, y = discrete_vars) +
-        theme_minimal() +
-        theme(legend.position = "right") +
-        scale_color_manual(values = category_colors)
-      
-      x_density <- ggplot(density_data_2d,
-                          aes(x = x, y = y,
-                              color = as.factor(.data[[discrete_vars]]),
-                              group = .data[[discrete_vars]])) +
-        geom_line(size = 1) +
-        scale_color_manual(values = category_colors) +
-        labs(x = NULL,
-             y = paste("Hustota (", continuous_vars, ")", sep = ""),
-             color = discrete_vars) +
-        theme_minimal() +
-        theme(axis.text.x = element_blank(),
-              axis.ticks.x = element_blank(),
-              legend.position = "right")
-      
-      y_bar <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
-        geom_bar(alpha = 0.7) +
-        coord_flip() +
-        scale_fill_manual(values = category_colors) +
-        labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
-        theme_minimal() +
-        theme(axis.text.y = element_blank(),
-              axis.ticks.y = element_blank(),
-              legend.position = "right")
-      
-      final_plot_2d <- (x_density + plot_spacer()) /
-        (scatter_plot + y_bar) +
-        plot_layout(widths = c(4, 1), heights = c(1, 4))
-      
-      return(list(
-        plot = final_plot_2d,
-        summary = summary_table_gt
-      ))
-      
-    }
-  }
-  
-  # Modelovanie hustoty ako hustoty Studentovho t-rozdelenia (dt)
-  if (model_type == "t") {
-    
-    # Konverzia diskretnej premennej na faktor a zoradenie kategorii
-    data[[discrete_vars]] <- factor(data[[discrete_vars]])
-    categories <- levels(data[[discrete_vars]])
-    
-    # Pravdepodobnosti vyskytu pre jednotlive kategorie
-    category_probs <- prop.table(table(data[[discrete_vars]]))
-    
-    # Vytvorenie farebnej mapy pre kategorie
-    category_colors <- RColorBrewer::brewer.pal(length(categories), "Set1")
-    names(category_colors) <- categories
-    
-    # Vypocet vazenej hustoty pre kazdu kategoriu
-    calculate_density_3D_t <- function(data, category) {
-      sub_data <- filter(data, .data[[discrete_vars]] == category)
-      
+    "t" = function(data, category) {
+      sub_data <- dplyr::filter(data, .data[[discrete_vars]] == category)
       if (nrow(sub_data) > 2) {
         mu <- mean(sub_data[[continuous_vars]])
         sigma <- sd(sub_data[[continuous_vars]])
-        df_t <- nrow(sub_data) - 1  # stupne volnosti pre t-rozdelenie
-        
+        df <- nrow(sub_data) - 1
         x <- seq(min(data[[continuous_vars]]), max(data[[continuous_vars]]), length.out = 100)
-        
-        # Hustota t-rozdelenia a jej normovanie podla smerodajnej odchylky
-        density <- dt((x - mu) / sigma, df = df_t) / sigma
-        
-        # Vazenie hustoty pravdepodobnostou vyskytu kategorie
+        density <- dt((x - mu) / sigma, df = df) / sigma
         weighted_density <- density * category_probs[[category]]
-        
-        return(data.frame(
-          Continuous_Var = x,
-          Density = weighted_density,
-          Discrete_Var = factor(category, levels = categories)
-        ))
+        tibble::tibble(Continuous_Var = x, Density = weighted_density, Discrete_Var = category)
       } else {
-        return(data.frame(
-          Continuous_Var = numeric(0),
-          Density = numeric(0),
-          Discrete_Var = factor(character(0), levels = categories)
-        ))
+        tibble::tibble(Continuous_Var = numeric(0), Density = numeric(0), Discrete_Var = character(0))
       }
     }
-    
-    # Spojenie hustot pre vsetky kategorie
-    density_data_t <- bind_rows(lapply(categories, function(cat) calculate_density_3D_t(data, cat)))
-    
-    # Kontrola normovania zmesi
-    integral_check_t <- sapply(categories, function(cat) {
-      sub_density <- filter(density_data_t, Discrete_Var == cat)
-      if (nrow(sub_density) > 1) {
-        dx <- diff(sub_density$Continuous_Var)[1]
-        sum(sub_density$Density) * dx
-      } else {
-        0
-      }
-    })
-    
-    total_integral_t <- sum(integral_check_t)
-    
-    message("Kontrola normovania zmesi t-hustoty: Celkovy integral = ", round(total_integral_t, 4))
-    
-    # Vypocet štatistík pre sumarizáciu
-    summary_stats_t <- data %>%
-      group_by(.data[[discrete_vars]]) %>%
-      summarise(
-        Mean = round(mean(.data[[continuous_vars]], na.rm = TRUE), 2),
-        SD = round(sd(.data[[continuous_vars]], na.rm = TRUE), 2),
-        DF = n() - 1,
-        .groups = "drop"
-      )
-    
-    # Vytvorenie textových reťazcov pre každú kategóriu
-    category_means <- paste(summary_stats_t[[discrete_vars]], ": ", summary_stats_t$Mean, sep = "", collapse = "; ")
-    category_sds   <- paste(summary_stats_t[[discrete_vars]], ": ", summary_stats_t$SD, sep = "", collapse = "; ")
-    category_dfs   <- paste(summary_stats_t[[discrete_vars]], ": ", summary_stats_t$DF, sep = "", collapse = "; ")
-    
-    # Sumarizacna tabulka
-    summary_tbl_t <- tibble::tibble(
-      Parameter = c(
-        "Number of Categories", "Names of Categories", "Weights",
-        "Category Means", "Category SDs", "Degrees of Freedom",
-        "Total Integral (Sum)"
-      ),
-      Value = c(
-        length(categories),
-        paste(categories, collapse = ", "),
-        paste(paste0(names(category_probs), ": ", round(as.numeric(category_probs), 3)), collapse = "; "),
-        category_means,
-        category_sds,
-        category_dfs,
-        round(total_integral_t, 4)
-      )
-    )
-    
-    summary_table_gt <- apply_dark_gt_theme(
-      gt::gt(summary_tbl_t) %>%
-        gt::tab_header(
-          title = gt::md("**Model Summary**"),
-          subtitle = "Student t-distribution Density"
-        ) %>%
-        gt::cols_width(Parameter ~ px(220), Value ~ px(480)) %>%
-        gt::fmt_markdown(columns = "Value") %>%
-        gt::opt_row_striping() %>%
-        gt::opt_table_font(font = "Arial"),
-      highlight_rows = grepl("Degrees of Freedom", summary_tbl_t$Parameter)
-    )
-    
-    if (plot_type == "3D") {
-      # 3D Vizualizacia
-      fig_3d_t <- plot_ly(
-        density_data_t,
-        x = ~Continuous_Var,
-        y = ~Discrete_Var,
-        z = ~Density,
-        type = 'scatter3d',
-        mode = 'lines',
-        color = ~Discrete_Var,
-        colors = category_colors,
-        line = list(width = 4)
-      ) %>%
-        layout(scene = list(
-          xaxis = list(title = continuous_vars),
-          yaxis = list(title = discrete_vars, type = "category"),
-          zaxis = list(title = 'Hustota')
-        ))
-      
-      return(list(
-        plot = fig_3d_t,
-        summary = summary_table_gt
-      ))
-      
-    } else if (plot_type == "2D") {
-      # 2D Vizualizacia
-      grouped_stats_t <- data %>%
-        group_by(.data[[discrete_vars]]) %>%
-        summarise(
-          mean_x = mean(.data[[continuous_vars]], na.rm = TRUE),
-          sd_x = sd(.data[[continuous_vars]], na.rm = TRUE),
-          df_x = n() - 1,
-          .groups = "drop"
-        )
-      
-      x_vals <- seq(min(data[[continuous_vars]], na.rm = TRUE),
-                    max(data[[continuous_vars]], na.rm = TRUE),
-                    length.out = 100)
-      
-      density_data_t_2d <- grouped_stats_t %>%
-        mutate(prob = category_probs[as.character(.data[[discrete_vars]])]) %>%
-        expand_grid(x = x_vals) %>%
-        mutate(y = dt((x - mean_x) / sd_x, df = df_x) / sd_x * prob)
-      
-      scatter_plot_t <- ggplot(data, aes_string(x = continuous_vars, y = discrete_vars, color = discrete_vars)) +
-        geom_point(size = 3, alpha = 0.7) +
-        labs(x = continuous_vars, y = discrete_vars) +
-        theme_minimal() +
-        theme(legend.position = "right") +
-        scale_color_manual(values = category_colors)
-      
-      x_density_t <- ggplot(density_data_t_2d,
-                            aes(x = x, y = y,
-                                color = as.factor(.data[[discrete_vars]]),
-                                group = .data[[discrete_vars]])) +
-        geom_line(size = 1) +
-        scale_color_manual(values = category_colors) +
-        labs(x = NULL,
-             y = paste("Hustota (", continuous_vars, ")", sep = ""),
-             color = discrete_vars) +
-        theme_minimal() +
-        theme(axis.text.x = element_blank(),
-              axis.ticks.x = element_blank(),
-              legend.position = "right")
-      
-      y_bar_t <- ggplot(data, aes_string(x = discrete_vars, fill = discrete_vars)) +
-        geom_bar(alpha = 0.7) +
-        coord_flip() +
-        scale_fill_manual(values = category_colors) +
-        labs(x = NULL, y = paste("P(", discrete_vars, ")", sep = "")) +
-        theme_minimal() +
-        theme(axis.text.y = element_blank(),
-              axis.ticks.y = element_blank(),
-              legend.position = "right")
-      
-      final_plot_2d_t <- (x_density_t + plot_spacer()) /
-        (scatter_plot_t + y_bar_t) +
-        plot_layout(widths = c(4, 1), heights = c(1, 4))
-      
-      return(list(
-        plot = final_plot_2d_t,
-        summary = summary_table_gt
-      ))
+  )
+  
+  # Vypocet hustot pre vsetky kategorie
+  density_data <- dplyr::bind_rows(lapply(categories, function(cat) calculate_density(data, cat)))
+  
+  # Vypocet celkoveho integralu pre kontrolu
+  total_integral <- sum(sapply(categories, function(cat) {
+    sub_density <- dplyr::filter(density_data, Discrete_Var == cat)
+    if (nrow(sub_density) > 1) {
+      dx <- diff(sub_density$Continuous_Var)[1]
+      sum(sub_density$Density) * dx
+    } else {
+      0
     }
+  }))
+  
+  # Vystup
+  bw_detail <- if (is.null(bw)) {
+    paste(paste0(names(bw_used_list), ": ", round(unlist(bw_used_list), 4)), collapse = "; ")
+  } else {
+    as.character(bw)
   }
+  
+  return(list(
+    density_data = density_data,
+    category_probs = category_probs,
+    summary_info = list(
+      n_categories = length(categories),
+      categories = categories,
+      model_type = model_type,
+      bandwidth = bw_detail,
+      total_integral = total_integral
+    ),
+    discrete_var = discrete_vars,
+    continuous_var = continuous_vars,
+    category_colors = category_colors,
+    data = data,
+    vector_type = "mix"
+  ))
 }
 
-continuous_joint_distribution <- function(data, continuous_vars, model_type, plot_type, abort_signal) {
+render_mixture_density <- function(model_output, plot_type = "2D") {
   
-  # Modelovanie hustoty pomocou jadroveho vyhladzovania
-  if (model_type == "kernel"){
-    kde_result <- kde2d(
+  data <- model_output$density_data
+  discrete_var <- model_output$discrete_var
+  continuous_var <- model_output$continuous_var
+  colors <- model_output$category_colors
+  categories <- levels(as.factor(data$Discrete_Var))
+  
+  if (plot_type == "3D") {
+    plot <- plot_ly(
+      data,
+      x = ~Continuous_Var,
+      y = ~Discrete_Var,
+      z = ~Density,
+      type = "scatter3d",
+      mode = "lines",
+      color = ~Discrete_Var,
+      colors = colors,
+      line = list(width = 4)
+    ) %>%
+      layout(scene = list(
+        xaxis = list(title = continuous_var),
+        yaxis = list(title = discrete_var, type = "category"),
+        zaxis = list(title = "Hustota")
+      ))
+    
+  } else { # plot_type == "2D"
+    raw_data <- model_output$data
+    raw_data[[discrete_var]] <- factor(raw_data[[discrete_var]], levels = categories)
+    
+    reference_bw <- bw.nrd0(raw_data[[continuous_var]])
+    adjust_factor <- as.numeric(model_output$summary_info$bandwidth) / reference_bw
+    
+    # Scatter plot
+    scatter_plot <- ggplot(raw_data, aes_string(x = continuous_var, y = discrete_var, color = discrete_var)) +
+      geom_point(size = 3, alpha = 0.7) +
+      labs(x = continuous_var, y = discrete_var) +
+      scale_color_manual(values = colors) +
+      theme_minimal() +
+      theme(legend.position = "right")
+    
+    data_density <- model_output$density_data
+    
+    x_density <- ggplot(data_density, aes(x = Continuous_Var, y = Density, color = Discrete_Var)) +
+      geom_line(size = 1) +
+      scale_color_manual(values = colors) +
+      labs(x = NULL, y = paste("Hustota (", continuous_var, ")", sep = ""), color = discrete_var) +
+      theme_minimal() +
+      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "right")
+    
+    y_bar <- ggplot(raw_data, aes_string(x = discrete_var, fill = discrete_var)) +
+      geom_bar(alpha = 0.7) +
+      coord_flip() +
+      scale_fill_manual(values = colors) +
+      labs(x = NULL, y = paste("P(", discrete_var, ")", sep = "")) +
+      theme_minimal() +
+      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "right")
+    
+    plot <- (x_density + patchwork::plot_spacer()) /
+      (scatter_plot + y_bar) +
+      patchwork::plot_layout(widths = c(4, 1), heights = c(1, 4))
+  }
+  
+  summary_tbl <- tibble::tibble(
+    Name = c(
+      "Number of Categories", "Names of Categories",
+      "Model Type", "Bandwidth", "Total Integral"
+    ),
+    Value = c(
+      model_output$summary_info$n_categories,
+      paste(model_output$summary_info$categories, collapse = ", "),
+      model_output$summary_info$model_type,
+      model_output$summary_info$bandwidth,
+      round(model_output$summary_info$total_integral, 4)
+    )
+  )
+  
+  summary_table <- gt::gt(summary_tbl) %>%
+    gt::tab_header(
+      title = gt::md("**Model Summary**")
+    ) %>%
+    gt::cols_width(Name ~ px(220), Value ~ px(420)) %>%
+    gt::opt_row_striping() %>%
+    gt::opt_table_font(font = "Arial")
+  
+  summary_table <- apply_dark_gt_theme(
+    gt_tbl = summary_table,
+    highlight_rows = NULL,
+    highlight_color = NULL
+  )
+  
+  return(list(
+    plot = plot,
+    summary = summary_table
+  ))
+}
+
+model_continuous_density <- function(data, continuous_vars, model_type = "kernel", abort_signal = NULL) {
+  
+  result <- list()
+  
+  if (model_type == "kernel") {
+    
+    kde_result <- MASS::kde2d(
       x = data[[continuous_vars[1]]], 
       y = data[[continuous_vars[2]]], 
       n = 100
     )
     
-    x_vals <- kde_result$x
-    y_vals <- kde_result$y
-    z_matrix <- kde_result$z
-    z_matrix <- t(z_matrix)
+    result$x_vals <- kde_result$x
+    result$y_vals <- kde_result$y
+    result$z_matrix <- t(kde_result$z)
+    result$model_type <- model_type
+    result$continuous_vars <- continuous_vars
     
-    summary_tbl <- tibble::tibble(
-      Parameter = c(
-        "Variables", "Bandwidth Method", 
-        "Z-matrix Dimensions"
-      ),
+    result$summary_info <- tibble::tibble(
+      Name = c("Variables", "Z-matrix Dimensions"),
       Value = c(
         paste(continuous_vars, collapse = ", "),
-        "Default (MASS::kde2d)",
-        paste(dim(z_matrix), collapse = " x ")
+        paste(dim(result$z_matrix), collapse = " x ")
       )
     )
     
-    summary_table_gt <- apply_dark_gt_theme(
-      gt::gt(summary_tbl) %>%
-        gt::tab_header(
-          title = gt::md("**Model Summary**"),
-          subtitle = "Bivariate Kernel Density Estimation"
-        ) %>%
-        gt::cols_width(Parameter ~ px(220), Value ~ px(420)) %>%
-        gt::opt_row_striping() %>%
-        gt::opt_table_font(font = "Arial"),
-      
-      highlight_rows = NULL
-    )
+  } else if (model_type == "normal" || model_type == "t") {
     
-    if (plot_type == "3D") {
-      fig_3d <- plot_ly(
-        x = x_vals, y = y_vals, z = z_matrix,
-        type = "surface",
-        colors = colorRamp(c("blue", "cyan", "yellow", "red")),
-        opacity = 0.7,
-        showscale = TRUE,
-        source = "A"
-      ) %>% layout(
-        title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(jadrové   vyhladzovanie)"),
-        scene = list(
-          xaxis = list(title = continuous_vars[1]),
-          yaxis = list(title = continuous_vars[2]),
-          zaxis = list(title = "Hustota")
-        )
-      )
-      
-      fig_3d <- fig_3d %>% event_register("plotly_click")
-      
-      return(list(
-        plot = fig_3d,
-        summary = summary_table_gt,
-        x_vals = x_vals,
-        y_vals = y_vals,
-        z_matrix = z_matrix
-      ))
-      
-    } else if (plot_type == "2D") {
-      kde_df <- data.frame(
-        expand.grid(x = kde_result$x, y = kde_result$y),
-        z = as.vector(kde_result$z)
-      )
-      
-      scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
-        geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +  
-        geom_contour(data = kde_df, aes(x = x, y = y, z = z), color = "black") +
-        labs(
-          x = continuous_vars[1],
-          y = continuous_vars[2],
-          title = paste("Scatter plot s vrstevnicami (jadrové vyhladzovanie)")
-        ) +
-        scale_color_gradient(low = "blue", high = "red") +
-        theme_minimal()
-      
-      density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
-        geom_density(fill = "blue", alpha = 0.5) +
-        labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
-        theme_minimal() +
-        theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
-      
-      density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
-        geom_density(fill = "red", alpha = 0.5) +
-        coord_flip() +
-        labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
-        theme_minimal() +
-        theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-      
-      final_plot_2d <- (density_x + plot_spacer()) /
-        (scatter_plot + density_y) +
-        plot_layout(widths = c(4, 1), heights = c(1, 4))
-      
-      return(list(plot = final_plot_2d, summary = summary_table_gt))
-    }
-  }
-  
-  # Modelovanie zdruzenej hustoty ako hustoty normalneho rozdelenia
-  if (model_type == "normal") {
-    # Vypocet zakladnych parametrov (momentov)
     mean_x <- mean(data[[continuous_vars[1]]], na.rm = TRUE)
     sd_x <- sd(data[[continuous_vars[1]]], na.rm = TRUE)
     mean_y <- mean(data[[continuous_vars[2]]], na.rm = TRUE)
     sd_y <- sd(data[[continuous_vars[2]]], na.rm = TRUE)
-    
-    # Korelacia medzi premennymi
     cor_val <- cor(data[[continuous_vars[1]]], data[[continuous_vars[2]]], method = "pearson", use = "complete.obs")
     
-    # Funkcia na vypocet bivariatnej normalnej hustoty (kvazi dnorm() ale v 2D)
-    bivariate_normal_density <- function(x, y) {
-      rho <- cor_val
-      z_x <- (x - mean_x) / sd_x
-      z_y <- (y - mean_y) / sd_y
-      
-      exponent <- -1 / (2 * (1 - rho^2)) * (z_x^2 + z_y^2 - 2 * rho * z_x * z_y)
-      density <- (1 / (2 * pi * sd_x * sd_y * sqrt(1 - rho^2))) * exp(exponent)
-      
-      return(density)
-    }
-    
-    # Siet pre vypocet hustoty
     x_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
     y_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
-    
     grid <- expand.grid(x = x_vals, y = y_vals)
     
-    # Vypocet hustoty na sieti
-    grid$z <- mapply(bivariate_normal_density, grid$x, grid$y)
-    z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
-    z_matrix <- t(z_matrix)
+    if (model_type == "normal") {
+      rho <- cor_val
+      bivariate_density <- function(x, y) {
+        z_x <- (x - mean_x) / sd_x
+        z_y <- (y - mean_y) / sd_y
+        exponent <- -1 / (2 * (1 - rho^2)) * (z_x^2 + z_y^2 - 2 * rho * z_x * z_y)
+        (1 / (2 * pi * sd_x * sd_y * sqrt(1 - rho^2))) * exp(exponent)
+      }
+    } else { # model_type == "t"
+      Sigma <- matrix(c(sd_x^2, cor_val * sd_x * sd_y,
+                        cor_val * sd_x * sd_y, sd_y^2), nrow = 2)
+      Sigma_inv <- solve(Sigma)
+      det_Sigma <- det(Sigma)
+      df <- nrow(data) - 1
+      bivariate_density <- function(x, y) {
+        z <- c(x - mean_x, y - mean_y)
+        quad_form <- t(z) %*% Sigma_inv %*% z
+        coeff <- gamma((df + 2) / 2) / (gamma(df / 2) * (df * pi) * sqrt(det_Sigma))
+        exponent <- (1 + quad_form / df)^(-(df + 2) / 2)
+        as.numeric(coeff * exponent)
+      }
+    }
     
-    model_summary <- tibble::tibble(
-      Parameter = c(
+    grid$z <- mapply(bivariate_density, grid$x, grid$y)
+    z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
+    
+    result$x_vals <- x_vals
+    result$y_vals <- y_vals
+    result$z_matrix <- t(z_matrix)
+    result$model_type <- model_type
+    result$continuous_vars <- continuous_vars
+    result$params <- list(mean_x = mean_x, sd_x = sd_x, mean_y = mean_y, sd_y = sd_y, cor_val = cor_val, df = if (model_type == "t") df else NULL)
+    
+    # Summary
+    names_vec <- if (model_type == "normal") {
+      c(
         paste0("Mean (", continuous_vars[1], ")"),
         paste0("SD (", continuous_vars[1], ")"),
         paste0("Mean (", continuous_vars[2], ")"),
         paste0("SD (", continuous_vars[2], ")"),
         "Pearson correlation"
-      ),
-      Value = c(mean_x, sd_x, mean_y, sd_y, cor_val)
-    )
-    
-    highlight_rows <- which(grepl("Pearson", model_summary$Parameter))
-    
-    summary_table_gt <- apply_dark_gt_theme(
-      gt::gt(model_summary) %>%
-        gt::tab_header(
-          title = gt::md("**Model Summary**"),
-          subtitle = "Bivariate Normal Distribution"
-        ) %>%
-        gt::cols_width(Parameter ~ px(220), Value ~ px(420)) %>%
-        gt::opt_row_striping() %>%
-        gt::opt_table_font(font = "Arial"),
-      
-      highlight_rows = NULL,
-      highlight_color = NULL
-    )
-    
-    if (plot_type == "3D") {
-      # 3D Vizualizacia
-      fig_3d <- plot_ly(
-        x = ~x_vals, y = ~y_vals, z = ~z_matrix,
-        type = "surface",
-        colors = colorRamp(c("blue", "cyan", "yellow", "red")),
-        opacity = 0.7,
-        showscale = TRUE,
-        source = "A"
-      ) %>% layout(
-        title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(bivariátne normálne rozdelenie)"),
-        scene = list(
-          xaxis = list(title = continuous_vars[1]),
-          yaxis = list(title = continuous_vars[2]),
-          zaxis = list(title = "Hustota")
-        )
       )
-      
-      fig_3d <- fig_3d %>% event_register("plotly_click")
-      
-      return(list(
-        plot = fig_3d,
-        x_vals = x_vals,
-        y_vals = y_vals,
-        z_matrix = z_matrix,
-        summary = summary_table_gt
-      ))
-      
-    } else if (plot_type == "2D") {
-      contour_df <- grid
-      
-      # 2D Vizualizacia
-      scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
-        geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
-        geom_contour(data = contour_df, aes(x = x, y = y, z = z), color = "black") +
-        labs(
-          x = continuous_vars[1],
-          y = continuous_vars[2],
-          title = paste("Scatter plot s vrstevnicami (bivariátne normálne)")
-        ) +
-        scale_color_gradient(low = "blue", high = "red") +
-        theme_minimal()
-      
-      density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
-        stat_function(fun = dnorm, args = list(mean = mean_x, sd = sd_x), fill = "blue", geom = "area", alpha = 0.5) +
-        labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
-        theme_minimal() +
-        theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
-      
-      density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
-        stat_function(fun = dnorm, args = list(mean = mean_y, sd = sd_y), fill = "red", geom = "area", alpha = 0.5) +
-        coord_flip() +
-        labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
-        theme_minimal() +
-        theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-      
-      final_plot_2d <- (density_x + plot_spacer()) /
-        (scatter_plot + density_y) +
-        plot_layout(widths = c(4, 1), heights = c(1, 4))
-      
-      return(list(final_plot_2d, summary = summary_table_gt))
-    }
-  }
-  
-  # Modelovanie zdruzenej hustoty ako hustoty Studentovho t-rozdelenia
-  if (model_type == "t") {
-    # Vypocet zakladnych parametrov (momentov)
-    mean_x <- mean(data[[continuous_vars[1]]], na.rm = TRUE)
-    sd_x <- sd(data[[continuous_vars[1]]], na.rm = TRUE)
-    mean_y <- mean(data[[continuous_vars[2]]], na.rm = TRUE)
-    sd_y <- sd(data[[continuous_vars[2]]], na.rm = TRUE)
-    
-    # Korelacia medzi premennymi (Pearson)
-    cor_val <- cor(data[[continuous_vars[1]]], data[[continuous_vars[2]]], method = "pearson", use = "complete.obs")
-    
-    # Kovariancna matica (smerodajne odchylky/rozptyly a korelacia)
-    Sigma <- matrix(c(sd_x^2, cor_val * sd_x * sd_y,
-                      cor_val * sd_x * sd_y, sd_y^2), nrow = 2)
-    
-    # Inverzna kovariancná matica
-    Sigma_inv <- solve(Sigma)
-    
-    # Determinant kovariancnej matice
-    det_Sigma <- det(Sigma)
-    
-    # Stupne volnosti
-    df <- nrow(data) - 1
-    
-    # Bivariatna Studentova t-hustota
-    bivariate_t_density <- function(x, y) {
-      z <- c(x - mean_x, y - mean_y)
-      quad_form <- t(z) %*% Sigma_inv %*% z
-      
-      coeff <- gamma((df + 2) / 2) / (gamma(df / 2) * (df * pi) * sqrt(det_Sigma))
-      exponent <- (1 + quad_form / df) ^ (-(df + 2) / 2)
-      
-      return(as.numeric(coeff * exponent))
-    }
-    
-    # Siet pre vypocet hustoty
-    x_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
-    y_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
-    
-    grid <- expand.grid(x = x_vals, y = y_vals)
-    
-    # Vypocet hustoty na sieti
-    grid$z <- mapply(bivariate_t_density, grid$x, grid$y)
-    z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
-    z_matrix <- t(z_matrix)
-    
-    summary_tbl_t <- tibble::tibble(
-      Parameter = c(
+    } else {
+      c(
         paste0("Mean (", continuous_vars[1], ")"),
         paste0("SD (", continuous_vars[1], ")"),
         paste0("Mean (", continuous_vars[2], ")"),
         paste0("SD (", continuous_vars[2], ")"),
         "Pearson correlation",
-        "Determinant of Σ",
-        "Degrees of freedom"
-      ),
-      Value = c(mean_x, sd_x, mean_y, sd_y, cor_val, det_Sigma, df)
+        "Degrees of Freedom"
+      )
+    }
+    
+    values_vec <- if (model_type == "normal") {
+      c(mean_x, sd_x, mean_y, sd_y, cor_val)
+    } else {
+      c(mean_x, sd_x, mean_y, sd_y, cor_val, df)
+    }
+    
+    result$summary_info <- tibble::tibble(
+      Name = names_vec,
+      Value = values_vec
     )
-    
-    #highlight_rows <- which(grepl("Pearson|Determinant|Degrees", summary_tbl_t$Parameter))
-    
-    summary_table_gt_t <- apply_dark_gt_theme(
-      gt::gt(summary_tbl_t) %>%
-        gt::tab_header(
-          title = gt::md("**Model Summary**"),
-          subtitle = "Bivariate Student t-distribution"
-        ) %>%
-        gt::cols_width(Parameter ~ px(240), Value ~ px(400)) %>%
-        gt::opt_row_striping() %>%
-        gt::opt_table_font(font = "Arial"),
-      
-      highlight_rows = NULL,
-      highlight_color = NULL
-    )
-    
-    if (plot_type == "3D") {
-      # 3D Vizualizacia
-      fig_3d <- plot_ly(
-        x = ~x_vals, y = ~y_vals, z = ~z_matrix,
-        type = "surface",
-        colors = colorRamp(c("blue", "cyan", "yellow", "red")),
-        opacity = 0.7,
-        showscale = TRUE,
-        source = "A"
-      ) %>% layout(
-        title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(bivariátne t-rozdelenie)"),
+  }
+  
+  result$vector_type <- "continuous"
+  return(result)
+}
+
+render_continuous_density <- function(model_output, data, plot_type = "2D") {
+  
+  x_vals <- model_output$x_vals
+  y_vals <- model_output$y_vals
+  z_matrix <- model_output$z_matrix
+  vars <- model_output$continuous_vars
+  
+  if (plot_type == "3D") {
+    plot <- plot_ly(
+      x = ~x_vals, y = ~y_vals, z = ~z_matrix,
+      type = "surface",
+      colors = colorRamp(c("blue", "cyan", "yellow", "red")),
+      opacity = 0.7,
+      showscale = TRUE,
+      source = "A"
+    ) %>%
+      layout(
+        title = paste("Združená hustota", vars[1], "a", vars[2], ifelse(model_output$model_type == "kernel", "(jadrové vyhladzovanie)", ifelse(model_output$model_type == "normal", "(bivariátne normálne)", "(bivariátne t-rozdelenie)"))),
         scene = list(
-          xaxis = list(title = continuous_vars[1]),
-          yaxis = list(title = continuous_vars[2]),
+          xaxis = list(title = vars[1]),
+          yaxis = list(title = vars[2]),
           zaxis = list(title = "Hustota")
         )
-      )
+      ) %>% event_register("plotly_click")
+    
+  } else { # 2D
+    
+    contour_df <- expand.grid(x = x_vals, y = y_vals)
+    contour_df$z <- as.vector(t(z_matrix))
+    
+    scatter_plot <- ggplot(data, aes_string(x = vars[1], y = vars[2])) +
+      geom_point(size = 3, alpha = 0.7, aes_string(color = vars[2])) +
+      geom_contour(data = contour_df, aes(x = x, y = y, z = z), color = "black") +
+      labs(
+        x = vars[1],
+        y = vars[2],
+        title = paste("Scatter plot s vrstevnicami", ifelse(model_output$model_type == "kernel", "(jadrové vyhladzovanie)", ifelse(model_output$model_type == "normal", "(bivariátne normálne)", "(bivariátne t-rozdelenie)")))
+      ) +
+      scale_color_gradient(low = "blue", high = "red") +
+      theme_minimal()
+    
+    if (model_output$model_type == "t") {
+      mean_x <- model_output$params$mean_x
+      sd_x <- model_output$params$sd_x
+      mean_y <- model_output$params$mean_y
+      sd_y <- model_output$params$sd_y
+      df <- model_output$params$df
       
-      fig_3d <- fig_3d %>% event_register("plotly_click")
-      
-      return(list(
-        plot = fig_3d,
-        x_vals = x_vals,
-        y_vals = y_vals,
-        z_matrix = z_matrix,
-        summary = summary_table_gt_t
-      ))
-      
-    } else if (plot_type == "2D") {
-      contour_df <- grid
-      
-      # 2D Vizualizacia
-      scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
-        geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
-        geom_contour(data = contour_df, aes(x = x, y = y, z = z), color = "black") +
-        labs(
-          x = continuous_vars[1],
-          y = continuous_vars[2],
-          title = paste("Scatter plot s vrstevnicami (bivariátne t-rozdelenie)")
-        ) +
-        scale_color_gradient(low = "blue", high = "red") +
-        theme_minimal()
-      
-      density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
+      density_x <- ggplot(data, aes_string(x = vars[1])) +
         stat_function(fun = function(x) dt((x - mean_x) / sd_x, df = df) / sd_x, fill = "blue", geom = "area", alpha = 0.5) +
-        labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
+        labs(x = NULL, y = paste("Hustota (", vars[1], ")", sep = "")) +
         theme_minimal() +
         theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
       
-      density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
+      density_y <- ggplot(data, aes_string(x = vars[2])) +
         stat_function(fun = function(y) dt((y - mean_y) / sd_y, df = df) / sd_y, fill = "red", geom = "area", alpha = 0.5) +
         coord_flip() +
-        labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
+        labs(x = NULL, y = paste("Hustota (", vars[2], ")", sep = "")) +
         theme_minimal() +
         theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
       
-      final_plot_2d <- (density_x + plot_spacer()) /
-        (scatter_plot + density_y) +
-        plot_layout(widths = c(4, 1), heights = c(1, 4))
+    } else {
+      density_x <- ggplot(data, aes_string(x = vars[1])) +
+        geom_density(fill = "blue", alpha = 0.5) +
+        labs(x = NULL, y = paste("Hustota (", vars[1], ")", sep = "")) +
+        theme_minimal() +
+        theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
       
-      return(list(final_plot_2d, summary = summary_table_gt_t))
-      
+      density_y <- ggplot(data, aes_string(x = vars[2])) +
+        geom_density(fill = "red", alpha = 0.5) +
+        coord_flip() +
+        labs(x = NULL, y = paste("Hustota (", vars[2], ")", sep = "")) +
+        theme_minimal() +
+        theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
     }
+    
+    plot <- (density_x + plot_spacer()) /
+      (scatter_plot + density_y) +
+      patchwork::plot_layout(widths = c(4, 1), heights = c(1, 4))
   }
+  
+  # Summary
+  summary_table <- gt::gt(model_output$summary_info) %>%
+    gt::tab_header(
+      title = gt::md("**Model Summary**")
+    ) %>%
+    gt::opt_row_striping() %>%
+    gt::opt_table_font(font = "Arial")
+  
+  summary_table <- apply_dark_gt_theme(
+    gt_tbl = summary_table,
+    highlight_rows = NULL,
+    highlight_color = NULL
+  )
+  
+  return(list(
+    plot = plot,
+    summary = summary_table
+  ))
 }
 
-continuous_joint_distribution_copula <- function(data, continuous_vars, model_type, copula_type, marginal_densities, plot_type, abort_signal) {
+model_continuous_density_copula <- function(data, continuous_vars, model_type = "nonparametric", copula_type = "empirical", marginal_densities = NULL, abort_signal = NULL) {
+  
   if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
   
   # Modelovanie zdruzenej hustoty cez kopulovu funkciu a marginalne rozdelenie (vsetko neparametricke)
@@ -1013,7 +507,9 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     kde_x <- density(data[[continuous_vars[1]]], n = 512)
     kde_y <- density(data[[continuous_vars[2]]], n = 512)
     
-    # Funkcie pre hustoty a distribucne funkcie KDE
+    bw_x <- kde_x$bw
+    bw_y <- kde_y$bw
+    
     kde_x_density <- approxfun(kde_x$x, kde_x$y, rule = 2)
     kde_x_cdf <- approxfun(kde_x$x, cumsum(kde_x$y) / sum(kde_x$y), rule = 2)
     
@@ -1022,35 +518,28 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     
     if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
     
-    # Transformacia dat na jednotkovy interval
     u1 <- kde_x_cdf(data[[continuous_vars[1]]])
     u2 <- kde_y_cdf(data[[continuous_vars[2]]])
-    
-    empirical_data <- pobs(cbind(u1, u2))  # zoradenie do [0,1]
+    empirical_data <- pobs(cbind(u1, u2))
     
     if (copula_type == "empirical") {
-      copula_model <- empCopula(empirical_data, smoothing = "beta")
-      copula_model_fitted <- copula_model
+      copula_model_fitted <- empCopula(empirical_data, smoothing = "beta")
     } else {
-      stop("Zadany 'copula_type' nie je podporovany. Pouzi: 'empirical'.")
+      stop("Unsupported copula_type. Only 'empirical' is allowed here.")
     }
     
     if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
     
-    # Vytvorenie gridu
     x_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
     y_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
     grid <- expand.grid(x = x_vals, y = y_vals)
     
-    # Funkcia na vypocet zdruzenej hustoty
     copula_density_function <- function(x, y) {
       if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
       
       u1 <- kde_x_cdf(x)
       u2 <- kde_y_cdf(y)
-      
       copula_density <- dCopula(cbind(u1, u2), copula = copula_model_fitted)
-      
       marginal_x <- kde_x_density(x)
       marginal_y <- kde_y_density(y)
       
@@ -1060,94 +549,23 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     grid$z <- mapply(copula_density_function, grid$x, grid$y)
     z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
     
-    if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
-    
-    summary_tbl <- tibble::tibble(
-      Parameter = c(
-        paste0("Marginal Density X (", continuous_vars[1], ")"),
-        paste0("Marginal Density Y (", continuous_vars[2], ")"),
-        "Copula Type",
-        "Copula Smoothing",
-        "Copula Fitted Method"
-      ),
-      Value = c(
-        "KDE", "KDE",
-        copula_type, "beta", "empCopula (empirical data)"
-      )
-    )
-    
-    # Vytvorenie zakladnej tabulky
-    base_table <- gt::gt(summary_tbl) %>%
-      gt::tab_header(
-        title = gt::md("**Model Summary**"),
-        subtitle = paste0("KDE + ", copula_type, " copula")
-      ) %>%
-      gt::cols_width(Parameter ~ px(260), Value ~ px(460)) %>%
-      gt::opt_row_striping() %>%
-      gt::opt_table_font(font = "Arial")
-    
-    summary_table_gt <- base_table %>%
-      apply_dark_gt_theme(highlight_rows = NULL, highlight_color = NULL)
-    
-    if (plot_type == "3D") {
-      fig_3d <- plot_ly(
-        x = ~x_vals, y = ~y_vals, z = ~z_matrix,
-        type = "surface",
-        opacity = 0.7,
-        colors = colorRamp(c("blue", "cyan", "yellow", "red"))
-      ) %>% layout(
-        title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], paste0(" (KDE + ", copula_type, " kopula)")),
-        scene = list(
-          xaxis = list(title = continuous_vars[1]),
-          yaxis = list(title = continuous_vars[2]),
-          zaxis = list(title = "Hustota")
-        )
-      )
-      
-      return(list(
-        plot = fig_3d,
-        x_vals = x_vals,
-        y_vals = y_vals,
-        z_matrix = z_matrix,
-        summary = summary_table_gt
-      ))
-      
-    } else if (plot_type == "2D") {
-      scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
-        geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
-        geom_contour(data = grid, aes(x = x, y = y, z = z), color = "black", size = 0.6) +
-        labs(
-          x = continuous_vars[1],
-          y = continuous_vars[2],
-          title = paste("Scatter + vrstevnice (KDE +", copula_type, "kopula)")
-        ) +
-        scale_color_gradient(low = "blue", high = "red") +
-        theme_minimal()
-      
-      density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
-        geom_density(fill = "blue", alpha = 0.5) +
-        labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
-        theme_minimal() +
-        theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
-      
-      density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
-        geom_density(fill = "red", alpha = 0.5) +
-        coord_flip() +
-        labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
-        theme_minimal() +
-        theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-      
-      final_plot_2d <- (density_x + plot_spacer()) /
-        (scatter_plot + density_y) +
-        plot_layout(widths = c(4, 1), heights = c(1, 4))
-      
-      return(list(plot = final_plot_2d, summary = summary_table_gt))
-    }
+    return(list(
+      x_vals = x_vals,
+      y_vals = y_vals,
+      z_matrix = t(z_matrix),
+      copula_type = copula_type,
+      model_type = model_type,
+      marginal_densities = c("KDE", "KDE"),
+      continuous_vars = continuous_vars,
+      bw_x = bw_x,
+      bw_y = bw_y,
+      vector_type = "continuous_copula"
+    ))
   }
   
   # Modelovanie zdruzenej hustoty cez kopulovu funkciu a marginalne rozdelenie (vsetko parametricke)
   if (model_type == "parametric") {
-    # Vypocet marginalnych parametrov
+    
     mean_x <- mean(data[[continuous_vars[1]]], na.rm = TRUE)
     sd_x <- sd(data[[continuous_vars[1]]], na.rm = TRUE)
     mean_y <- mean(data[[continuous_vars[2]]], na.rm = TRUE)
@@ -1155,7 +573,6 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     
     marginal_cdf_function <- function(value, mean, sd, index) {
       density_type <- marginal_densities[index]
-      
       if (density_type == "normal" || density_type == "log_normal") {
         return(pnorm(value, mean = mean, sd = sd))
       } else if (density_type == "t") {
@@ -1166,7 +583,6 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
       }
     }
     
-    # Vypocet hodnoty marginalnych rozdeleni pre vstup do kopuly
     u1 <- marginal_cdf_function(data[[continuous_vars[1]]], mean_x, sd_x, 1)
     u2 <- marginal_cdf_function(data[[continuous_vars[2]]], mean_y, sd_y, 2)
     
@@ -1182,20 +598,15 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
       stop("Zadaný 'copula_type' nie je podporovaný. Použi: 'Clayton', 'Gumbel', 'Frank', 'Joe'.")
     }
     
-    # Fitovanie kopuly na marginálne transformované dáta
     copula_fit <- fitCopula(copula_model, pobs(cbind(u1, u2)), method = "ml")
     copula_model_fitted <- copula_fit@copula
     
-    # Vytvorenie gridu pre hustotu
     x_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
     y_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
-    
     grid <- expand.grid(x = x_vals, y = y_vals)
     
-    # Funkcia na vypocet marginalnej hustoty podla vyberu
     marginal_density_function <- function(value, mean, sd, index) {
       density_type <- marginal_densities[index]
-      
       if (density_type == "normal") {
         return(dnorm(value, mean = mean, sd = sd))
       } else if (density_type == "log_normal") {
@@ -1208,141 +619,45 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
       }
     }
     
-    # Vypocet zdruzenej hustoty cez rozklad na marginaly + kopula
     copula_density_function <- function(x, y) {
       u1 <- marginal_cdf_function(x, mean_x, sd_x, 1)
       u2 <- marginal_cdf_function(y, mean_y, sd_y, 2)
-      
       copula_part <- dCopula(cbind(u1, u2), copula = copula_model_fitted)
-      
       marginal_x <- marginal_density_function(x, mean_x, sd_x, 1)
       marginal_y <- marginal_density_function(y, mean_y, sd_y, 2)
-      
       copula_part * marginal_x * marginal_y
     }
     
-    # Vypocet hustoty na sieti
     grid$z <- mapply(copula_density_function, grid$x, grid$y)
     z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
     
-    summary_tbl <- tibble::tibble(
-      Parameter = c(
-        paste0("Marginal Model X (", continuous_vars[1], ")"),
-        paste0("Mean (", continuous_vars[1], ")"),
-        paste0("SD (", continuous_vars[1], ")"),
-        paste0("Marginal Model Y (", continuous_vars[2], ")"),
-        paste0("Mean (", continuous_vars[2], ")"),
-        paste0("SD (", continuous_vars[2], ")"),
-        "Copula Type",
-        "Fitted Copula Family",
-        "Fitted Copula Parameter"
-      ),
-      Value = c(
-        marginal_densities[1],
-        round(mean_x, 4),
-        round(sd_x, 4),
-        marginal_densities[2],
-        round(mean_y, 4),
-        round(sd_y, 4),
-        copula_type,
-        class(copula_model_fitted),
-        round(copula_model_fitted@parameters, 4)
-      )
-    )
-    
-    # Riadky na zvyraznenie
-    #highlight_marginals <- which(grepl("Marginal Model|Mean|SD", summary_tbl$Parameter))
-    #highlight_copula <- which(grepl("Copula", summary_tbl$Parameter))
-    
-    # Zakladna tabulka
-    base_table <- gt::gt(summary_tbl) %>%
-      gt::tab_header(
-        title = gt::md("**Model Summary**"),
-        subtitle = paste0("Parametric + ", copula_type, " Copula")
-      ) %>%
-      gt::cols_width(Parameter ~ px(260), Value ~ px(460)) %>%
-      gt::opt_row_striping() %>%
-      gt::opt_table_font(font = "Arial")
-    
-    summary_table_gt <- base_table %>%
-      apply_dark_gt_theme(highlight_rows = NULL, highlight_color = NULL)
-    
-    if (plot_type == "3D") {
-      # 3D Vizualizacia
-      fig_3d <- plot_ly(
-        x = ~x_vals, y = ~y_vals, z = ~z_matrix,
-        type = "surface",
-        opacity = 0.7,
-        colors = colorRamp(c("blue", "cyan", "yellow", "red"))
-      ) %>% layout(
-        title = paste0("Združená hustota ", continuous_vars[1], " a ", continuous_vars[2], " (dnorm + ", copula_type, " kopula)"),
-        scene = list(
-          xaxis = list(title = continuous_vars[1]),
-          yaxis = list(title = continuous_vars[2]),
-          zaxis = list(title = "Hustota")
-        )
-      )
-      
-      return(list(
-        plot = fig_3d,
-        x_vals = x_vals,
-        y_vals = y_vals,
-        z_matrix = z_matrix,
-        summary = summary_table_gt
-      ))
-      
-    } else if (plot_type == "2D") {
-      # 2D Vizualizacia
-      scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
-        geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
-        geom_contour(
-          data = grid,
-          aes(x = x, y = y, z = z),
-          bins = 10,
-          color = "black",
-          size = 0.6
-        ) +
-        labs(
-          x = continuous_vars[1],
-          y = continuous_vars[2],
-          title = paste("Scatter + vrstevnice (dnorm +", copula_type, "kopula)")
-        ) +
-        scale_color_gradient(low = "blue", high = "red") +
-        theme_minimal()
-      
-      density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
-        stat_function(fun = dnorm, args = list(mean = mean_x, sd = sd_x), fill = "blue", geom = "area", alpha = 0.5) +
-        labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
-        theme_minimal() +
-        theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
-      
-      density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
-        stat_function(fun = dnorm, args = list(mean = mean_y, sd = sd_y), fill = "red", geom = "area", alpha = 0.5) +
-        coord_flip() +
-        labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
-        theme_minimal() +
-        theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-      
-      final_plot_2d <- (density_x + plot_spacer()) /
-        (scatter_plot + density_y) +
-        plot_layout(widths = c(4, 1), heights = c(1, 4))
-      
-      return(list(plot = final_plot_2d, summary = summary_table_gt))
-      
-    }
+    return(list(
+      x_vals = x_vals,
+      y_vals = y_vals,
+      z_matrix = z_matrix,
+      mean_x = mean_x,
+      sd_x = sd_x,
+      mean_y = mean_y,
+      sd_y = sd_y,
+      copula_model_fitted = copula_model_fitted,
+      continuous_vars = continuous_vars,
+      marginal_densities = marginal_densities,
+      copula_type = copula_type,
+      model_type = model_type,
+      vector_type = "continuous_copula"
+    ))
   }
   
   # Modelovanie zdruzenej hustoty cez kopulovu funkciu a marginalne rozdelenie (lubovolny vyber)
   if (model_type == "hybrid") {
+    
     mean_x <- mean(data[[continuous_vars[1]]], na.rm = TRUE)
     sd_x <- sd(data[[continuous_vars[1]]], na.rm = TRUE)
     mean_y <- mean(data[[continuous_vars[2]]], na.rm = TRUE)
     sd_y <- sd(data[[continuous_vars[2]]], na.rm = TRUE)
     
-    # Marginalne distribucne funkcie podla vyberu
     marginal_cdf_function <- function(value, mean, sd, index) {
       density_type <- marginal_densities[index]
-      
       if (density_type == "normal" || density_type == "log_normal") {
         return(pnorm(value, mean = mean, sd = sd))
       } else if (density_type == "t") {
@@ -1350,43 +665,46 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
         return(pt((value - mean) / sd, df = df))
       } else if (density_type == "KDE") {
         dens <- density(data[[continuous_vars[index]]], n = 512)
-        dx <- dens$x
-        dy <- dens$y
-        cdf_vals <- cumsum(dy) / sum(dy)
-        approx_fun <- approxfun(dx, cdf_vals, rule = 2)
+        approx_fun <- approxfun(dens$x, cumsum(dens$y)/sum(dens$y), rule = 2)
         return(approx_fun(value))
       } else {
         stop(paste("Neznáma hustota:", density_type))
       }
     }
     
+    bw_x <- if (marginal_densities[1] == "KDE") {
+      density(data[[continuous_vars[1]]], n = 512)$bw
+    } else {
+      NA_real_
+    }
+    bw_y <- if (marginal_densities[2] == "KDE") {
+      density(data[[continuous_vars[2]]], n = 512)$bw
+    } else {
+      NA_real_
+    }
+    
     u1 <- marginal_cdf_function(data[[continuous_vars[1]]], mean_x, sd_x, 1)
     u2 <- marginal_cdf_function(data[[continuous_vars[2]]], mean_y, sd_y, 2)
     
-    # Kopula podla vyberu
     if (copula_type == "empirical") {
       copula_model_fitted <- empCopula(pobs(cbind(u1, u2)), smoothing = "beta")
-    } else if (copula_type == "Clayton") {
-      copula_model <- claytonCopula(param = 2, dim = 2)
-      copula_fit <- fitCopula(copula_model, pobs(cbind(u1, u2)), method = "ml")
-      copula_model_fitted <- copula_fit@copula
-    } else if (copula_type == "Gumbel") {
-      copula_model <- gumbelCopula(param = 2, dim = 2)
-      copula_fit <- fitCopula(copula_model, pobs(cbind(u1, u2)), method = "ml")
-      copula_model_fitted <- copula_fit@copula
-    } else if (copula_type == "Frank") {
-      copula_model <- frankCopula(param = 5, dim = 2)
-      copula_fit <- fitCopula(copula_model, pobs(cbind(u1, u2)), method = "ml")
-      copula_model_fitted <- copula_fit@copula
-    } else if (copula_type == "Joe") {
-      copula_model <- joeCopula(param = 2, dim = 2)
-      copula_fit <- fitCopula(copula_model, pobs(cbind(u1, u2)), method = "ml")
-      copula_model_fitted <- copula_fit@copula
     } else {
-      stop("Neznámy typ kopuly.")
+      copula_model <- switch(copula_type,
+                             Clayton = claytonCopula(param = 2, dim = 2),
+                             Gumbel = gumbelCopula(param = 2, dim = 2),
+                             Frank = frankCopula(param = 5, dim = 2),
+                             Joe = joeCopula(param = 2, dim = 2),
+                             NULL
+      )
+      
+      if (is.null(copula_model)) {
+        stop("Neznámy typ kopuly.")
+      }
+      
+      copula_fit <- fitCopula(copula_model, pobs(cbind(u1, u2)), method = "ml")
+      copula_model_fitted <- copula_fit@copula
     }
     
-    # Funkcia na vypocet marginalnej hustoty
     marginal_density_function <- function(value, mean, sd, index) {
       density_type <- marginal_densities[index]
       if (density_type == "normal") {
@@ -1407,122 +725,264 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
     
     x_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
     y_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
+    
     grid <- expand.grid(x = x_vals, y = y_vals)
     
     copula_density_function <- function(x, y) {
       u1 <- marginal_cdf_function(x, mean_x, sd_x, 1)
       u2 <- marginal_cdf_function(y, mean_y, sd_y, 2)
-      
       copula_part <- dCopula(cbind(u1, u2), copula = copula_model_fitted)
       marginal_x <- marginal_density_function(x, mean_x, sd_x, 1)
       marginal_y <- marginal_density_function(y, mean_y, sd_y, 2)
-      
       copula_part * marginal_x * marginal_y
     }
     
     grid$z <- mapply(copula_density_function, grid$x, grid$y)
     z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
     
-    marginal_summary <- function(var_name, density_type, mean_val, sd_val, index) {
-      df <- max(nrow(data) - 1, 2)
-      if (density_type == "normal") {
-        return(tibble::tibble(
-          Component = paste("Marginal", var_name),
-          Type = "Normal",
-          Parameters = paste0("Mean = ", round(mean_val, 4), "; SD = ", round(sd_val, 4))
-        ))
-      } else if (density_type == "log_normal") {
-        return(tibble::tibble(
-          Component = paste("Marginal", var_name),
-          Type = "Log-Normal",
-          Parameters = paste0("Mean = ", round(mean_val, 4), "; SD = ", round(sd_val, 4))
-        ))
-      } else if (density_type == "t") {
-        return(tibble::tibble(
-          Component = paste("Marginal", var_name),
-          Type = "Student-t",
-          Parameters = paste0("Mean = ", round(mean_val, 4),
-                              "; SD = ", round(sd_val, 4),
-                              "; df = ", df)
-        ))
-      } else if (density_type == "KDE") {
-        return(tibble::tibble(
-          Component = paste("Marginal", var_name),
-          Type = "Kernel Density Estimate",
-          Parameters = "bw = KDE-based (automatic)"
-        ))
-      } else {
-        return(tibble::tibble(
-          Component = paste("Marginal", var_name),
-          Type = density_type,
-          Parameters = "Unknown"
-        ))
-      }
-    }
+    return(list(
+      x_vals = x_vals,
+      y_vals = y_vals,
+      z_matrix = z_matrix,
+      continuous_vars = continuous_vars,
+      copula_type = copula_type,
+      marginal_densities = marginal_densities,
+      mean_x = mean_x,
+      sd_x = sd_x,
+      mean_y = mean_y,
+      sd_y = sd_y,
+      bw_x = bw_x,
+      bw_y = bw_y,
+      copula_model_fitted = copula_model_fitted,
+      vector_type = "continuous_copula"
+    ))
     
-    # Získaj parametre marginál
-    marg1 <- marginal_summary(continuous_vars[1], marginal_densities[1], mean_x, sd_x, 1)
-    marg2 <- marginal_summary(continuous_vars[2], marginal_densities[2], mean_y, sd_y, 2)
-    
-    # Získaj popis kopuly
-    copula_parameters <- tryCatch({
-      paste(capture.output(show(copula_model_fitted)), collapse = "<br>")
-    }, error = function(e) {
-      "Empirical copula (no parameters)"
-    })
-    
-    copula_summary <- tibble::tibble(
-      Component = "Copula",
-      Type = copula_type,
-      Parameters = copula_parameters
+  }
+}
+
+render_continuous_density_copula <- function(model_output, data, model_type = "nonparametric", plot_type = "2D") {
+  
+  x_vals <- model_output$x_vals
+  y_vals <- model_output$y_vals
+  z_matrix <- model_output$z_matrix
+  continuous_vars <- model_output$continuous_vars
+  copula_type <- model_output$copula_type
+  marginal_densities <- model_output$marginal_densities
+  
+  if (is.null(model_type)){
+    stop("Chýba typ modelu pre kopulové modelovanie.")
+  }
+  
+  if (model_type == "nonparametric") {
+    if (plot_type == "3D") {
+    plot <- plot_ly(
+      x = ~x_vals, y = ~y_vals, z = ~z_matrix,
+      type = "surface",
+      colors = colorRamp(c("blue", "cyan", "yellow", "red")),
+      opacity = 0.7,
+      showscale = TRUE
+    ) %>% layout(
+      title = paste0("Združená hustota ", continuous_vars[1], " a ", continuous_vars[2], " (KDE + ", copula_type, " copula)"),
+      scene = list(
+        xaxis = list(title = continuous_vars[1]),
+        yaxis = list(title = continuous_vars[2]),
+        zaxis = list(title = "Hustota")
+      )
     )
     
-    summary_tbl <- dplyr::bind_rows(marg1, marg2, copula_summary)
+  } else { # plot_type == "2D"
+    contour_df <- expand.grid(x = x_vals, y = y_vals)
+    contour_df$z <- as.vector(t(z_matrix))
     
+    scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
+      geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
+      geom_contour(data = contour_df, aes(x = x, y = y, z = z), color = "black", size = 0.6) +
+      labs(
+        x = continuous_vars[1],
+        y = continuous_vars[2],
+        title = paste("Scatter plot s vrstevnicami (", marginal_densities[1], " +", copula_type, " kopula)")
+      ) +
+      scale_color_gradient(low = "blue", high = "red") +
+      theme_minimal()
     
-    base_table <- summary_tbl %>%
-      gt::gt() %>%
+    density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
+      geom_density(fill = "blue", alpha = 0.5) +
+      labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")", sep = "")) +
+      theme_minimal() +
+      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+    
+    density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
+      geom_density(fill = "red", alpha = 0.5) +
+      coord_flip() +
+      labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")", sep = "")) +
+      theme_minimal() +
+      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+    
+    plot <- (density_x + plot_spacer()) /
+      (scatter_plot + density_y) +
+      patchwork::plot_layout(widths = c(4, 1), heights = c(1, 4))
+  }
+    
+    bw_x <- round(model_output$bw_x, 4)
+    bw_y <- round(model_output$bw_y, 4)
+    
+    summary_tbl <- tibble::tibble(
+      Name = c(
+        paste0("Marginal Density X (", continuous_vars[1], ")"),
+        paste0("Bandwidth X (", continuous_vars[1], ")"),
+        paste0("Marginal Density Y (", continuous_vars[2], ")"),
+        paste0("Bandwidth Y (", continuous_vars[2], ")"),
+        "Copula Type",
+        "Smoothing Method",
+        "Copula Model"
+      ),
+      Value = c(
+        marginal_densities[1], bw_x,
+        marginal_densities[2], bw_y,
+        copula_type, "beta", "empCopula (empirical)"
+      )
+    )
+    
+    summary_table <- gt::gt(summary_tbl) %>%
       gt::tab_header(
-        title = gt::md("**Model Summary**"),
-        subtitle = "Hybrid Copula Model"
+        title = gt::md("**Model Summary**")
       ) %>%
-      gt::cols_width(Component ~ px(200), Type ~ px(200), Parameters ~ px(420)) %>%
-      gt::cols_label(Parameters = gt::html("Parameters")) %>%
-      gt::fmt_markdown(columns = "Parameters") %>%
+      gt::cols_width(Name ~ px(260), Value ~ px(460)) %>%
       gt::opt_row_striping() %>%
       gt::opt_table_font(font = "Arial")
     
-    summary_table_gt <- apply_dark_gt_theme(
-      gt_tbl = base_table,
+    summary_table <- apply_dark_gt_theme(
+      gt_tbl = summary_table,
       highlight_rows = NULL,
       highlight_color = NULL
     )
     
+    return(list(
+      plot = plot,
+      summary = summary_table
+    ))
+  }
+  
+  if (model_type == "parametric") {
+    
     if (plot_type == "3D") {
-      fig_3d <- plot_ly(
+      plot <- plot_ly(
         x = ~x_vals, y = ~y_vals, z = ~z_matrix,
         type = "surface",
         opacity = 0.7,
-        colors = colorRamp(c("blue", "cyan", "yellow", "red"))
-      ) %>% layout(
-        title = paste("Združená hustota", continuous_vars[1], "a", continuous_vars[2], "(hybridné marginály +", copula_type, "kopula)"),
-        scene = list(
-          xaxis = list(title = continuous_vars[1]),
-          yaxis = list(title = continuous_vars[2]),
-          zaxis = list(title = "Hustota")
+        colors = colorRamp(c("blue", "cyan", "yellow", "red")),
+        showscale = TRUE
+      ) %>%
+        layout(
+          title = paste0("Združená hustota ", continuous_vars[1], " a ", continuous_vars[2], " (", marginal_densities[1], " + ", copula_type, " kopula)"),
+          scene = list(
+            xaxis = list(title = continuous_vars[1]),
+            yaxis = list(title = continuous_vars[2]),
+            zaxis = list(title = "Hustota")
+          )
         )
+      
+    } else { # plot_type == "2D"
+      
+      contour_df <- expand.grid(x = x_vals, y = y_vals)
+      contour_df$z <- as.vector(t(z_matrix))
+      
+      scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
+        geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
+        geom_contour(data = contour_df, aes(x = x, y = y, z = z), color = "black", bins = 10) +
+        labs(
+          x = continuous_vars[1],
+          y = continuous_vars[2],
+          title = paste("Scatter plot s vrstevnicami (", marginal_densities[1], " +", copula_type, " kopula)")
+        ) +
+        scale_color_gradient(low = "blue", high = "red") +
+        theme_minimal()
+      
+      density_x <- ggplot(data, aes_string(x = continuous_vars[1])) +
+        stat_function(fun = dnorm, args = list(mean = model_output$mean_x, sd = model_output$sd_x), fill = "blue", geom = "area", alpha = 0.5) +
+        labs(x = NULL, y = paste("Hustota (", continuous_vars[1], ")")) +
+        theme_minimal() +
+        theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+      
+      density_y <- ggplot(data, aes_string(x = continuous_vars[2])) +
+        stat_function(fun = dnorm, args = list(mean = model_output$mean_y, sd = model_output$sd_y), fill = "red", geom = "area", alpha = 0.5) +
+        coord_flip() +
+        labs(x = NULL, y = paste("Hustota (", continuous_vars[2], ")")) +
+        theme_minimal() +
+        theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+      
+      plot <- (density_x + patchwork::plot_spacer()) /
+        (scatter_plot + density_y) +
+        patchwork::plot_layout(widths = c(4, 1), heights = c(1, 4))
+    }
+    
+    summary_tbl <- tibble::tibble(
+      Name = c(
+        paste0("Marginal Model X (", continuous_vars[1], ")"),
+        paste0("Mean (", continuous_vars[1], ")"),
+        paste0("SD (", continuous_vars[1], ")"),
+        paste0("Marginal Model Y (", continuous_vars[2], ")"),
+        paste0("Mean (", continuous_vars[2], ")"),
+        paste0("SD (", continuous_vars[2], ")"),
+        "Copula Type",
+        "Fitted Copula Family",
+        "Fitted Copula Parameter"
+      ),
+      Value = c(
+        marginal_densities[1],
+        round(model_output$mean_x, 4),
+        round(model_output$sd_x, 4),
+        marginal_densities[2],
+        round(model_output$mean_y, 4),
+        round(model_output$sd_y, 4),
+        copula_type,
+        class(model_output$copula_model_fitted),
+        round(model_output$copula_model_fitted@parameters, 4)
       )
+    )
+    
+    summary_table <- gt::gt(summary_tbl) %>%
+      gt::tab_header(
+        title = gt::md("**Model Summary**")
+      ) %>%
+      gt::cols_width(Name ~ px(260), Value ~ px(460)) %>%
+      gt::opt_row_striping() %>%
+      gt::opt_table_font(font = "Arial")
+    
+    summary_table <- apply_dark_gt_theme(
+      gt_tbl = summary_table,
+      highlight_rows = NULL,
+      highlight_color = NULL
+    )
+    
+    return(list(
+      plot = plot,
+      summary = summary_table
+    ))
+  }
+  
+  if (model_type == "hybrid") {
+    
+    if (plot_type == "3D") {
+      plot <- plot_ly(
+        x = ~x_vals, y = ~y_vals, z = ~z_matrix,
+        type = "surface",
+        opacity = 0.7,
+        colors = colorRamp(c("blue", "cyan", "yellow", "red")),
+        showscale = TRUE
+      ) %>%
+        layout(
+          title = paste0("Združená hustota ", continuous_vars[1], " a ", continuous_vars[2], " (hybridné marginály + ", copula_type, " kopula)"),
+          scene = list(
+            xaxis = list(title = continuous_vars[1]),
+            yaxis = list(title = continuous_vars[2]),
+            zaxis = list(title = "Hustota")
+          )
+        )
+    } else {
+      contour_df <- expand.grid(x = x_vals, y = y_vals)
+      contour_df$z <- as.vector(t(z_matrix))
       
-      return(list(
-        plot = fig_3d,
-        x_vals = x_vals,
-        y_vals = y_vals,
-        z_matrix = z_matrix,
-        summary = summary_table_gt
-      ))
-      
-    } else if (plot_type == "2D") {
-      contour_df <- grid
       scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
         geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
         geom_contour(data = contour_df, aes(x = x, y = y, z = z), color = "black", size = 0.6) +
@@ -1547,16 +1007,89 @@ continuous_joint_distribution_copula <- function(data, continuous_vars, model_ty
         theme_minimal() +
         theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
       
-      final_plot_2d <- (density_x + plot_spacer()) /
-        (scatter_plot + density_y) +
-        plot_layout(widths = c(4, 1), heights = c(1, 4))
-      
-      return(list(plot = final_plot_2d, summary = summary_table_gt))
+      plot <- (density_x + plot_spacer()) / (scatter_plot + density_y) +
+        patchwork::plot_layout(widths = c(4, 1), heights = c(1, 4))
     }
+    
+    ## Summary Table:
+    marginal_summary <- function(var_name, density_type, mean_val, sd_val, index) {
+      df <- max(nrow(data) - 1, 2)
+      if (density_type == "normal") {
+        return(tibble::tibble(
+          Component = paste("Marginal", var_name),
+          Type = "Normal",
+          Parameters = paste0("Mean = ", round(mean_val, 4), "; SD = ", round(sd_val, 4))
+        ))
+      } else if (density_type == "log_normal") {
+        return(tibble::tibble(
+          Component = paste("Marginal", var_name),
+          Type = "Log-Normal",
+          Parameters = paste0("Mean = ", round(mean_val, 4), "; SD = ", round(sd_val, 4))
+        ))
+      } else if (density_type == "t") {
+        return(tibble::tibble(
+          Component = paste("Marginal", var_name),
+          Type = "Student-t",
+          Parameters = paste0("Mean = ", round(mean_val, 4), "; SD = ", round(sd_val, 4), "; df = ", df)
+        ))
+      } else if (density_type == "KDE") {
+        return(tibble::tibble(
+          Component = paste("Marginal", var_name),
+          Type = "Kernel Density Estimate",
+          Parameters = paste0("bw = ", round(if (index == 1) model_output$bw_x else model_output$bw_y, 4))
+        ))
+      } else {
+        return(tibble::tibble(
+          Component = paste("Marginal", var_name),
+          Type = density_type,
+          Parameters = "Unknown"
+        ))
+      }
+    }
+    
+    marg1 <- marginal_summary(continuous_vars[1], marginal_densities[1], model_output$mean_x, model_output$sd_x, 1)
+    marg2 <- marginal_summary(continuous_vars[2], marginal_densities[2], model_output$mean_y, model_output$sd_y, 2)
+    
+    copula_parameters <- tryCatch({
+      paste(capture.output(show(model_output$copula_model_fitted)), collapse = "<br>")
+    }, error = function(e) {
+      "Empirical copula (no parameters)"
+    })
+    
+    copula_summary <- tibble::tibble(
+      Component = "Copula",
+      Type = copula_type,
+      Parameters = copula_parameters
+    )
+    
+    summary_tbl <- dplyr::bind_rows(marg1, marg2, copula_summary)
+    
+    summary_table <- gt::gt(summary_tbl) %>%
+      gt::tab_header(
+        title = gt::md("**Model Summary**"),
+        subtitle = "Hybrid Copula Model"
+      ) %>%
+      gt::cols_width(Component ~ px(200), Type ~ px(200), Parameters ~ px(420)) %>%
+      gt::fmt_markdown(columns = "Parameters") %>%
+      gt::opt_row_striping() %>%
+      gt::opt_table_font(font = "Arial")
+    
+    summary_table <- apply_dark_gt_theme(
+      gt_tbl = summary_table,
+      highlight_rows = NULL,
+      highlight_color = NULL
+    )
+    
+    return(list(
+      plot = plot,
+      summary = summary_table
+    ))
   }
 }
 
-discrete_joint_distribution <- function(data, discrete_vars, plot_type, abort_signal) {
+model_joint_pmf <- function(data, discrete_vars, abort_signal = NULL) {
+  
+  if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
   
   tab <- as.data.frame(table(data[, discrete_vars]))
   tab$Probability <- tab$Freq / sum(tab$Freq)
@@ -1581,7 +1114,7 @@ discrete_joint_distribution <- function(data, discrete_vars, plot_type, abort_si
   joint_values_md <- paste0("```\n", paste(joint_values_lines, collapse = "\n"), "\n```")
   
   summary_tbl <- tibble::tibble(
-    Parameter = c(
+    Name = c(
       "Model Type",
       "Variable X", "Variable Y",
       "Levels in X", "Levels in Y",
@@ -1601,15 +1134,13 @@ discrete_joint_distribution <- function(data, discrete_vars, plot_type, abort_si
     )
   )
   
-  #highlight_row_ids <- which(summary_tbl$Parameter == "PMF Values")
-  
   base_table <- summary_tbl %>%
     gt::gt() %>%
     gt::tab_header(
       title = gt::md("**Model Summary**"),
       subtitle = "Probability Mass Function"
     ) %>%
-    gt::cols_width(Parameter ~ px(200), Value ~ px(500)) %>%
+    gt::cols_width(Name ~ px(200), Value ~ px(500)) %>%
     gt::fmt_markdown(columns = "Value") %>%
     gt::opt_row_striping() %>%
     gt::opt_table_font(font = "Arial")
@@ -1620,7 +1151,25 @@ discrete_joint_distribution <- function(data, discrete_vars, plot_type, abort_si
     highlight_color = NULL
   )
   
+  return(list(
+    tab = tab,
+    x_labels = x_labels,
+    y_labels = y_labels,
+    discrete_vars = discrete_vars,
+    summary = summary_table_gt,
+    vector_type = "discrete"
+  ))
+}
+
+render_joint_pmf <- function(model_output, plot_type = "2D") {
+  
+  tab <- model_output$tab
+  x_labels <- model_output$x_labels
+  y_labels <- model_output$y_labels
+  discrete_vars <- model_output$discrete_vars
+  
   if (plot_type == "2D") {
+    
     marginal_x <- tab %>%
       group_by(!!sym(discrete_vars[1])) %>%
       summarise(Prob_X = sum(Probability))
@@ -1629,8 +1178,7 @@ discrete_joint_distribution <- function(data, discrete_vars, plot_type, abort_si
       group_by(!!sym(discrete_vars[2])) %>%
       summarise(Prob_Y = sum(Probability))
     
-    # 2D Vizualizacia
-    scatter_plot <- ggplot(tab, aes_string(x = discrete_vars[1], y = discrete_vars[2], fill =   "Probability")) +
+    scatter_plot <- ggplot(tab, aes_string(x = discrete_vars[1], y = discrete_vars[2], fill = "Probability")) +
       geom_tile(color = "white") +
       scale_fill_gradient(low = "blue", high = "red") +
       labs(x = discrete_vars[1], y = discrete_vars[2], fill = "Pravdepodobnosť") +
@@ -1647,16 +1195,12 @@ discrete_joint_distribution <- function(data, discrete_vars, plot_type, abort_si
       labs(x = NULL, y = "P(Y)") +
       theme_minimal()
     
-    final_plot_2d <- (marginal_x_plot + plot_spacer()) /
+    plot <- (marginal_x_plot + patchwork::plot_spacer()) /
       (scatter_plot + marginal_y_plot) +
-      plot_layout(widths = c(4, 1), heights = c(1, 4))
-    
-    return(list(
-      plot = final_plot_2d,
-      summary = summary_table_gt
-    ))
+      patchwork::plot_layout(widths = c(4, 1), heights = c(1, 4))
     
   } else if (plot_type == "3D") {
+    
     fig_3d <- plot_ly()
     
     for (i in 1:nrow(tab)) {
@@ -1681,7 +1225,7 @@ discrete_joint_distribution <- function(data, discrete_vars, plot_type, abort_si
       name = "Pravdepodobnosti"
     )
     
-    fig_3d <- fig_3d %>% layout(
+    plot <- fig_3d %>% layout(
       scene = list(
         xaxis = list(title = paste0(discrete_vars[1], " (X)"),
                      tickvals = 1:length(x_labels),
@@ -1692,15 +1236,15 @@ discrete_joint_distribution <- function(data, discrete_vars, plot_type, abort_si
         zaxis = list(title = "P(X, Y)")
       )
     )
-    
-    return(list(
-      plot = fig_3d,
-      summary = summary_table_gt
-    ))
   }
+  
+  list(
+    plot = plot,
+    summary = model_output$summary
+  )
 }
 
-model_joint_distribution_density <- function(data, selected_variables, model_type = NULL, bw = NULL, use_copula = FALSE, copula_type = NULL, marginal_densities = c("dnorm", "dnorm"), plot_type = NULL, abort_signal = NULL) {
+model_joint_distribution_density <- function(data, selected_variables, model_type = NULL, bw = NULL, use_copula = FALSE, copula_type = NULL, marginal_densities = c("dnorm", "dnorm"), abort_signal = NULL) {
   if (!is.null(abort_signal) && isTRUE(abort_signal())) {
     stop("Aborted by user.")
   }
@@ -1712,17 +1256,11 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
   variables_count <- length(discrete_vars) + length(continuous_vars)
   
   if (length(selected_variables) == 2 && length(continuous_vars) == 0) {
-    if (is.null(plot_type)){
-      stop("Nebol zadany typ grafu na vykreslenie.")
-    }
-    result <- discrete_joint_distribution(data, discrete_vars, plot_type, abort_signal)
+    result <- model_joint_pmf(data, discrete_vars, abort_signal)
     return(result)
   } else if (length(selected_variables) == 2 && length(discrete_vars) == 0) {
     if (use_copula == FALSE) {
-      if (is.null(plot_type)){
-        stop("Nebol zadany typ grafu na vykreslenie.")
-      }
-      result <- continuous_joint_distribution(data, continuous_vars, model_type, plot_type, abort_signal)
+      result <- model_continuous_density(data, continuous_vars, model_type, abort_signal)
       return(result)
     }
     else {
@@ -1730,20 +1268,41 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
         stop("Ak je 'use_copula' = 'TRUE', musi byt specifikovany aj parameter 'copula_type'.")
       }
       else {
-        if (is.null(plot_type)){
-          stop("Nebol zadany typ grafu na vykreslenie.")
-        }
-        result <- continuous_joint_distribution_copula(data, continuous_vars, model_type, copula_type, marginal_densities, plot_type, abort_signal)
+        result <- model_continuous_density_copula(data, continuous_vars, model_type, copula_type, marginal_densities, abort_signal)
         return(result)
       }
     }
   } else if (length(selected_variables) == 2 && length(discrete_vars) == 1) {
-    if (is.null(plot_type)){
-      stop("Nebol zadany typ grafu na vykreslenie.")
-    }
-    result <- mixture_joint_distribution(data, discrete_vars, continuous_vars, model_type, bw, plot_type, abort_signal)
+    result <- model_mixture_density(data, discrete_vars, continuous_vars, model_type, bw, abort_signal)
     return(result)
   }
+}
+
+render_joint_distribution_density <- function(model_output = NULL, data = NULL, plot_type = NULL, model_type = NULL) {
+  
+  if (is.null(plot_type)) {
+    stop("Nebol zadany typ grafu na vykreslenie.")
+  }
+  
+  if (is.null(model_output)) {
+    stop("Neboli poskytnuté žiadne dáta na vizualizáciu.")
+  }
+  
+  vector_type <- model_output$vector_type
+  
+  result <- switch(vector_type,
+                         "mix" = render_mixture_density(model_output, plot_type),
+                         "continuous" = render_continuous_density(model_output, data, plot_type),
+                         "continuous_copula" = render_continuous_density_copula(model_output, data, model_type, plot_type),
+                         "discrete" = render_joint_pmf(model_output, plot_type),
+                         NULL
+  )
+  
+  if (is.null(result)) {
+    stop("Neznámy typ vektora premenných.")
+  }
+  
+  return(result)
 }
 
 model_conditional_mean <- function(data, selected_variables, mean_method = "linear", poly_mean_degree = NULL, specific_x = NULL) {
@@ -1826,7 +1385,7 @@ model_conditional_mean <- function(data, selected_variables, mean_method = "line
   
   # Vystupna tabulka
   summary_tbl <- tibble::tibble(
-    Parameter = c(
+    Name = c(
       "Model Type", "Basis Function", "Hyperparameters",
       "R-squared", "MSE", "X (specific)", "E[Y|X = x]"
     ),
@@ -1844,7 +1403,7 @@ model_conditional_mean <- function(data, selected_variables, mean_method = "line
   if (!is.null(param_summary)) {
     param_tbl <- param_summary %>%
       dplyr::transmute(
-        Parameter = paste0("β_", term),
+        Name = paste0("β_", term),
         Value = paste0(round(estimate, 4), " ± ", round(std.error, 4))
       )
     summary_tbl <- bind_rows(summary_tbl, param_tbl)
@@ -1856,7 +1415,7 @@ model_conditional_mean <- function(data, selected_variables, mean_method = "line
         title = gt::md(paste0("**Mean Model Summary**")),
         subtitle = "Conditional Mean Function"
       ) %>%
-      gt::cols_width(Parameter ~ px(240), Value ~ px(460)) %>%
+      gt::cols_width(Name ~ px(240), Value ~ px(460)) %>%
       gt::opt_row_striping() %>%
       gt::opt_table_font(font = "Arial")
   )
@@ -1925,7 +1484,7 @@ model_conditional_quantiles <- function(data, selected_variables, quantile_metho
     
     # Suhrnna tabulka
     param_summary <- tibble::tibble(
-      Parameter = paste0("β_", params$term),
+      Name = paste0("β_", params$term),
       Value = if ("std.error" %in% colnames(params)) {
         paste0(round(params$estimate, 4), " ± ", round(params$std.error, 4))
       } else {
@@ -1934,7 +1493,7 @@ model_conditional_quantiles <- function(data, selected_variables, quantile_metho
     )
     
     eval_metrics <- tibble::tibble(
-      Parameter = c("Null deviance", "Residual deviance", "AIC"),
+      Name = c("Null deviance", "Residual deviance", "AIC"),
       Value = as.character(round(c(
         metrics$null.deviance %||% NA,
         metrics$deviance %||% NA,
@@ -1943,7 +1502,7 @@ model_conditional_quantiles <- function(data, selected_variables, quantile_metho
     )
     
     model_info <- tibble::tibble(
-      Parameter = c("Quantile Level", "Method", "Basis Function"),
+      Name = c("Quantile Level", "Method", "Basis Function"),
       Value = as.character(c(q, quantile_method, formula_str))
     )
     
@@ -1958,7 +1517,7 @@ model_conditional_quantiles <- function(data, selected_variables, quantile_metho
             title = gt::md(paste0("**Quantile Model Summary (τ = ", q, ")**")),
             subtitle = "Conditional Quantile Function"
           ) %>%
-          gt::cols_width(Parameter ~ gt::px(240), Value ~ gt::px(460)) %>%
+          gt::cols_width(Name ~ gt::px(240), Value ~ gt::px(460)) %>%
           gt::opt_row_striping() %>%
           gt::opt_table_font(font = "Arial")
       )
@@ -2038,7 +1597,7 @@ model_discrete_predictor <- function(data, selected_variables, discrete_model_ty
   # Zakladne odhady pre kazdu kategoriu
   est <- broom::tidy(fit)
   param_tbl <- tibble::tibble(
-    Parameter = paste0("β_", est$term),
+    Name = paste0("β_", est$term),
     Value = paste0(round(est$estimate, 4), " ± ",
                    ifelse("std.error" %in% names(est),
                           round(est$std.error, 4), "N/A"))
@@ -2046,7 +1605,7 @@ model_discrete_predictor <- function(data, selected_variables, discrete_model_ty
   
   # Sumarizacna tabulka
   summary_tbl <- tibble::tibble(
-    Parameter = c("Model Type", "Link Function", "R-squared"),
+    Name = c("Model Type", "Link Function", "R-squared"),
     Value = c(
       discrete_model_type,
       if (discrete_model_type == "glm_log") "log link" else "identity link",
@@ -2060,7 +1619,7 @@ model_discrete_predictor <- function(data, selected_variables, discrete_model_ty
         title = gt::md("**Discrete Predictor Summary**"),
         subtitle = "Conditional Mean Function"
       ) %>%
-      gt::cols_width(Parameter ~ gt::px(240), Value ~ gt::px(460)) %>%
+      gt::cols_width(Name ~ gt::px(240), Value ~ gt::px(460)) %>%
       gt::opt_row_striping() %>%
       gt::opt_table_font(font = "Arial")
   )
@@ -2630,39 +2189,39 @@ classification_model <- function(data, response_name, predictor_names, method = 
   # Vystupna sumarizacna tabulka
   param_rows <- list()
   metrics <- tibble::tibble(
-    Parameter = c("Model Type", "Accuracy"),
+    Name = c("Model Type", "Accuracy"),
     Value = as.character(c(method, round(accuracy, 4)))
   )
   
   if (method == "logistic") {
-    metrics <- add_row(metrics, Parameter = "Response Type", Value = ifelse(length(levels(response)) == 2, "Binary", "Multinomial"))
+    metrics <- add_row(metrics, Name = "Response Type", Value = ifelse(length(levels(response)) == 2, "Binary", "Multinomial"))
     
     if (length(levels(response)) == 2) {
       coefs <- broom::tidy(model)
       param_rows <- coefs %>%
         dplyr::transmute(
-          Parameter = paste0("β_", term),
+          Name = paste0("β_", term),
           Value = paste0(round(estimate, 4), " ± ", round(std.error, 4))
         )
     } else {
       coefs <- broom::tidy(model)
       param_rows <- coefs %>%
         dplyr::transmute(
-          Parameter = paste0("β_", term, " (", y.level, ")"),
+          Name = paste0("β_", term, " (", y.level, ")"),
           Value = paste0(round(estimate, 4), " ± ", ifelse(is.na(std.error), "N/A", round(std.error, 4)))
         )
     }
     
   } else if (method %in% c("lda", "qda")) {
-    metrics <- add_row(metrics, Parameter = "Response Type", Value = "Multiclass")
-    metrics <- add_row(metrics, Parameter = "Degrees of Freedom", Value = paste(model$df))
+    metrics <- add_row(metrics, Name = "Response Type", Value = "Multiclass")
+    metrics <- add_row(metrics, Name = "Degrees of Freedom", Value = paste(model$df))
     
   } else if (method == "knn") {
-    metrics <- add_row(metrics, Parameter = "Hyperparameter (k)", Value = as.character(model$k))
+    metrics <- add_row(metrics, Name = "Hyperparameter (k)", Value = as.character(model$k))
   }
   
   if (length(param_rows) == 0) {
-    param_rows <- tibble::tibble(Parameter = character(), Value = character())
+    param_rows <- tibble::tibble(Name = character(), Value = character())
   }
   
   summary_tbl <- dplyr::bind_rows(metrics, param_rows)
@@ -2673,7 +2232,7 @@ classification_model <- function(data, response_name, predictor_names, method = 
         title = gt::md("**Classification Model Summary**"),
         subtitle = paste("Method:", toupper(method))
       ) %>%
-      gt::cols_width(Parameter ~ gt::px(260), Value ~ gt::px(460)) %>%
+      gt::cols_width(Name ~ gt::px(260), Value ~ gt::px(460)) %>%
       gt::opt_row_striping() %>%
       gt::opt_table_font(font = "Arial")
   )
