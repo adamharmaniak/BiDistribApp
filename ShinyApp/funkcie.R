@@ -2497,7 +2497,10 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
       )
   }
   else {
+    
     epsilon <- 0.02 * diff(range(x))
+    max_n_local <- max(sapply(breaks, function(xi) sum(abs(x - xi) <= epsilon)))
+    
     for (xi in breaks) {
       subset_y <- y[abs(x - xi) <= epsilon]
       n_local <- length(subset_y)
@@ -2521,7 +2524,8 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
           f_cond[is.na(f_cond)] <- 0
           interpolated <- approx(x = dens2d$y, y = f_cond, xout = y_seq, rule = 2)
           f_scaled <- interpolated$y * fade_factor
-          f_scaled <- f_scaled / max(f_scaled) * density_scaling
+          scale_factor <- if (max_n_local > 0) sqrt(n_local / max_n_local) else 1
+          f_scaled <- f_scaled / max(f_scaled) * density_scaling * scale_factor
           density_data[[length(density_data) + 1]] <- data.frame(
             x = xi + f_scaled, y = y_seq,
             section = section_label, type = "KDE"
@@ -2563,29 +2567,31 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
   density_df <- dplyr::bind_rows(density_data)
   new_data <- data.frame(predictor_numeric = x_seq)
   
-  # Stredna hodnota
-  if (mean_curve) {
-    fit <- lm(response ~ poly(predictor_numeric, mean_poly_degree, raw = TRUE), data = df)
-    mean_pred <- predict(fit, newdata = new_data)
-    p <- p + geom_line(
-      data = data.frame(predictor_numeric = x_seq, y = mean_pred),
-      aes(x = predictor_numeric, y = y),
-      color = "blue", linewidth = 1.2
-    )
-  }
-  
-  # Kvantilove funkcie
-  if (!is.null(quantiles)) {
-    for (q in quantiles) {
-      rq_fit <- quantreg::rq(response ~ poly(predictor_numeric, quantile_poly_degree, raw = TRUE), tau = q, data = df)
-      q_pred <- predict(rq_fit, newdata = new_data)
+  if (!predictor_is_discrete) {
+    # Stredna hodnota
+    if (mean_curve) {
+      fit <- lm(response ~ poly(predictor_numeric, mean_poly_degree, raw = TRUE), data = df)
+      mean_pred <- predict(fit, newdata = new_data)
       p <- p + geom_line(
-        data = data.frame(predictor_numeric = x_seq, y = q_pred),
+        data = data.frame(predictor_numeric = x_seq, y = mean_pred),
         aes(x = predictor_numeric, y = y),
-        color = "purple", linetype = "dashed"
+        color = "blue", linewidth = 1.2
       )
     }
-  }
+    
+    # Kvantilove funkcie
+    if (!is.null(quantiles)) {
+      for (q in quantiles) {
+        rq_fit <- quantreg::rq(response ~ poly(predictor_numeric, quantile_poly_degree, raw = TRUE), tau = q, data = df)
+        q_pred <- predict(rq_fit, newdata = new_data)
+        p <- p + geom_line(
+          data = data.frame(predictor_numeric = x_seq, y = q_pred),
+          aes(x = predictor_numeric, y = y),
+          color = "purple", linetype = "dashed"
+        )
+      }
+    }
+  } else if (mean_curve && !is.null(quantiles)) { stop("Nie je možné zobrazovať regresné krivky pri diskrétnom prediktore.") }
   
   mu_x <- mean(x, na.rm = TRUE)
   mu_y <- mean(y, na.rm = TRUE)
@@ -2693,10 +2699,10 @@ plot_conditional_discrete_densities <- function(df, n_breaks, density_scaling, o
     
     # Vysledny dataframe pre geom_segment + body
     df_segment <- data.frame(
-      y = y_vals,
+      y = y_vals + runif(length(y_vals), -0.20, 0.20),
       Category = response_labels,
-      x_start = x_start,
-      x_end = x_end,
+      x_start = x_center,
+      x_end = x_start + (as.numeric(prob_table) * density_scaling),
       prob = as.numeric(prob_table),
       section = unique(sub_df$section)
     )
