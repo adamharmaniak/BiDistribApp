@@ -410,8 +410,7 @@ render_continuous_density <- function(model_output, data, plot_type = "2D") {
       type = "surface",
       colors = colorRamp(c("blue", "cyan", "yellow", "red")),
       opacity = 0.7,
-      showscale = TRUE,
-      source = "A"
+      showscale = TRUE
     ) %>%
       layout(
         title = paste("Združená hustota", vars[1], "a", vars[2], ifelse(model_output$model_type == "kernel", "(jadrové vyhladzovanie)", ifelse(model_output$model_type == "normal", "(bivariátne normálne)", "(bivariátne t-rozdelenie)"))),
@@ -2312,7 +2311,9 @@ classification_model <- function(data, response_name, predictor_names, method = 
   return(result)
 }
 
-plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling, mean_curve, quantiles, mean_poly_degree, quantile_poly_degree, normal_density, empirical_density, bw_scale) {
+plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling, mean_curve, quantiles,
+                                                  mean_poly_degree, quantile_poly_degree,
+                                                  normal_density, kernel_density, bw_scale) {
   
   response_name <- attr(df, "response_var")
   predictor_name <- attr(df, "predictor_var")
@@ -2320,85 +2321,309 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
   x <- df$predictor
   y <- df$response
   
-  # Vytvorenie gridu pre zdruzenu hustotu
-  x_seq <- seq(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = 100)
-  y_seq <- seq(min(y, na.rm = TRUE), max(y, na.rm = TRUE), length.out = 100)
+  # Zistenie typu prediktora
+  var_types <- identify_variables(df)
+  predictor_is_discrete <- "predictor" %in% var_types$Diskretne
   
-  dens2d <- MASS::kde2d(x, y, n = 100)
+  valid_idx <- is.finite(x) & is.finite(y)
+  df <- df[valid_idx, ]
+  x <- x[valid_idx]
+  y <- y[valid_idx]
   
-  # Rezy hustotou
-  breaks <- seq(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = n_breaks + 2)[-c(1, n_breaks + 2)]
+  h_default <- c(
+    if (is.numeric(x)) bandwidth.nrd(x) else NA,
+    bandwidth.nrd(y)
+  )
+  h_scaled <- if (!is.null(bw_scale)) h_default * bw_scale else h_default
   
-  density_data <- lapply(breaks, function(xi) {
-    col_idx <- which.min(abs(dens2d$x - xi))
-    dens_slice <- dens2d$z[, col_idx]
+  if (!predictor_is_discrete) {
+    dens2d <- MASS::kde2d(x, y, n = 100, h = h_scaled)
+    dens_x <- density(x, bw = if (!is.null(bw_scale)) bw_scale * bandwidth.nrd(x) else "nrd0", n = 100)
     
-    if (max(dens_slice, na.rm = TRUE) == 0) return(NULL)
+    x_seq <- dens2d$x 
+    y_range <- range(y, na.rm = TRUE)
+    y_seq <- seq(y_range[1], y_range[2], length.out = 300)
     
-    scale_factor <- density_scaling / max(dens2d$z, na.rm = TRUE)
-    dens_scaled <- dens_slice * scale_factor
-    
-    data.frame(
-      x_left  = xi - dens_scaled,
-      y       = dens2d$y,
-      section = as.factor(round(xi, 2))
-    )
-  }) %>% dplyr::bind_rows()
+    df$predictor_numeric <- df$predictor
+  }
   
-  # Zakladny graf
-  p <- ggplot(df, aes(x = predictor, y = response)) +
-    geom_point(alpha = 0.6, color = "darkorange") +
-    geom_vline(xintercept = breaks, linetype = "dashed", color = "grey50") +
-    geom_path(data = density_data, aes(x = x_left, y = y, group = section), color = "red", linewidth = 1) +
-    theme_bw() +
-    labs(
-      title = paste("Podmienené hustoty pre", response_name, "podľa", predictor_name),
-      x = paste0(predictor_name, " (Prediktor)"),
-      y = paste0(response_name, " (Spojitá odozva)")
-    )
+  if (predictor_is_discrete) {
+    x_factor_original <- factor(df$predictor)
+    category_levels <- levels(x_factor_original)
+    category_numeric <- seq_along(category_levels)
+    names(category_numeric) <- category_levels
+    
+    df$predictor_numeric <- as.numeric(x_factor_original)
+    x_numeric <- df$predictor_numeric
+    x <- x_numeric
+    
+    unique_vals <- sort(unique(x))
+    if (n_breaks > length(unique_vals)) {
+      warning("Počet požadovaných rezov (n_breaks) je väčší ako počet kategórií v diskrétnom prediktore. Znížené na počet kategórií.")
+      n_breaks <- length(unique_vals)
+    }
+    
+    breaks <- unique_vals[1:n_breaks]
+    x_seq <- sort(unique(x))
+    
+  } else {
+    eps <- 0.001 * diff(range(x, na.rm = TRUE))
+    breaks <- seq(min(x, na.rm = TRUE) + eps, max(x, na.rm = TRUE) - eps, length.out = n_breaks)
+  }
+  
+  density_data <- list()
+  print("Prvá pauza")
+  
+  if (predictor_is_discrete) {
+    
+    # Vyberieme prvých n_breaks kategórií (podľa poradia vo faktore)
+    if (n_breaks > length(category_levels)) {
+      warning("Počet požadovaných rezov (n_breaks) je väčší ako počet kategórií. Skracujem.")
+      n_breaks <- length(category_levels)
+    }
+    selected_levels <- category_levels[1:n_breaks]
+    
+    print("Druhá pauza")
+    
+    for (i in seq_along(selected_levels)) {
+      level_label <- selected_levels[i]
+      #xi_numeric <- as.numeric(as.character(level_label))  # pozicia pre vizualizaciu
+      xi_numeric <- category_numeric[level_label]
+      
+      y_subset <- y[x_factor_original == level_label]
+      
+      print("Tretia pauza")
+      finite_y <- y_subset[is.finite(y_subset)]
+      if (length(finite_y) <= 1) {
+        warning(paste("Preskakujem level", level_label, "- má len", length(finite_y), "validných hodnôt"))
+        next
+      }
+      print(paste("Počet finite hodnôt:", length(finite_y)))
+      
+      if (length(finite_y) > 1) {
+        # Definicia spolocnej y-sekvencie pre hustotu
+        y_seq <- seq(min(y_subset, na.rm = TRUE), max(y_subset, na.rm = TRUE), length.out = 300)
+        
+        if (length(y_seq) >= 2 && is.finite(min(y_seq)) && is.finite(max(y_seq)) && min(y_seq) < max(y_seq)) {
+          fade_density <- density(rep(0, 100), bw = 0.3, n = length(y_seq), from = -1, to = 1)
+          fade_factor <- fade_density$y / max(fade_density$y)
+        } else {
+          warning(paste("Preskakujem výpočet fade_density pre level:", level_label, "- nevalidná y_seq."))
+          next  # preskoč túto iteráciu
+        }
+        print(paste("y_seq length:", length(y_seq)))
+        print(range(y_seq))
+        
+        # KDE
+        if (kernel_density) {
+          bw_yi <- if (!is.null(bw_scale)) bw_scale * bw.nrd0(y_subset) else bw.nrd0(y_subset)
+          dens_yi <- density(y_subset, bw = bw_yi, n = length(y_seq), from = min(y_seq), to = max(y_seq))
+          
+          valid_idx <- is.finite(dens_yi$x) & is.finite(dens_yi$y)
+          x_vals <- dens_yi$x[valid_idx]
+          y_vals <- dens_yi$y[valid_idx]
+          
+          if (
+            length(x_vals) >= 2 &&
+            length(y_vals) == length(x_vals) &&
+            length(unique(x_vals)) >= 2
+          ) {
+            if (length(x_vals) < 2 || length(unique(x_vals)) < 2) {
+              print(paste("x_vals:", paste(round(x_vals, 2), collapse = ", ")))
+              print(paste("y_vals:", paste(round(y_vals, 2), collapse = ", ")))
+            }
+            interpolated <- approx(x_vals, y_vals, xout = y_seq, rule = 2)$y
+            f_scaled <- interpolated * fade_factor
+            f_scaled[!is.finite(f_scaled)] <- 0
+            if (max(f_scaled) > 0) {
+              f_scaled <- f_scaled / max(f_scaled) * density_scaling
+              density_data[[length(density_data) + 1]] <- data.frame(
+                x = xi_numeric + f_scaled,
+                y = y_seq,
+                section = level_label,
+                type = "KDE"
+              )
+            }
+          } else {
+            warning(paste("Preskakujem approx() pre level:", level_label, "- má nevalidné x_vals"))
+          }
+        }
+        
+        # Normal
+        if (normal_density) {
+          mu_y <- mean(y_subset)
+          sigma_y <- sd(y_subset)
+          if (is.finite(sigma_y) && sigma_y > 0) {
+            f_y <- dnorm(y_seq, mean = mu_y, sd = sigma_y)
+            f_scaled <- f_y * fade_factor
+            f_scaled[!is.finite(f_scaled)] <- 0
+            if (max(f_scaled) > 0) {
+              f_scaled <- f_scaled / max(f_scaled) * density_scaling
+              density_data[[length(density_data) + 1]] <- data.frame(
+                x = xi_numeric + f_scaled,
+                y = y_seq,
+                section = level_label,
+                type = "normal"
+              )
+            }
+          }
+        }
+      }
+    }
+    
+    df$predictor_numeric <- x_numeric
+    
+    p <- ggplot(df, aes(x = predictor_numeric, y = response)) +
+      geom_point(alpha = 0.6, color = "darkorange") +
+      geom_vline(xintercept = category_numeric[selected_levels],
+                 linetype = "dashed", color = "grey50")
+    
+    if (length(density_data) > 0) {
+      p <- p + geom_path(data = dplyr::bind_rows(density_data),
+                         aes(x = x, y = y, group = interaction(section, type), color = type),
+                         linewidth = 1)
+    }
+    
+    p <- p + 
+      scale_x_continuous(
+        breaks = category_numeric,
+        labels = category_levels
+      ) +
+      theme_bw() +
+      labs(
+        title = paste("Podmienené hustoty pre", response_name, "podľa", predictor_name),
+        x = paste0(predictor_name, " (Prediktor)"),
+        y = paste0(response_name, " (Spojitá odozva)")
+      )
+  }
+  else {
+    epsilon <- 0.02 * diff(range(x))
+    for (xi in breaks) {
+      subset_y <- y[abs(x - xi) <= epsilon]
+      n_local <- length(subset_y)
+      
+      if (n_local <= 3) {
+        warning(paste("Preskakujem bod xi =", round(xi, 2), "- má len", n_local, "bodov v okolí"))
+        next
+      }
+      
+      section_label <- as.factor(round(xi, 2))
+      fade_density <- density(rep(0, 100), bw = 0.3, n = length(y_seq), from = -1, to = 1)
+      fade_factor <- fade_density$y / max(fade_density$y)
+      
+      # Neparametricky odhad: jadrove vyhladzovanie
+      if (kernel_density) {
+        col_idx <- which.min(abs(dens2d$x - xi))
+        fxy <- dens2d$z[, col_idx]
+        fx <- approx(dens_x$x, dens_x$y, xout = xi, rule = 2)$y
+        if (!is.na(fx) && fx > 1e-6) {
+          f_cond <- fxy / fx
+          f_cond[is.na(f_cond)] <- 0
+          interpolated <- approx(x = dens2d$y, y = f_cond, xout = y_seq, rule = 2)
+          f_scaled <- interpolated$y * fade_factor
+          f_scaled <- f_scaled / max(f_scaled) * density_scaling
+          density_data[[length(density_data) + 1]] <- data.frame(
+            x = xi + f_scaled, y = y_seq,
+            section = section_label, type = "KDE"
+          )
+        }
+      }
+      
+      # Parametricky odhad hustoty: Bivariatne normalne rozdelenie
+      if (normal_density) {
+        mu <- c(mean(x), mean(y))
+        sigma <- cov(cbind(x, y))
+        fxy_norm <- mvtnorm::dmvnorm(cbind(rep(xi, length(y_seq)), y_seq), mean = mu, sigma = sigma)
+        fx_norm <- dnorm(xi, mean = mu[1], sd = sqrt(sigma[1, 1]))
+        f_cond <- fxy_norm / fx_norm
+        f_cond[is.na(f_cond)] <- 0
+        f_scaled <- f_cond * fade_factor
+        f_scaled <- f_scaled / max(f_scaled) * density_scaling
+        density_data[[length(density_data) + 1]] <- data.frame(
+          x = xi + f_scaled, y = y_seq,
+          section = section_label, type = "normal"
+        )
+      }
+    }
+    
+    p <- ggplot(df, aes(x = predictor, y = response)) +
+      geom_point(alpha = 0.6, color = "darkorange") +
+      geom_vline(xintercept = breaks, linetype = "dashed", color = "grey50") +
+      geom_path(data = dplyr::bind_rows(density_data),
+                aes(x = x, y = y, group = interaction(section, type), color = type),
+                linewidth = 1) +
+      theme_bw() +
+      labs(
+        title = paste("Podmienené hustoty pre", response_name, "podľa", predictor_name),
+        x = paste0(predictor_name, " (Prediktor)"),
+        y = paste0(response_name, " (Spojitá odozva)")
+      )
+  }
+  
+  density_df <- dplyr::bind_rows(density_data)
+  new_data <- data.frame(predictor_numeric = x_seq)
   
   # Stredna hodnota
   if (mean_curve) {
-    fit <- lm(response ~ poly(predictor, mean_poly_degree, raw = TRUE), data = df)
-    mean_pred <- predict(fit, newdata = data.frame(predictor = x_seq))
-    p <- p + geom_line(data = data.frame(x = x_seq, y = mean_pred),
-                       aes(x = x, y = y), color = "blue", linewidth = 1.2)
+    fit <- lm(response ~ poly(predictor_numeric, mean_poly_degree, raw = TRUE), data = df)
+    mean_pred <- predict(fit, newdata = new_data)
+    p <- p + geom_line(
+      data = data.frame(predictor_numeric = x_seq, y = mean_pred),
+      aes(x = predictor_numeric, y = y),
+      color = "blue", linewidth = 1.2
+    )
   }
   
   # Kvantilove funkcie
   if (!is.null(quantiles)) {
     for (q in quantiles) {
-      rq_fit <- quantreg::rq(response ~ poly(predictor, quantile_poly_degree, raw = TRUE), tau = q, data = df)
-      q_pred <- predict(rq_fit, newdata = data.frame(predictor = x_seq))
-      p <- p + geom_line(data = data.frame(x = x_seq, y = q_pred),
-                         aes(x = x, y = y), color = "purple", linetype = "dashed")
+      rq_fit <- quantreg::rq(response ~ poly(predictor_numeric, quantile_poly_degree, raw = TRUE), tau = q, data = df)
+      q_pred <- predict(rq_fit, newdata = new_data)
+      p <- p + geom_line(
+        data = data.frame(predictor_numeric = x_seq, y = q_pred),
+        aes(x = predictor_numeric, y = y),
+        color = "purple", linetype = "dashed"
+      )
     }
   }
   
-  # Sumarizacna tabuľka – lokalna statistika v okoli kazdeho rezu
-  epsilon <- 0.02 * diff(range(x))  # 2 % z rozsahu ako "okolie" rezu
+  mu_x <- mean(x, na.rm = TRUE)
+  mu_y <- mean(y, na.rm = TRUE)
+  sd_x <- sd(x, na.rm = TRUE)
+  sd_y <- sd(y, na.rm = TRUE)
+  cor_xy <- cor(x, y, use = "complete.obs")
   
+  # Sumarizacna tabulka
+  epsilon <- 0.02 * diff(range(x))
   summary_table <- lapply(breaks, function(xi) {
     subset_y <- df$response[abs(df$predictor - xi) <= epsilon]
-    
     if (length(subset_y) == 0) {
       return(data.frame(
-        Break = round(xi, 2),
-        Count = 0,
-        Mean = NA,
-        SD = NA,
-        Min = NA,
-        Max = NA
+        Break = round(xi, 2), Count = 0, Mean = NA, SD = NA,
+        Min = NA, Max = NA,
+        bw_x = round(h_scaled[1], 4),
+        bw_y = round(h_scaled[2], 4),
+        mean_x = round(mu_x, 4),
+        mean_y = round(mu_y, 4),
+        sd_x = round(sd_x, 4),
+        sd_y = round(sd_y, 4),
+        cor_xy = round(cor_xy, 4)
       ))
     }
-    
     data.frame(
       Break = round(xi, 2),
       Count = length(subset_y),
       Mean = round(mean(subset_y, na.rm = TRUE), 4),
       SD = round(sd(subset_y, na.rm = TRUE), 4),
       Min = round(min(subset_y, na.rm = TRUE), 4),
-      Max = round(max(subset_y, na.rm = TRUE), 4)
+      Max = round(max(subset_y, na.rm = TRUE), 4),
+      bw_x = round(h_scaled[1], 4),
+      bw_y = round(h_scaled[2], 4),
+      mean_x = round(mu_x, 4),
+      mean_y = round(mu_y, 4),
+      sd_x = round(sd_x, 4),
+      sd_y = round(sd_y, 4),
+      cor_xy = round(cor_xy, 4)
     )
   }) %>% dplyr::bind_rows()
   
@@ -2578,7 +2803,7 @@ plot_conditional_discrete_densities <- function(df, n_breaks, density_scaling, o
   ))
 }
 
-plot_conditional_densities <- function(data, selected_variables, n_breaks = 5, density_scaling = 2000, ordinal = FALSE, mean_curve = TRUE, quantiles = NULL, mean_poly_degree = 1, quantile_poly_degree = 1, normal_density = TRUE, empirical_density = TRUE, bw_scale = NULL) {
+plot_conditional_densities <- function(data, selected_variables, n_breaks = 5, density_scaling = 2000, ordinal = FALSE, mean_curve = TRUE, quantiles = NULL, mean_poly_degree = 1, quantile_poly_degree = 1, normal_density = TRUE, kernel_density = TRUE, bw_scale = NULL) {
   
   response_var <- selected_variables[1]
   predictor_var <- selected_variables[2]
@@ -2590,6 +2815,10 @@ plot_conditional_densities <- function(data, selected_variables, n_breaks = 5, d
   df <- data[, c(predictor_var, response_var)]
   var_types <- identify_variables(df)
   colnames(df) <- c("predictor", "response")
+  
+  if (is.character(df$predictor)) {
+    df$predictor <- factor(df$predictor)
+  }
   
   # Atributy pre prediktor a odozvu
   attr(df, "response_var") <- response_var
@@ -2604,7 +2833,7 @@ plot_conditional_densities <- function(data, selected_variables, n_breaks = 5, d
   } else if (response_var %in% var_types$Spojite) {
     
     message(paste("Odozva", response_var, "bola identifikovana ako spojita."))
-    plot_conditional_continuous_densities(df, n_breaks, density_scaling, mean_curve, quantiles, mean_poly_degree, quantile_poly_degree, normal_density, empirical_density, bw_scale)
+    plot_conditional_continuous_densities(df, n_breaks, density_scaling, mean_curve, quantiles, mean_poly_degree, quantile_poly_degree, normal_density, kernel_density, bw_scale)
     
   } else {
     

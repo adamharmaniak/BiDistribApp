@@ -503,7 +503,7 @@ server <- function(input, output, session) {
                       selected = isolate(input$cond_quantile_poly_degree) %||% 1),
           
           checkboxInput("normal_density", "Show normal conditional density", value = TRUE),
-          checkboxInput("empirical_density", "Show empirical conditional density", value = TRUE),
+          checkboxInput("kernel_density", "Show kernel conditional density", value = TRUE),
           checkboxInput("manual_bw_scale", "Manual Scaling of bw", value = FALSE),
           
           conditionalPanel(
@@ -511,7 +511,7 @@ server <- function(input, output, session) {
             tagList(
               numericInput("bw_scale", "Bandwidth scaling (bw_scale):",
                            value = 1, min = 0.1, max = 50, step = 0.1),
-              helpText("Scaling factor for bandwidth used in estimating empirical density. 
+              helpText("Scaling factor for bandwidth used in estimating kernel density. 
               Higher values increase smoothing; lower values make the density curve sharper.")
             )
           )
@@ -1272,12 +1272,12 @@ server <- function(input, output, session) {
     n_breaks <- input$n_breaks
     density_scaling <- input$density_scaling
     normal_density <- input$normal_density
-    empirical_density <- input$empirical_density
+    kernel_density <- input$kernel_density
     ordinal <- input$ordinal
     bw_scale <- if (isTRUE(input$manual_bw_scale)) input$bw_scale else NULL
     
-    if (!normal_density && !empirical_density && cond_response_type() == "spojita") {
-      showNotification("At least one density type (normal or empirical) must be selected.", type = "error")
+    if (!normal_density && !kernel_density && cond_response_type() == "spojita") {
+      showNotification("At least one density type (normal or kernel) must be selected.", type = "error")
       return(NULL)
     }
     
@@ -1294,7 +1294,7 @@ server <- function(input, output, session) {
           mean_poly_degree = mean_poly_degree,
           quantile_poly_degree = quant_poly_degree,
           normal_density = normal_density,
-          empirical_density = empirical_density,
+          kernel_density = kernel_density,
           bw_scale = bw_scale
         )
         
