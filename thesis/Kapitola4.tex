@@ -1,2 +1,67 @@
 \chapter{Aplikácie}\label{sec:applications}
 
+V tejto kapitole budeme prezentovať implementáciu vybraných štatistických modelov popísaných v predchádzajúcich kapitolách. Cieľom bolo nielen overiť ich teoretické vlastnosti, ale aj vytvoriť nástroje vhodné na praktickú prácu s dátami. Implementácia bola realizovaná v jazyku \texttt{R}, a to vo forme prehľadného a rozšíriteľného modulu, ktorý je sprístupnený prostredníctvom interaktívneho webového rozhrania (Shiny aplikácie).
+
+\section{Regresný a klasifikačný model}
+
+V tejto časti prezentujeme implementáciu základných regresných a klasifikačných modelov, ktoré nám umožňujú odhadovať podmienenú strednú hodnotu a kvantilovú funkciu odozvy vzhľadom na zvolený prediktor. Cieľom týchto modelov je nielen získať presný odhad očakávanej hodnoty alebo kvantilu, ale aj zachytiť nelineárne alebo neštandardné vzťahy v dátach.
+
+\subsection{Implementácia regresných modelov}\label{subsec:regression_implementation}
+
+Pre flexibilné modelovanie podmienenej závislosti medzi dvojicou premenných — spojitej odozvy $Y$ a ľubovoľného prediktora $X$ bola navrhnutá a implementovaná hlavná funkcia \texttt{combine\_conditional\_models()}, ktorá podľa typu vstupných premenných a používateľom zvolených parametrov zabezpečuje výber vhodnej modelovacej metódy.
+
+Táto funkcia slúži ako zastrešujúce rozhranie pre:
+\begin{itemize}
+  \item odhad \textit{podmienenej strednej hodnoty} $\mathbb{E}[Y \mid X = x]$ pre spojité aj diskrétne premenné,
+  \item odhad \textit{kvantilových funkcií} $Q_Y^{(X)}(q)$ pre zadané úrovne kvantilu,
+  \item vizualizáciu výstupov (regresné krivky, odhady v konkrétnom bode, boxplot),
+  \item sumarizáciu výpočtových výstupov v tabuľkovej forme.
+\end{itemize}
+
+V nasledujúcich podkapitolách bližšie popisujeme jednotlivé moduly, ktoré sú touto funkciou využívané.
+
+\subsubsection{Modelovanie podmienenej strednej hodnoty}\label{subsec:app_cond_mean}
+
+Funkcia \texttt{model\_conditional\_mean()} implementuje rôzne prístupy k odhadu podmienenej strednej hodnoty $\mathbb{E}[Y \mid X = x]$ pri spojitom prediktore. Používateľ si môže vybrať z nasledujúcich modelov:
+
+\begin{itemize}
+  \item \textbf{Parametrické modely:}
+  \begin{itemize}
+    \item \textit{Lineárny model} – klasická regresia 1. stupňa,
+    \item \textit{Polynomiálny model} – vyššie stupne polynómu,
+    \item \textit{Exponenciálny model} – model špecifikovaný ako $Y = a \cdot \exp(bX)$,
+    \item \textit{B-spline} – model na báze spline funkcií ($\texttt{df = 5}$).
+  \end{itemize}
+  
+  \item \textbf{Neparametrické modely:}
+  \begin{itemize}
+    \item \textit{LOESS} – lokálne vyhladzovaný regresný model (span $= 0.75$),
+    \item \textit{GAM} – generalizovaný aditívny model s hladkou spline funkciou.
+  \end{itemize}
+\end{itemize}
+
+Pre každý model sa vypočítavajú základné metriky presnosti (R$^2$, MSE) a generuje sa vizuálny výstup vrátane výpočtu podmienenej strednej hodnoty v zadanom bode $x^*$.
+
+\subsubsection{Modelovanie podmienenej kvantilovej funkcie}
+
+Funkcia \texttt{model\_conditional\_quantiles()} slúži na odhad kvantilových funkcií $Q_Y^{(X)}(q)$ pre rôzne hodnoty kvantilu $q \in (0, 1)$. Podporované sú:
+
+\begin{itemize}
+  \item \textit{Lineárna kvantilová regresia},
+  \item \textit{Polynomiálna kvantilová regresia},
+  \item \textit{Sploštená spline regresia} (natural splines s $\texttt{df = 4}$).
+\end{itemize}
+
+\subsubsection{Modelovanie pri diskrétnom prediktore}
+
+V prípade, že prediktor nadobúda diskrétne hodnoty, bol implementovaný samostatný modul \texttt{model\_discrete\_predictor()}, ktorý využíva modely:
+\begin{itemize}
+  \item \textit{Lineárny model} s faktormi,
+  \item \textit{GLM s logaritmickou linkou}.
+\end{itemize}
+
+Výstupom je graf vo forme boxplotu pre jednotlivé kategórie doplnený o odhady $\mathbb{E}[Y \mid X = d_k]$ spolu s intervalmi spoľahlivosti. Rovnako ako v prípade spojitých modelov sú generované sumarizačné tabuľky s odhadmi parametrov a hodnotami R$^2$.
+
+\subsubsection{Zhrnutie funkcionality}
+
+Všetky regresné modely sú implementované vo forme samostatných funkcií s jednotným rozhraním. Ich výstup je vizualizovaný pomocou balíka \texttt{ggplot2} a sumarizačné tabuľky sú vytvárané pomocou balíka \texttt{gt} so štýlovaným výstupom. V prípade zadania konkrétnej hodnoty prediktora $x^*$ sa do výstupu zahrnú aj bodové odhady očakávanej hodnoty a kvantilov.

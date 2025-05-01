@@ -150,8 +150,8 @@ Inými slovami, kvantil $x_q$ je hodnota, ktorú náhodná premenná neprekroč�
 Špeciálne prípady kvantilov sú:
 \begin{itemize}
   \item \textit{Medián} ($q = 0{,}5$): rozdeľuje obor hodnôt náhodnej premennej na dve rovnako pravdepodobné časti,
-  \item \textit{Kvartily} ($q = 0{,}25$, $0{,}5$, $0{,}75$): členia definičný obor rozdelenia na 4 rovnako podobné množiny,
-  \item \textit{Percentily} ($q = \frac{p}{100}$, $p = 1, 2, \dots, 99$): členia definičný obor rozdelenia na 100 rovnako podobných množín.
+  \item \textit{Kvartily} ($q = 0{,}25$, $0{,}5$, $0{,}75$): členia definičný obor rozdelenia na 4 rovnako pravdepodobné množiny,
+  \item \textit{Percentily} ($q = \frac{p}{100}$, $p = 1, 2, \dots, 99$): členia definičný obor rozdelenia na 100 rovnako pravdepodobných množín.
 \end{itemize}
 
 Kvantil je mimoriadne užitočná charakteristika v prípadoch, keď je rozdelenie asymetrické alebo obsahuje odľahlé hodnoty.
@@ -183,7 +183,7 @@ Pri parametrickom modelovaní predpokladáme, že rozdelenie náhodnej premennej
 Typickými príkladmi pre \textit{spojité} náhodné premenné sú:
 \begin{itemize}
   \item \textit{Normálne rozdelenie} $\mathcal{N}(\mu, \sigma^2)$, ktorého hustota pravdepodobnosti je daná vzťahom:
-  \begin{equation}
+  \begin{equation}\label{eq:norm_dist}
     f_{\mu,\sigma}(x) = \frac{1}{\sqrt{2\pi}\,\sigma} \exp\left( -\frac{(x - \mu)^2}{2\sigma^2} \right)
   \end{equation}
   kde $\mu \in \mathbb{R}$ je stredná hodnota a $\sigma > 0$ je smerodajná odchýlka.
@@ -194,7 +194,7 @@ Typickými príkladmi pre \textit{spojité} náhodné premenné sú:
 Pre \textit{diskrétne} náhodné premenné medzi najčastejšie používané modely patria:
 \begin{itemize}
   \item \textit{Bernoulliho rozdelenie} $\mathrm{Bern}(p)$ – opisuje výsledok jedného pokusu s dvoma možnými výsledkami (úspech/neúspech), kde $p$ je pravdepodobnosť úspechu.
-  \item \textit{Kategoriálne rozdelenie} – zobecnenie Bernoulliho rozdelenia pre viac ako dve kategórie. Určené je pravdepodobnostným vektorom $\vec{p} = (p_1, p_2, \dots, p_K)$, kde $p_i = \Pr(Y = c_i)$ a $\sum_{i=1}^K p_i = 1$.
+  \item \textit{Kategoriálne rozdelenie} – zovšeobecnenie Bernoulliho rozdelenia pre viac ako dve kategórie. Určené je pravdepodobnostným vektorom $\vec{p} = (p_1, p_2, \dots, p_K)$, kde $p_i = \Pr(Y = c_i)$ a $\sum_{i=1}^K p_i = 1$.
 \end{itemize}
 
 Postup výstavby takéhoto parametrického modelu má spravidla dve základné fázy:
@@ -226,7 +226,7 @@ Neparametrické prístupy modelovania sú typické tým, že nepredpokladajú ko
 \textbf{Vyhladené (angl. Kernel Smoothing)}\label{textbf:kernel_smoothing}
 
 Ide o neparametrický prístup, pri ktorom sa pre každé pozorovanie počíta hladká funkcia (jadro). Jej typický tvar je:
-\begin{equation}
+\begin{equation}\label{eq:kernel_smoothing}
 \hat{f}_{h}(x) = \frac{1}{nh} \sum_{i=1}^n K\left( \frac{x - x_i}{h} \right)
 \end{equation}
 kde $K$ je jadrová funkcia (napr. Gaussovská) a $h$ je rozsah vyhladenia (bandwidth).
@@ -244,7 +244,7 @@ Y = f(X) + \varepsilon,
 kde:
 \begin{itemize}
   \item $Y$ je náhodná premenná predstavujúca \textit{odozvu (závislú premennú)},
-  \item $X$ je (vektor) \textit{prediktorov (nezávislých premenných)},
+  \item $X$ je \textit{prediktor (nezávislá premenná)},
   \item $f(X)$ je \textit{deterministická zložka modelu}, ktorá opisuje očakávanú hodnotu odozvy vzhľadom na prediktory,
   \item $\varepsilon$ je \textit{stochastická zložka}, reprezentujúca náhodné odchýlky od tejto očakávanej hodnoty.
 \end{itemize}
@@ -266,7 +266,7 @@ Vo vektorovom tvare môžeme model vyjadriť ako:
 \begin{equation}
 Y = \boldsymbol{\phi}(X)^\top \boldsymbol{\beta} + \varepsilon,
 \end{equation}
-kde $\boldsymbol{\phi}(X) = (1, \phi_1(X), \ldots, \phi_p(X))^\top$ je vektor bázových funkcií a $\boldsymbol{\beta}$ vektor parametrov modelu. Táto reprezentácia zahŕňa nielen klasickú lineárnu regresiu (kde $\phi_j(X) = X_j$), ale aj jej zovšeobecnené formy, ako napríklad \textit{polynomiálnu regresiu} alebo \textit{regresiu s interakciami}. Výber vhodného stupňa bázových funkcií je kľúčový – príliš nízky stupeň nemusí vystihnúť závislosť, zatiaľ čo príliš vysoký môže viesť k tzv. pretečeniu (angl. \textit{overfitting}).
+kde $\boldsymbol{\phi}(X) = (1, \phi_1(X), \ldots, \phi_p(X))^\top$ je vektor bázových funkcií a $\boldsymbol{\beta}$ vektor parametrov modelu. Táto reprezentácia zahŕňa nielen klasickú lineárnu regresiu (kde $\phi_j(X) = X_j$), ale aj jej zovšeobecnené formy, ako napríklad \textit{polynomiálnu regresiu} alebo \textit{regresiu s interakciami}. Výber vhodných bázových funkcií je kľúčový - príliš jednoduché nemusia vystihnúť funkčnú závislosť, zatiaľčo príliš komplikované môžu viesť ku tzv. overfittingu, čo je stav, kedy sa deterministická časť modelu snaží popísať náhodné fluktuácie.
 
 \subsubsection{Lineárny regresný model}
 \label{subsec:linear_regression}
@@ -300,11 +300,11 @@ Polynomiálna regresia je užitočná v situáciách, keď pozorované dáta vyk
 
 Odhad parametrov $\boldsymbol{\beta}$ sa v lineárnych modeloch realizuje metódou najmenších štvorcov (OLS), kde minimalizujeme reziduálny súčet štvorcov:
 \begin{equation}
-\hat{\boldsymbol{\beta}} = \arg\min_{\boldsymbol{\beta}} \| \vec{y} - \mathbf{X} \boldsymbol{\beta} \|^2.
+\hat{\boldsymbol{\beta}} = \arg\min_{\boldsymbol{\beta}} \| \mathbf{y} - \mathbf{X} \boldsymbol{\beta} \|^2.
 \end{equation}
 Riešenie je dané vzťahom:
 \begin{equation}
-\hat{\boldsymbol{\beta}} = (\mathbf{X}^\top \mathbf{X})^{-1} \mathbf{X}^\top \vec{y},
+\hat{\boldsymbol{\beta}} = (\mathbf{X}^\top \mathbf{X})^{-1} \mathbf{X}^\top \mathbf{y},
 \end{equation}
 kde $\mathbf{X}$ je matica s riadkami $\boldsymbol{\phi}(X_i)$.
 
@@ -319,7 +319,7 @@ Z toho vieme odvodiť štandardné chyby odhadov a konštruovať intervaly spoľ
 \begin{equation}
 \hat{\beta}_j \pm t_{1 - \alpha/2}(n - p - 1) \cdot \mathrm{SE}(\hat{\beta}_j),
 \end{equation}
-pričom štandardná chyba sa odvodí z diagonálnych prvkov matice:
+pričom štandardná chyba $\mathrm{SE}(\hat{\beta_j})$ sa vypočíta ako  odmocnina j-teho diagonálneho prvku kovariančnej matice:
 \[
 \mathrm{Var}(\hat{\boldsymbol{\beta}}) = \hat{\sigma}^2 (\mathbf{X}^\top \mathbf{X})^{-1}.
 \]
@@ -348,7 +348,7 @@ Pre \textit{odhadnutý rozptyl rezíduí} možno zmeniť $n$ na $n - p - 1$.
 V niektorých prípadoch môže byť vhodné transformovať závislú premennú $Y$ pred samotným modelovaním. Typické dôvody na to sú:
 
 \begin{itemize}
-  \item \textit{Linearizácia} funkčného vzťahu medzi $Y$ a $X$ (napr. exponenciálne alebo logaritmické transformácie),
+  \item \textit{Linearizácia} funkčného vzťahu medzi $Y$ a $X$ (logaritmická transformácia),
   \item \textit{Symetrizácia rozdelenia šumu} $\varepsilon$ – napr. pri výrazne šikmých rozdeleniach.
 \end{itemize}
 Transformácie tak môžu zlepšiť splnenie predpokladov lineárneho modelu a zvýšiť presnosť odhadov aj interpretovateľnosť výsledkov.
@@ -369,7 +369,7 @@ kde:
   \item $\alpha$ je základný koeficient (úroveň pri $X=0$),
   \item $\beta$ určuje rýchlosť rastu alebo poklesu,
   \item $e$ je Eulerovo číslo ($\approx 2.718$),
-  \item $\varepsilon$ je náhodná chyba.
+  \item $\varepsilon$ je náhodná zložka, najčastejšie s normálnym rozdelením a parametrom $\sigma$.
 \end{itemize}
 
 Na odhad parametrov je bežným prístupom logaritmická transformácia, ktorou sa model linearizuje:
@@ -380,13 +380,13 @@ Na odhad parametrov je bežným prístupom logaritmická transformácia, ktorou 
 
 Exponenciálna regresia sa uplatňuje najmä v oblasti prírodných vied, epidemiológie, finančného modelovania a všade tam, kde procesy prebiehajú s exponenciálnym charakterom (napr. populačný rast, rádioaktívny rozpad, úrokovanie, šírenie infekcie a pod.).
 
-\subsection{Kódovanie kvalitatívnych premenných}
+\subsection{Kódovanie kvalitatívnej premennej}
 
-Ak medzi prediktormi $X$ figurujú aj \textit{kvalitatívne (kategoriálne)} premenné, je potrebné ich previesť na číselnú formu. Najčastejšie sa využíva tzv. \textit{indikátorové (dummy) kódovanie}, pri ktorom sa pre každú kategóriu (okrem referenčnej) vytvorí binárna premenná s hodnotami $\{0, 1\}$. Takto je možné zaradiť aj nominálne a ordinálne premenné do lineárneho modelu.
+Ak je prediktor $X$ \textit{kvalitatívna (kategoriálna)} premenná, je potrebné ju previesť na číselnú formu. Najčastejšie sa využíva tzv. \textit{indikátorové (dummy) kódovanie}, pri ktorom sa pre každú kategóriu (okrem referenčnej) vytvorí binárna premenná s hodnotami $\{0, 1\}$. Takto je možné zaradiť aj nominálne a ordinálne premenné do lineárneho modelu.
 
-Formálne možno pre kategóriálnu premennú $Z$ nad množinou kategórií $\mathcal{C} = \{c_1, c_2, \dots, c_K\}$ definovať \textbf{indikátorové (bázové) funkcie} nasledovne:
+Formálne možno pre kategóriálnu premennú $X$ nad množinou kategórií $\mathcal{C} = \{c_1, c_2, \dots, c_K\}$ definovať \textbf{indikátorové (bázové) funkcie} nasledovne:
 \begin{equation}
-\phi_j(z) := \mathbb{I}\{z = c_j\}, \quad \text{pre } j = 1, 2, \dots, K-1
+\phi_j(X) := \mathbb{I}\{X = c_j\}, \quad \text{pre } j = 1, 2, \dots, K-1
 \end{equation}
 kde $\mathbb{I}\{\cdot\}$ je \textit{indikátorová funkcia}, ktorá nadobúda hodnotu 1, ak je podmienka splnená, inak 0.
 
@@ -395,31 +395,9 @@ Prakticky to znamená, že ak máme napríklad premennú \textit{Farba} s tromi 
 \phi_1(\text{Farba}) &= \mathbb{I}\{\text{Farba} = \text{modrá}\}, \\
 \phi_2(\text{Farba}) &= \mathbb{I}\{\text{Farba} = \text{zelená}\}.
 \end{align*}
-Kategória \textit{červená} v tomto prípade slúži ako \textit{referenčná kategória} a je implicitne obsiahnutá v nulových hodnotách oboch premenných $\phi_1$ a $\phi_2$.
+Kategória \textit{červená} v tomto prípade slúži ako \textit{referenčná kategória} a je implicitne obsiahnutá v nulových hodnotách oboch premenných $\phi_1(\text{Farba})$ a $\phi_2(\text{Farba})$.
 
 Vložením týchto indikátorových premenných do regresného modelu umožňujeme modelu zohľadniť vplyv rôznych kategórií bez porušenia číselnej povahy regresného výpočtu.
-
-\subsection{Maticová reprezentácia a odhad parametrov}
-
-Ak pozorujeme $n$ realizácií premenných, môžeme sústavu rovníc pozorovaní pre regresný model zapísať v maticovej forme ako:
-\begin{equation}
-\vec y = \mathbf{X} \boldsymbol{\beta} + \boldsymbol{\varepsilon},
-\end{equation}
-kde:
-\begin{itemize}
-  \item $\vec y$ je $(n \times 1)$ vektor pozorovaných hodnôt odozvy,
-  \item $\mathbf{X}$ je $(n \times p)$ matica plánu, ktorej riadky obsahujú hodnoty bázových funkcií pre každé pozorovanie,
-  \item $\boldsymbol{\beta}$ je $(p \times 1)$ vektor neznámych parametrov,
-  \item $\boldsymbol{\varepsilon}$ je vektor náhodných chýb.
-\end{itemize}
-Parametre $\boldsymbol{\beta}$ sa najčastejšie odhadujú pomocou metódy najmenších štvorcov (OLS), ktorá minimalizuje súčet štvorcov rezíduí:
-\[
-\hat{\boldsymbol{\beta}} = (\mathbf{X}^\top \mathbf{X})^{-1} \mathbf{X}^\top \vec y.
-\]
-
-\smallskip
-\noindent
-Napokon, existuje aj trieda modelov, pre ktoré nie je možné nájsť transformáciu, ktorá by ich previedla na lineárny tvar vzhľadom na parametre. Tieto modely označujeme ako \textit{nelineárne regresné modely} a na ich odhad sa využívajú špecializované numerické metódy – napríklad \textit{nelineárna metóda najmenších štvorcov}, založená na iteračných algoritmoch (ako napr. Newtonova metóda).
 
 \section{Klasifikačné metódy}\label{sec:classification}
 
@@ -551,13 +529,13 @@ Práve na základe týchto pravdepodobností vykonáva klasifikátor rozhodovani
 \subsubsection{Lineárna diskriminačná analýza (LDA)}
 \label{subsubsec:lda}
 
-Lineárna diskriminačná analýza (LDA) patrí medzi najjednoduchšie generatívne klasifikačné metódy. Predpokladá, že podmienené rozdelenia $f_{\mu_k,\sigma}(x)$ sú normálne a všetky triedy zdieľajú spoločný rozptyl $\sigma^2$. Teda pre každú triedu $k$ platí:
+Lineárna diskriminačná analýza (LDA) patrí medzi najjednoduchšie generatívne klasifikačné metódy. Predpokladá, že podmienené rozdelenia $f_{\mu_k,\sigma}(x)$ sú normálne a všetky triedy zdieľajú spoločný rozptyl $\sigma^2$. Teda pre každú triedu $k$ platí $f_k = f_{\mu_k,\sigma}$ zo vzťahu ~\ref{eq:norm_dist}:
 
 \begin{equation}
 f_{\mu_k,\sigma}(x) = \frac{1}{\sqrt{2\pi} \, \sigma} \exp\left( -\frac{(x - \mu_k)^2}{2\sigma^2} \right)
 \end{equation}
 
-Aposteriórne pravdepodobnosti potom vyplývajú zo všeobecného vzťahu uvedeného vyššie \eqref{eq:apost_prob}. Po logaritmickej úprave a zanedbaní konštánt spoločných všetkým triedam vzniká tzv. diskriminačná funkcia:
+Aposteriórne pravdepodobnosti potom vyplývajú zo všeobecného vzťahu \eqref{eq:apost_prob}. Po logaritmickej úprave a zanedbaní konštánt spoločných všetkým triedam vzniká tzv. diskriminačná funkcia:
 
 \begin{equation}
 \delta_k(x) = \frac{x \mu_k}{\sigma^2} - \frac{\mu_k^2}{2\sigma^2} + \ln(\pi_k)
@@ -585,31 +563,7 @@ Funkcia $\delta_k(x)$ je kvadratická vo vzťahu k $x$, čo poskytuje väčšiu 
 \subsubsection{Naivný Bayesov klasifikátor}
 \label{subsubsec:naivebayes}
 
-Naivný Bayesov klasifikátor predstavuje zjednodušený generatívny prístup ku klasifikácii, ktorý sa vyhýba potrebe modelovať zložité združené rozdelenia prediktorov. Jeho základným predpokladom je \textit{podmienená nezávislosť prediktorov} vzhľadom na triedu. Znamená to, že pre vektor prediktorov $\vec{X} = (X_1, \dots, X_p)$ platí:
-
-\begin{equation}
-f_k(x) = f_{k1}(x_1) \cdot f_{k2}(x_2) \cdot \dots \cdot f_{kp}(x_p),
-\end{equation}
-
-kde $f_{kj}(x_j)$ je podmienená hustota (alebo pravdepodobnostná funkcia) pre $X_j$ vzhľadom na triedu $Y = c_k$.
-
-Tento predpoklad umožňuje výrazne zjednodušiť odhad hustoty $f_k(x)$ – netreba odhadovať kovariancie alebo zložité spoločné rozdelenia, ako je to pri LDA a QDA. Aj keď nezávislosť prediktorov je v praxi zvyčajne nerealistická (preto označenie „naivný“), klasifikátor častokrát dosahuje prekvapivo dobré výsledky, najmä v úlohách s väčšou dimenziou.
-
-\medskip
-\noindent
-Odhad hustôt $f_{kj}(x_j)$ závisí od typu prediktora:
-\begin{itemize}
-  \item Ak je $X_j$ \textit{kvantitatívna premenná}, možno predpokladať:
-  \begin{itemize}
-    \item normálne rozdelenie: $(X_j \mid Y = c_k) \sim \mathcal{N}(\mu_{kj}, \sigma^2_{kj})$, čím vzniká špeciálny prípad QDA s diagonálnymi kovariančnými maticami,
-    \item iné spojité rozdelenie (napr. exponenciálne, uniformné),
-    \item neparametrické odhady (napr. histogram alebo jadrový odhad hustoty).
-  \end{itemize}
-  \item Ak je $X_j$ \textit{kvalitatívna (kategoriálna) premenná}, hustotu $f_{kj}(x_j)$ možno odhadnúť ako relatívnu početnosť výskytov triedy $c_k$ pre danú hodnotu $x_j$.
-\end{itemize}
-
-\noindent
-Aj napriek svojej zdanlivej jednoduchosti sa Naivný Bayesov klasifikátor ukázal byť relatívne robustný, najmä v prípadoch, kde prediktory pôsobia nezávislo alebo máme výrazný šum.
+Naivný Bayesov klasifikátor je jednoduchý generatívny prístup ku klasifikácii, ktorý vychádza z predpokladu, že prediktory sú podmienečne nezávislé vzhľadom na triedu. Vďaka tejto „naivnej“ nezávislosti možno celkové rozdelenie prediktorov v rámci triedy vyjadriť ako súčin jednozložkových rozdelení, čo výrazne zjednodušuje ich modelovanie. Pri kvantitatívnych premenných sa často predpokladá normálne rozdelenie, pri kategoriálnych sa využívajú relatívne frekvencie. Napriek silnému predpokladu nezávislosti dosahuje tento klasifikátor prekvapivo dobré výsledky v mnohých úlohách, najmä pri vyšších dimenziách alebo pri prítomnosti šumu.
 
 \subsubsection{Vyhodnotenie presnosti klasifikačných modelov}
 
@@ -619,7 +573,7 @@ Presnosť klasifikačných modelov je často hodnotená na základe \textit{celk
 ER = \frac{1}{n} \sum_{i=1}^{n} \mathbb{I}(\hat{y}_i \neq y_i),
 \end{equation}
 
-kde $n$ je počet pozorovaní, $y_i$ skutočné a $\hat{y}_i$ predikované triedy. Komplementom tejto veličiny je \textit{celková presnosť klasifikácie (accuracy)}, ktorá udáva relatívny počet správne klasifikovaných prípadov.
+kde $n$ je počet pozorovaní, $y_i$ skutočné a $\hat{y}_i$ predikované hodnoty odozvy, teda triedy. Komplementom tejto veličiny je \textit{celková presnosť klasifikácie (accuracy)}, ktorá udáva relatívny počet správne klasifikovaných prípadov.
 
 Presnosť modelu možno detailnejšie analyzovať aj pomocou \textit{klasifikačnej matice (confusion matrix)}, ktorá zobrazuje rozloženie správnych a nesprávnych predikcií medzi jednotlivými triedami, kde mimo-diagonálne prvky indikujú chyby.
 

@@ -13,7 +13,17 @@ V tejto kapitole sa zameriame na:
   \item praktické aspekty odhadu združeného rozdelenia na základe dostupných údajov.
 \end{itemize}
 
-Konkrétne budeme v tejto kapitole pracovať so združenými rozdeleniami náhodných premenných rovnakého typu – teda buď čisto spojitými, alebo čisto diskrétnymi. Budeme rozoberať všeobecné princípy modelovania, analýzy a odhady takýchto rozdelení. Praktické príklady budú vychádzať z regresných a klasifikačných kontextov, kde sa využívajú znalosti o marginálnych a podmienených rozdeleniach. Pre ilustráciu štruktúry dát a závislostí medzi premennými využijeme nástroje popisnej štatistiky a vizualizačné techniky, ktoré sú súčasťou výstupov mnou implementovanej interaktívnej aplikácie. Táto aplikácia predstavuje aplikačnú časť tejto bakalárskej práce a poskytuje praktické vizualizačné a analytické nástroje na skúmanie združených rozdelení pravdepodobnosti, ktoré sú využité aj pri prezentácii výsledkov v tejto kapitole. Ako ilustračný príklad využívame dataset \textit{Palmer Penguins}, ktorý obsahuje morfologické údaje o troch druhoch tučniakov (Adélie, Chinstrap a Gentoo) žijúcich na ostrovoch Antarktídy. Dataset zahŕňa premenné ako \textit{dĺžku} a \textit{hĺbku zobáka}, \textit{dĺžku plutiev}, \textit{hmotnosť} či \textit{pohlavie} jedincov.
+Konkrétne budeme v tejto kapitole pracovať so združenými rozdeleniami náhodných premenných rovnakého typu – teda buď čisto spojitými, alebo čisto diskrétnymi. Budeme rozoberať všeobecné princípy modelovania, analýzy a odhady takýchto rozdelení. Praktické príklady budú vychádzať z regresných a klasifikačných kontextov, kde sa využívajú znalosti o marginálnych a podmienených rozdeleniach. Pre ilustráciu štruktúry dát a závislostí medzi premennými využijeme nástroje popisnej štatistiky a vizualizačné techniky, ktoré sú súčasťou výstupov mnou implementovanej interaktívnej aplikácie. Táto aplikácia predstavuje aplikačnú časť tejto bakalárskej práce a poskytuje praktické vizualizačné a analytické nástroje na skúmanie združených rozdelení pravdepodobnosti, ktoré sú využité aj pri prezentácii výsledkov v tejto kapitole. Ako ilustračný príklad využívame dataset \textit{Palmer Penguins}~\parencite{horst2020palmerpenguins}, ktorý obsahuje morfologické údaje o troch druhoch tučniakov (Adélie, Chinstrap a Gentoo) žijúcich na ostrovoch Antarktídy. Dataset zahŕňa nasledujúce premenné:
+
+\begin{itemize}
+  \item \textit{species} – \textit{Druh}: \texttt{Adelie}, \texttt{Chinstrap}, \texttt{Gentoo}.
+  \item \textit{island} – \textit{Ostrov ako miesto výskytu}: \texttt{Biscoe}, \texttt{Dream}, \texttt{Torgersen}.
+  \item \textit{culmen\_length\_mm} – \textit{Dĺžka zobáka v milimetroch} (mm): spojitá premenná, v rozsahu približne 32 až 60 mm.
+  \item \textit{culmen\_depth\_mm} – \textit{Hĺbka zobáka v milimetroch} (mm): spojitá premenná, približne v rozsahu 13 až 21 mm.
+  \item \textit{flipper\_length\_mm} – \textit{Dĺžka plutvy v milimetroch} (mm): spojitá premenná, približne od 170 do 230 mm.
+  \item \textit{body\_mass\_g} – \textit{Hmotnosť v gramoch} (g): spojitá premenná, pohybuje sa v rozmedzí 2700 až 6300 g.
+  \item \textit{sex} – \textit{Pohlavie}: \texttt{male}, \texttt{female}.
+\end{itemize}
 
 Modelovanie zmesi spojitých a diskrétnych náhodných premenných, ako špecifický prípad heterogénnych štruktúr, bude predmetom samostatnej podkapitoly, keďže ide o hlavnú problematiku, na ktorú sa v tejto práci chceme zamerať. Avšak bez ohľadu na typ premenných platí, že združené rozdelenie poskytuje kompletný popis ich spoločného správania a tvorí základ pre odvodenie marginálnych a podmienených rozdelení, ako aj závislostí medzi premennými.
 
@@ -24,9 +34,9 @@ Modelovanie zmesi spojitých a diskrétnych náhodných premenných, ako špecif
 
 Podobne ako to bolo v jednorozmernom prípade, aj viacrozmerné združené rozdelenie možno reprezentovať rôznymi funkciami. My sa v tejto práci budeme zaoberať iba dvojrozmerným prípadom. Dve náhodné premenné $X_1$ a $X_2$ sú najčastejšie charakterizované združenou pravdepodobnostnou funkciou, hustotou alebo distribučnou funkciou, a to v závislosti od typu premenných a existencie uzavretej podoby funkčného vzťahu.
 
-\subsubsection{Združená hustota pravdepodobnosti (PDF)}\label{subsec:joint_pdf}
+\subsubsection{Hustota pravdepodobnosti}\label{subsec:joint_pdf}
 
-V prípade diskrétnych premenných sa namiesto hustoty používa \textit{združená pravdepodobnostná funkcia} (angl. joint probability mass function – PMF), ktorá každému páru hodnôt $(x_1, x_2)$ priraďuje konkrétnu pravdepodobnosť výskytu: 
+V prípade diskrétnych premenných sa namiesto hustoty používa \textit{združená pravdepodobnostná funkcia} (angl. joint probability mass function), ktorá každému páru hodnôt $(x_1, x_2)$ priraďuje konkrétnu pravdepodobnosť výskytu: 
 
 \begin{equation}
 p(x_1, x_2) = \mathrm{Pr}(X_1 = x_1,\, X_2 = x_2)
@@ -41,12 +51,12 @@ Táto pravdepodobnosť je daná explicitne pre jednotlivé kombinácie hodnôt, 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.7\linewidth]{SK_verzia_praca/figures/pravdeb_funk_ostrov_druhy_3D.png}
-    \caption{Združená pravdepodobnostná funkcia (PMF) medzi premennými \textit{Ostrov ako miesto výskytu} a \textit{Druh} tučniakov.}
+    \caption{Pravdepodobnosti premenných \textit{Ostrov ako miesto výskytu} a \textit{Druh} tučniakov.}
     \label{fig:miesto_druh_joint_density}
 \end{figure}
 
 Ak sú premenné spojité, spoločné rozdelenie opisujeme prostredníctvom \textit{združenej hustoty pravdepodobnosti} $f$ (angl. joint probability density function – PDF), ktorá udáva pravdepodobnostnú hustotu výskytu dvojice hodnôt v danej oblasti roviny $\mathbb{R}^2$.
-Zatiaľ čo v jednorozmernom spojitom prípade nás zaujímala pravdepodobnosť výskytu náhodnej premennej v určitej oblasti na reálnej osi, v prípade dvoch spojitých premenných nás už zaujíma pravdepodobnosť, že realizácie oboch premenných spadnú do danej oblasti v rovine $\mathbb{R}^2$.
+Zatiaľ čo v jednorozmernom spojitom prípade nás zaujímala pravdepodobnosť výskytu náhodnej premennej v určitej oblasti na reálnej osi, v prípade dvoch spojitých premenných nás už zaujíma pravdepodobnosť, že obe premenné sa súčasne zrealizujú do danej oblasti v rovine $\mathbb{R}^2$.
 
 Ak $R_1 = [x_1, x_1 + dx_1]$ a $R_2 = [x_2, x_2 + dx_2]$ sú malé intervaly okolo bodu $(x_1, x_2)$, potom pravdepodobnosť, že náhodný vektor $(X_1, X_2)$ spadne do oblasti $R_1 \times R_2$, je približne:
 
@@ -56,7 +66,7 @@ Ak $R_1 = [x_1, x_1 + dx_1]$ a $R_2 = [x_2, x_2 + dx_2]$ sú malé intervaly oko
 
 kde $f(x_1, x_2)$ je hodnota združenej hustoty pravdepodobnosti v bode $(x_1, x_2)$.
 
-Presnejšie, pravdepodobnosť, že sa realizácie oboch premenných nachádzajú v oblasti $[a_1, b_1] \times [a_2, b_2]$, vypočítame pomocou dvojnásobného integrálu:
+Presnejšie, pravdepodobnosť, že sa realizácie oboch premenných nachádzajú v oblasti $[a_1, b_1] \times [a_2, b_2] \in R^2$, vypočítame pomocou dvojnásobného integrálu:
 
 \begin{equation}
 \mathrm{Pr}(a_1 \leq X_1 \leq b_1,\ a_2 \leq X_2 \leq b_2) = \int_{a_2}^{b_2} \int_{a_1}^{b_1} f(x_1, x_2) \, dx_1 \, dx_2
@@ -68,14 +78,14 @@ Aby funkcia $f(x_1, x_2)$ bola platnou hustotou pravdepodobnosti, musí platiť:
 \iint_{\mathbb{R}^2} f(x_1, x_2) \, dx_1 \, dx_2 = 1
 \end{equation}
 
-Združená hustota veľmi efektívne popisuje spoločné správanie dvoch spojitých náhodných premenných a tvorí základ pre ďalšie koncepty ako sú marginálne a podmienené rozdelenia.
+Združené rozdelenie popisuje spoločné správanie dvoch spojitých náhodných premenných a tvorí základ pre ďalšie koncepty ako sú marginálne a podmienené rozdelenia.
 
-Na nasledujúcom obrázku môžeme vidieť príklad vizualizácie združenej hustoty pravdepodobnosti homogénnej spojitej štruktúry dvoch premenných, pričom ako model výpočtu tu používame jadrové vyhladzovanie (kap.~\ref{textbf:kernel_smoothing}).
+Na nasledujúcom obrázku môžeme vidieť príklad vizualizácie združenej hustoty pravdepodobnosti dvoch premenných, pričom ako model výpočtu tu používame jadrové vyhladzovanie (kap.~\ref{textbf:kernel_smoothing}).
 
 \begin{figure}[htpb]
     \centering
     \includegraphics[width=0.7\linewidth]{hustota_hlbka_dlzka_zobaku_3D}
-    \caption{Združená hustota pravdepodobnosti (PDF) medzi premennými \textit{Hĺbka zobáku} a \textit{Dĺžka zobáku} tučniakov.}
+    \caption{Hustota pravdepodobnosti premenných \textit{Hĺbka zobáku} a \textit{Dĺžka zobáku} tučniakov.}
     \label{fig:zobak_joint_density}
 \end{figure}
 
@@ -87,7 +97,7 @@ Spoločná distribučná funkcia $F(x_1, x_2)$ dvoch náhodných premenných $X_
 F(x_1, x_2) = \mathrm{Pr}(X_1 \leq x_1,\ X_2 \leq x_2),
 \end{equation}
 
-pričom vo vzťahu k združenej hustote týchto premenných platia nasledujúce vzťahy:
+pričom vo vzťahu k združenej hustote dvoch spojitých premenných platia nasledujúce vzťahy:
 
 \begin{equation}
 F(x_1, x_2) = \int_{-\infty}^{x_1} \int_{-\infty}^{x_2} f(y_1, y_2) \, dy_1 dy_2
@@ -116,6 +126,14 @@ alebo pomocou združenej hustoty:
 \begin{equation}
 \mathbb{E}[X_1] = \iint_{\mathbb{R}^2} x_1 \, f(x_1, x_2) \, dx_1 \, dx_2
 \end{equation}
+
+V prípade, že \(X_1\) je diskrétna náhodná premenná nad množinou hodnôt \(\{x_1^{(i)}\}_{i=1}^{n}\), definujeme jej strednú hodnotu ako:
+
+\begin{equation}
+\mathbb{E}[X_1] = \sum_{i=1}^{n} x_1^{(i)} \cdot \Pr(X_1 = x_1^{(i)}),
+\end{equation}
+
+kde \(\Pr(X_1 = x_1^{(i)})\) je pravdepodobnostná funkcia diskrétnej premennej \(X_1\).
 
 \subsubsection{Rozptyl}\label{subsubsec:joint_variance}
 
@@ -274,7 +292,7 @@ Týmto sme zaviedli pojem podmienenej hustoty, ktorý bude ďalej kľúčový pr
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.8\linewidth]{cond_normal_densities.png}
-    \caption{Podmienené hustoty pre premenné (Odozva) $Y=$ \textit{Dĺžka zobáka tučniaka} a (Prediktor) $X=$ \textit{Hmotnosť tučniaka v gramoch} (parametrický prístup: \textit{normálne rozdelenie}, kap.~\ref{subsubsec:parametric_models})}
+    \caption{Podmienené hustoty pre premenné (Odozva) $Y=$ \textit{Dĺžka zobáka tučniaka} a (Prediktor) $X=$ \textit{Hmotnosť tučniaka} (parametrický prístup: \textit{normálne rozdelenie}, kap.~\ref{subsubsec:parametric_models})}
     \label{fig:cond_normal_densities}
 \end{figure}
 
@@ -298,13 +316,6 @@ kde $f_{Y|X}(y \mid x)$, ako už vieme z predošlej podkapitoly, je v tomto prí
 
 Podmienená stredná hodnota je teda funkciou známej hodnoty inej premennej a v kontexte regresného modelovania častokrát vystupuje ako regresná funkcia. Napríklad, funkcia $\mu_{Y|X}$ opisuje očakávaný výstup $Y$ vzhľadom na vstup $x$, čo presne zodpovedá určeniu deterministickej zložky regresného modelu.
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\linewidth]{podm_stredna_hodnota.png}
-    \caption{Podmienená stredná hodnota pre premenné (Odozva) $Y=$ \textit{Dĺžka zobáka tučniaka} a (Prediktor) $X=$ \textit{Hmotnosť tučniaka v gramoch} s vypočítanou hodnotou v $\mathbb{E}[Y \mid X=5000]$}
-    \label{fig:cond_mean}
-\end{figure}
-
 \subsubsection{Kvantilová funkcia}
 \label{subsubsec:conditional_quantile_function}
 
@@ -313,6 +324,14 @@ Pre daný kvantil $q \in (0,1)$ je \textit{podmienená kvantilová funkcia} defi
 Q_{Y \mid X}(q) := \inf \left\{ y \in \mathbb{R} \mid \Pr(Y \leq y \mid X = x) \geq q \right\}
 \end{equation}
 
+Táto funkcia vyjadruje, aká hodnota odozvy $Y$ zodpovedá kvantilu $q$ podmieneného rozdelenia vzhľadom na dané hodnoty prediktorov $X = x$. V praxi je túto funkciu potrebné odhadnúť. Existuje viacero prístupov:
+
+\begin{itemize}
+  \item odhad cez známe alebo simulované podmienené rozdelenie (napr. zo združeného rozdelenia pomocou marginalizácie),
+  \item parametrické modelovanie podmienených kvantilov — napríklad pomocou \textit{kvantilovej regresie}.
+\end{itemize}
+
+\medskip
 V prípade \textit{lineárnej kvantilovej regresie} sa predpokladá, že kvantilová funkcia má tvar:
 
 \begin{equation}
@@ -321,34 +340,12 @@ Q_{Y \mid X}(q) = X^\top \beta_q
 
 kde $\beta_q$ je vektor parametrov pre daný kvantil $q$. Tento prístup umožňuje skúmať účinok prediktorov nielen na strednú hodnotu, ale aj na ľubovoľný kvantil podmieneného rozdelenia.
 
-Parametre $\beta_q$ sa odhadujú pomocou minimalizácie cieľovej funkcie:
-
-\begin{equation}
-\hat{\beta}_q = \arg\min_{\beta \in \mathbb{R}^p} \sum_{i=1}^n \rho_q (y_i - x_i^\top \beta)
-\end{equation}
-kde $\rho_q(u)$ je definovaná ako:
-\begin{equation}
-\rho_q(u) = u(q - \mathbb{I}(u < 0))
-\end{equation}
-
-Kvantilová regresia (\textit{Quantile Regression}, QR) umožňuje odhadovať \textit{kvantily podmieneného rozdelenia} odozvy vzhľadom na hodnoty prediktora. Na rozdiel od klasickej regresie, ktorá sa zameriava na strednú hodnotu $\mathbb{E}[Y \mid X = x]$ a zvyšok rozdelenia predpokladá cez špecifikovanú šumovú zložku, kvantilová regresia priamo modeluje konkrétny kvantil bez potreby predpokladu o rozdelení reziduí.
-
-V štandardnom lineárnom modeli sa zvyšok rozdelenia popisuje prostredníctvom aditívnej šumovej zložky s konštantným rozptylom (napr. $\varepsilon \sim \mathcal{N}(0, \sigma^2)$). V tejto štruktúre je teda modelovaná stredná hodnota a rozptyl predstavuje samostatný parameter. Naproti tomu v zovšeobecnených lineárnych modeloch (GLM) sa predpokladá, že rozptyl odozvy závisí od strednej hodnoty a vtedy model plne určuje tvar podmieneného rozdelenia.
-
-\bigskip
-\textbf{Výhody kvantilovej regresie oproti klasickej lineárnej regresii:}
-\begin{itemize}
-  \item Zachytáva \textit{heteroskedasticitu}, teda zmenu variability odozvy vzhľadom na hodnoty prediktorov.
-  \item Poskytuje detailnejší obraz o štruktúre dát — napríklad rôzne účinky prediktorov v nízkych a vysokých kvantiloch.
-  \item Je robustná voči odľahlým hodnotám.
-\end{itemize}
-
 Na nasledujúcom obrázku môžeme pozorovať kvantilové funkcie pre vybrané kvantily vo vzťahu k strednej hodnote.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.8\linewidth]{cond_quant_func.png}
-    \caption{Podmienené kvantilové funkcie $Q_{Y \mid X}(0.05)$, $Q_{Y \mid X}(0.95)$ a stredná hodnota $\mathbb{E}[Y \mid X]$ pre premenné $Y=$ \textit{Dĺžka zobáka tučniaka} a $X=$ \textit{Hmotnosť tučniaka v gramoch} s vypočítanou hodnotou v $X=5000$}
+    \caption{Podmienené kvantilové funkcie $Q_{Y \mid X}(0.05)$, $Q_{Y \mid X}(0.95)$ a stredná hodnota $\mathbb{E}[Y \mid X]$ pre premenné $Y=$ \textit{Dĺžka zobáka tučniaka} a $X=$ \textit{Hmotnosť tučniaka} s vypočítanou hodnotou v $X=5000$}
     \label{fig:cond_quant_mean}
 \end{figure}
 
@@ -404,19 +401,24 @@ Tento princíp je ilustrovaný na nasledujúcom obrázku:
     \label{fig:sklar_transform}
 \end{figure}
 
-\subsection{Kopule}
+\subsection{Kopula}
 \label{subsec:copulas}
 
 Kopula je matematická funkcia, ktorá umožňuje oddeliť modelovanie marginálnych rozdelení od modelovania závislosti medzi náhodnými premennými (pozri~\ref{eq:copula_dist} a ~\ref{eq:copula_density}).
 
 \subsubsection{Vlastnosti}
 
-Každá kopula $C: [0,1]^2 \to [0,1]$ musí spĺňať nasledovné vlastnosti:
+Každá dvojrozmerná kopula $C: [0,1]^2 \to [0,1]$ musí spĺňať
 
 \begin{itemize}
-  \item Hraničné podmienky: $C(u_1=0, u_2) = C(u_1, u_2=0) = 0$.
-  \item Identita: $C(u_1, 1) = u_1$, $C(1, u_2) = u_2$.
-  \item Rastúca:
+  \item Hraničné podmienky:
+    \begin{align*}
+        C(0, u_2) &= 0, \\
+        C(u_1, 0) &= 0, \\
+        C(1, u_2) &= u_2, \\
+        C(u_1, 1) &= u_1.
+    \end{align*}
+  \item 2-rastúcosť:
   \begin{equation}
     C(v_1, v_2) - C(v_1, u_2) - C(u_1, v_2) + C(u_1, u_2) \geq 0, \quad \text{ak } u_i \leq v_i.
   \end{equation}
@@ -446,7 +448,7 @@ W(u_1, u_2) \leq C(u_1, u_2) \leq M(u_1, u_2).
 
 \subsubsection{Využitie modelu závislosti}
 
-Kopula predstavuje štruktúru závislosti v združenom modeli. Umožňuje napríklad výpočet:
+Kopula predstavuje štruktúru závislosti v združenom modeli. Tak ako každá distribučná funkcia, kopula umožňuje napríklad výpočet:
 
 \begin{itemize}
   \item Spoločnej pravdepodobnosti: $\Pr(U_1 \leq u_1,\, U_2 \leq u_2) = C(u_1, u_2)$,
@@ -480,12 +482,12 @@ Kopula predstavuje štruktúru závislosti v združenom modeli. Umožňuje napr�
   
 \end{itemize}
 
-Pre porovnanie jednotlivých typov kopúl sme si spravili nasledujúce simulácie.
+Pre porovnanie jednotlivých typov kopúl sme si spravili simulácie náhodných výberov, viď obr.~\ref{fig:parametric_copulas}.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.95\linewidth]{parametric_copulas.png}
-    \caption{Parametrické kopule: Simulácie náhodných výberov}
+    \caption{Tvar parametrických kopúl pri pevne nastavenej Kendallovej tau $\tau = 0{,}5$.}
     \label{fig:parametric_copulas}
 \end{figure}
 
@@ -504,7 +506,7 @@ kde $\left(\hat{U}^{(i)}, \hat{V}^{(i)}\right)$ sú \textit{pseudo-pozorovania},
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.6\linewidth]{nonparametric_copula.png}
-    \caption{Empirická kopula: Pseudo-pozorovania premenných \textit{Dĺžka krídiel} a \textit{Hmotnosť v gramoch} tučniakov}
+    \caption{Pseudo-pozorovania premenných \textit{Dĺžka krídiel} a \textit{Hmotnosť} tučniakov}
     \label{fig:nonparametric_copula}
 \end{figure}
 
@@ -529,28 +531,27 @@ Parametrické modelovanie predpokladá, že združené rozdelenie pravdepodobnos
   \end{equation}
   kde $\vec{\mu}$ a $\Sigma$ sú stredná hodnota a kovariančná matica analogicky ako pri normálnom rozdelení, a $\nu > 0$ sú stupne voľnosti.
   
-  \item \textit{Kopulové modely} – založené na dekompozícii rozdelenia na marginálne rozdelenia $F_1, F_2$ a kopulu $C$, kde sa parametrická forma týka výberu konkrétnej triedy kopuly (napr. Gaussovská, Claytonova, Gumbelova, t-kopula).
+  \item Modely založené na dekompozícii rozdelenia na marginálne rozdelenia $F_1, F_2$ a kopulu $C$, kde sa parametrická forma týka výberu konkrétnej triedy kopuly (napr. Gaussovská, Claytonova, Gumbelova, t-kopula).
 \end{itemize}
 
 \subsubsection{Odhad parametrov}\label{subsubsec:param_estimation}
 
 Odhad parametrov $\theta$ pre daný model možno vykonať viacerými spôsobmi, najčastejšie spôsoby sú:
 
-\paragraph{Metóda momentov} - vychádza z priameho vzťahu medzi teoretickými momentami rozdelenia a jeho parametrami. Tieto momenty sa nahradia empirickými momentami (z výberu) a výsledný súbor rovníc sa vyrieši vzhľadom na neznáme parametre.
+\begin{itemize}
+  \item \textit{Metóda momentov} – vychádza z priameho vzťahu medzi teoretickými momentami rozdelenia a jeho parametrami. Tieto momenty sa nahradia empirickými momentami (z výberu) a výsledný súbor rovníc sa vyrieši vzhľadom na neznáme parametre.
 
-\paragraph{Metóda maximálnej vierohodnosti (Maximum Likelihood)} - tento prístup odhaduje parametre $\theta$ maximalizáciou logaritmickej vierohodnostnej funkcie, ktorá vyjadruje pravdepodobnosť výskytu pozorovanej vzorky vzhľadom na daný model. Formálne:
+  \item \textit{Metóda maximálnej vierohodnosti (Maximum Likelihood)} – tento prístup odhaduje parametre $\theta$ maximalizáciou logaritmickej vierohodnostnej funkcie, ktorá vyjadruje pravdepodobnosť výskytu pozorovanej vzorky vzhľadom na daný model. Formálne:
+  \begin{equation}
+  \hat{\theta} = \arg\max_{\theta \in \Theta} \frac{1}{n} \sum_{i=1}^{n} \ln f(X_{i1}, X_{i2} \mid \theta)
+  \end{equation}
+  pričom získané odhady sú konzistentné, efektívne a asymptoticky normálne rozdelené.
 
-\begin{equation}
-\hat{\theta} = \arg\max_{\theta \in \Theta} \frac{1}{n} \sum_{i=1}^{n} \ln f(X_{i1}, X_{i2} \mid \theta)
-\end{equation}
-
-pričom získané odhady sú konzistentné, efektívne a asymptoticky normálne rozdelené.
-
-\paragraph{Metóda najmenších štvorcov} - táto metóda vychádza z minimalizácie vzdialenosti medzi teoretickou distribučnou funkciou modelu a jej empirickým odhadom. Napríklad vo forme:
-
-\begin{equation}
-\hat{\theta} = \arg\min_{\theta \in \Theta} \sum_{i=1}^{n} \left( F(X_{i1}, X_{i2} \mid \theta) - \hat{F}_n(X_{i1}, X_{i2}) \right)^2
-\end{equation}
+  \item \textit{Metóda najmenších štvorcov} – táto metóda vychádza z minimalizácie vzdialenosti medzi teoretickou distribučnou funkciou modelu a jej empirickým odhadom. Napríklad vo forme:
+  \begin{equation}
+  \hat{\theta} = \arg\min_{\theta \in \Theta} \sum_{i=1}^{n} \left( F(X_{i1}, X_{i2} \mid \theta) - \hat{F}_n(X_{i1}, X_{i2}) \right)^2
+  \end{equation}
+\end{itemize}
 
 \subsection{Neparametrické modely}\label{subsec:joint_nonparam_models}
 
@@ -567,11 +568,11 @@ Rovnako ako v jednorozmernom prípade, \textit{neparametrické prístupy} nevyž
   \end{equation}
   kde $K$ je vyhladzovacia (jadrová) funkcia (napr. Gaussovská) a $h_j$ sú rozsahy vyhladenia.
 
-  \item \textit{Beta vyhladenie empirickej kopule} – namiesto ostrého odhadu pomocou indikačnej funkcie sa využíva vyhladzovanie cez beta rozdelenie. Odhad potom vyzerá ako:
+  \item \textit{Beta vyhladenie empirickej kopule} (~\ref{subsubsec:nonparametric_copula}) – namiesto ostrého odhadu pomocou indikačnej funkcie sa využíva vyhladzovanie cez beta rozdelenie. Odhad potom vyzerá ako:
   \begin{equation}
     \hat{C}_n^{\beta}(u, v) = \frac{1}{n} \sum_{i=1}^n B(u; r_i, n - r_i + 1) \cdot B(v; s_i, n - s_i + 1)
   \end{equation}
-  kde $r_i$ a $s_i$ sú poradia $U_i$ a $V_i$ vo vzorke a $B(\cdot; a,b)$ je kumulatívna distribučná funkcia beta rozdelenia.
+  kde $r_i$ a $s_i$ sú poradia $U_i$ a $V_i$ vo vzorke a $B(\cdot; a,b)$ je kumulatívna distribučná funkcia beta s parametrami a,b.
   
 \end{itemize}
 
@@ -586,81 +587,60 @@ Rovnako ako v jednorozmernom prípade, \textit{neparametrické prístupy} nevyž
         \centering
         \includegraphics[width=\linewidth]{nonparametric_copula_dens.png}
     \end{minipage}
-    \caption{Použitie beta vyhladenej empirickej kopule na modelovanie združeného rozdelenia premenných \textit{Dĺžka krídiel} a \textit{Hmotnosť v gramoch} tučniakov (vpravo hustota (PDF): jadrový odhad marginálií, vľavo pseudo-pozorovania), ~\ref{textbf:kernel_smoothing})}
+    \caption{Použitie beta vyhladenej empirickej kopule na modelovanie združeného rozdelenia premenných \textit{Dĺžka krídiel} a \textit{Hmotnosť} tučniakov (vpravo hustota: jadrový odhad marginálií~\ref{eq:kernel_smoothing}, vľavo pseudo-pozorovania)}
     \label{fig:empcopula}
 \end{figure}
 
-
 \section{Modelovanie rozdelenia zmiešaného náhodného vektora}\label{sec:joint_mixture_modeling}
 
-V mnohých praktických aplikáciách sa stretávame so situáciami, kde niektoré komponenty náhodného vektora sú diskrétne, zatiaľ čo iné sú spojité. Takéto modely označujeme ako \textit{zmiešané náhodné vektory} (angl. \textit{mixed-type random vectors}). Typickým príkladom sú meteorologické, poisťovacie alebo simulačné modely, kde napr. výskyt udalosti je diskrétny, ale jej rozsah je spojitý. 
+V mnohých praktických aplikáciách sa stretávame so situáciami, kde niektoré komponenty náhodného vektora sú diskrétne, zatiaľ čo iné sú spojité. Takéto náhodné vektory označujeme ako \textit{zmiešané} (angl. \textit{mixed-type random vectors}). Typickým príkladom sú meteorologické, poisťovacie alebo simulačné modely, kde napr. výskyt udalosti je diskrétny, ale jej rozsah je spojitý. 
 
 Modelovanie týchto štruktúr je komplikované najmä preto, že štandardné pravdepodobnostné modely predpokladajú homogénny typ premenných (všetky spojité alebo všetky diskrétne).
 
-\subsection{Podmienené rozdelenie}
+\subsection{Prehľad prístupov ku konštrukcii združeného rozdelenia}\label{subsec:overview_joint_mixed}
 
-\subsubsection{Hustota}
+Podľa práce ~\textcite{pleisMixtureDissertation} môžeme pri tvorbe združeného rozdelenia zmiešaných premenných uvažovať tri základné prístupy:
 
-Podmienená hustota spojitej premennej vzhľadom na kategóriu sa vypočíta ako:
-
-\begin{equation}
-f_{C \mid D}(c \mid d) = \frac{f_{D,C}(d, c)}{\Pr(D = d)},
-\end{equation}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\linewidth]{cond_dens_mix_contresp.png}
-    \caption{Podmienená hustota (parametrická: normálne rozdelenie) spojitej premennej \textit{Hmotnosť v gramoch} vzhľadom na diskrétnu premennú \textit{Druh} tučniakov}
-    \label{fig:cond_dens_mix_contresp}
-\end{figure}
-
-Podmienenú pravdepodobnostnú funkciu kategórie vzhľadom na spojitú hodnotu počítame nasledovne:
+\subsubsection{Rozklad na podmienené a marginálne rozdelenia}
+Ak máme diskrétnu premennú $D$ a spojitú premennú $C$, môžeme využiť základný princíp:
 
 \begin{equation}
-\Pr(D = d \mid C = c) = \frac{\Pr(D = d) \cdot f_{C \mid D}(c \mid d)}{f_C(c)}.
+f_{D,C}(d, c) = \Pr(D = d) \cdot f_{C \mid D}(c \mid d).
 \end{equation}
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\linewidth]{cond_dens_mix_discresp.png}
-    \caption{Podmienená pravdepodobnostná funkcia diskrétnej premennej \textit{Druh} vzhľadom na spojitú premennú \textit{Hmotnosť v gramoch} tučniakov}
-    \label{fig:cond_dens_mix_contresp}
-\end{figure}
-
-\subsubsection{Stredná hodnota a kvantilová funkcia}
-
-Podmienená stredná hodnota spojitej premennej vzhľadom na kategóriu $D = d$ je definovaná ako:
+alebo alternatívne:
 
 \begin{equation}
-\mathbb{E}[C \mid D = d] = \int_{\mathbb{R}} c \cdot f_{C \mid D}(c \mid d) \, dc,
+f_{D,C}(d, c) = f_C(c) \cdot \Pr(D = d \mid C=c).
 \end{equation}
 
-Kvantilová funkcia spojitej premennej $C$ podmienená kategóriou $D = d$:
-
-\begin{equation}
-Q_C^{(d)}(q) := \inf \left\{ c \in \mathbb{R} \mid \int_{-\infty}^c f_{C \mid D}(t \mid d) \, dt \geq q \right\}.
-\end{equation}
-
-Podmienená stredná hodnota diskrétnej premennej vzhľadom na hodnotu spojitej:
-
-\begin{equation}
-\mathbb{E}[D \mid C = c] = \sum_{d=1}^{K} d \cdot \Pr(D = d \mid C = c),
-\end{equation}
-
-Kvantilová funkcia diskrétnej premennej $D$ vzhľadom na $C = c$:
-
-\begin{equation}
-Q_D^{(c)}(q) := \min \left\{ d \in \{1, \ldots, K\} \mid \sum_{j=1}^{d} \Pr(D = j \mid C = c) \geq q \right\}.
-\end{equation}
+Tento prístup možno nazývať ako stratifikované modelovanie, kde každá kategória diskrétnej premennej má svoje vlastné rozdelenie spojitej zložky.
 
 
+\subsubsection{Modelovanie pomocou kopúl}\label{copula_joint_density}
 
-\subsection{Združená hustota}
-\label{subsec:conditional_mixture_strategy}
+Jedným z nástrojov, ktoré umožňujú spojiť rozdielne typy premenných v spoločnom modeli, sú \textit{kopule}.
 
-\subsubsection{Stratifikované modelovanie pomocou zmesi podmienených hustôt}\label{subsubsec:stratif_joint_density}
+Avšak kopule, ktoré bežne používame (napr. Gaussova alebo t-kopula), sú definované nad spojitými distribučnými funkciami. Pokiaľ aspoň jedna z marginálnych distribúcií nie je spojitá, ako v našom prípade, prestáva platiť jednoznačnosť dekompozície podľa \textit{Sklarovej vety} a výsledná kopula nie je na celom priestore jednoznačne určená.
 
-Pri modelovaní \textit{združenej hustoty} zmiešaného náhodného vektora $(D, C)$, kde $D$ je diskrétna (kategoriálna) premenná a $C$ je spojitá, je často využívaná tzv. \textit{stratégia podmienených hustôt}. Táto stratégia vychádza z nasledovného rozkladu združenej hustoty pravdepodobnosti:
+To vedie k viacerým problémom:
+\begin{itemize}
+  \item \textit{Problémy na hraniciach} – diskrétne premenné nemajú spojitú distribučnú funkciu, čo vedie k nejednoznačnosti transformácie na jednotkový interval.
+  \item \textit{Strata informácie} – binarizácia alebo kódovanie kategoriálnej premennej vedie k strate jemnej štruktúry závislosti.
+  \item \textit{Interpretácia} – štruktúra závislosti medzi kategoriálnou a spojitou premennou je pri tomto prístupe ťažko interpretovateľná.
+\end{itemize}
+
+Z týchto dôvodov sa v aplikáciách uplatňujú alternatívne stratégie ako napríklad \textit{conditional copula modeling}, kde sa predpokladá, že rozdelenie spojitej premennej $C$ vzhľadom na diskrétnu premennú $D = d$ má vlastnú kopulu, a teda sa modelujú podmienené distribúcie $\mathbb{C}_d$ osobitne pre každú triedu $d$~\parencite{pleisMixtureDissertation}. Tento prístup zároveň umožňuje riešiť problém nejednoznačnosti tým, že sa každá trieda modeluje ako samostatný „blok“ so špecifickou štruktúrou závislosti.
+
+\subsubsection{Latentné premenné}\label{latent_vars}
+
+Latentný prístup modeluje diskrétnu premennú ako \textit{prahovanie (thresholding)} nepozorovanej spojitej veličiny. Tento model je obzvlášť vhodný pre ordinálne premenné, no pre nominálne nemusí byť vždy interpretovateľný alebo vhodný.
+
+Podrobnejšie rozpracovanie týchto techník však presahuje rámec tejto práce a preto sa im ďalej venovať nebudeme.
+
+\subsection{Modelovanie združeného rozdelenia ako kombináciu podmienených hustôt}\label{subsec:glom_joint_mixture}
+
+Pri modelovaní \textit{združeného rozdelenia} zmiešaného náhodného vektora $(D, C)$, kde $D$ je diskrétna (kategoriálna) premenná a $C$ je spojitá, vychádzame z tzv. \textit{general location model} (GLOM), ktorý bol podrobne predstavený v práci ~\textcite{pleisMixtureDissertation} ako vhodný spôsob modelovania zmiešaného vektora pomocou zmesi podmienených Gaussových rozdelení s rovnakým rozptylom. Tento prístup vyjadruje združenú hustotu ako súčin marginálnej pravdepodobnosti diskrétnej premennej a podmienenej hustoty spojitej premennej:
 
 \begin{equation}
 f_{D,C}(d, c) = \Pr(D = d) \cdot f_{C \mid D}(c \mid d).
@@ -682,16 +662,14 @@ Analogicky môžeme získať aj \textit{marginálnu pravdepodobnostnú funkciu d
 
 kde $f_{D,C}(d, c)$ je združená hustota zmiešaného náhodného vektora $(D, C)$. Tento vzťah vyjadruje pravdepodobnosť výskytu kategórie $d$ ako celkovú pravdepodobnosť v spojitom priestore $C$ pre dané $D = d$.
 
-\bigskip
+V každej diskrétnej triede $D = d$ sa predpokladá vlastné parametrické rozdelenie spojitej zložky $f_{C \mid D=d}(c)$, avšak je možné použiť aj jadrové vyhladzovanie ako neparametrický prístup. Výsledná hustota sa nakoniec zostavuje ako vážená kombinácia podmienených hustôt ktoré môžu byť pre rôzne kategórie odlišné, čím sa prirodzene zohľadňuje ich štrukturálna rozdielnosť.
 
-Prístup, ktorý si v tejto podkapitole stručne popíšeme, bol systematicky opísaný v práci od ~\textcite{pleisMixtureDissertation}, kde je pod názvom \textit{general location model} (GLOM) prezentovaný ako vhodný spôsob modelovania zmiešaného vektora pomocou zmesi podmienených Gaussových (prípadne aj iných) rozdelení. V každej diskrétnej triede sa predpokladá odlišné parametrické rozdelenie spojitej zložky, avšak je možné použiť aj jadrové vyhladzovanie ako neparametrický prístup, a združená hustota sa potom zostavuje ako ich vážená kombinácia.
-
-Danú stratégiu možno implementovať nasledovne:
+Tento model možno implementovať nasledovne:
 \begin{itemize}
   \item Diskrétna premenná $D$ je kódovaná ako faktor s $K$ kategóriami.
   \item Pre každú kategóriu $d = 1, \dots, K$ sa vypočíta podmienená hustota $f_{C \mid D}(c \mid d)$ – buď neparametricky (jadrovým vyhladzovaním), alebo pomocou parametrov napríklad normálneho alebo Studentovho $t$-rozdelenia.
   \item Každá hustota je následne vážená podľa výskytu kategórie $\pi_d$ v dátach (empirická pravdepodobnosť).
-  \item Výsledná hustota $f_C(c)$ je tak zmesou hustôt podmienených tried.
+  \item Výsledná hustota $f_C(c)$ je tak zmesou hustôt podmienených výskytom kategórie.
 \end{itemize}
 
 Táto stratégia zodpovedá konštrukcii konečnej zmesi:
@@ -700,11 +678,11 @@ Táto stratégia zodpovedá konštrukcii konečnej zmesi:
 f_C(c) = \sum_{d=1}^{K} \pi_d \cdot f_{C|D=d}(c), \quad \text{kde } \sum_{d=1}^{K} \pi_d = 1.
 \end{equation}
 
-Tento prístup má niekoľko výhod:
+Tento prístup má niekoľko výhod oproti metódam, ktoré sa snažia modelovať združené rozdelenie zmiešaných premenných priamo, napríklad pomocou spojitých kopúl alebo binarizáciou kategoriálnej premennej:
 \begin{itemize}
   \item Zachováva jemnú štruktúru závislosti medzi $C$ a $D$, bez potreby nepresného binárneho kódovania.
   \item Vyhýba sa problémom pri použití spojitých kopúl na kombináciu diskrétnych a spojitých rozdelení.
-  \item Prirodzená interpretácia generatívneho modelu: najprv sa vygeneruje kategória $D = d$, následne sa podľa nej vyberie podmienené rozdelenie $C$.
+  \item Model má prirodzenú generatívnu interpretáciu: najskôr sa podľa pravdepodobnosti $\Pr(D = d)$ vyberie konkrétna hodnota diskrétnej premennej $D$, a následne sa hodnota spojitej premennej $C$ modeluje podmieneným rozdelením $f_{C \mid D}(c \mid d)$. 
 \end{itemize}
 
 Na druhej strane, použitie tejto stratégie predpokladá, že pre každú kategóriu $D = d$ je možné spoľahlivo odhadnúť parametre rozdelenia spojitej premennej. V prípade veľmi malých kategórií môže byť však tento odhad nestabilný.
@@ -722,24 +700,64 @@ Na druhej strane, použitie tejto stratégie predpokladá, že pre každú kateg
         \centering
         \includegraphics[width=\linewidth]{joint_mixture_density_3D.png}
     \end{minipage}
-    \caption{Stratifikované modelovanie združenej hustoty pravdepodobnosti premenných \textit{Druh} a \textit{Hmotnosť v gramoch} tučniakov (vľavo graf: Pozorovania + Marginálie, vpravo graf: Združená hustota (parametricky: normálne rozdelenie))}
+    \caption{Stratifikované modelovanie združenej hustoty pravdepodobnosti premenných \textit{Druh} a \textit{Hmotnosť} tučniakov (vľavo graf: Pozorovania + Marginálie, vpravo graf: Združená hustota (parametricky: normálne rozdelenie))}
     \label{fig:stratified_modelling_mix_density}
 \end{figure}
 
-\subsubsection{Modelovanie pomocou kopúl}\label{copula_joint_density}
 
-Jedným z nástrojov, ktoré umožňujú spojiť rozdielne typy premenných v spoločnom modeli, sú \textit{kopule}.
+\subsection{Podmienené rozdelenie}
 
-Avšak kopule, ktoré bežne používame (napr. Gaussova alebo t-kopula), sú definované nad spojitými distribučnými funkciami. Pokiaľ aspoň jedna z marginálnych distribúcií nie je spojitá, ako v našom prípade, prestáva platiť jednoznačnosť dekompozície podľa \textit{Sklarovej vety} a výsledná kopula nie je na celom priestore jednoznačne určená.
+\subsubsection{Hustota}
 
-To vedie k viacerým problémom:
-\begin{itemize}
-  \item \textit{Problémy na hraniciach} – diskrétne premenné nemajú spojitú distribučnú funkciu, čo vedie k nejednoznačnosti transformácie na jednotkový interval.
-  \item \textit{Strata informácie} – binarizácia alebo kódovanie kategoriálnej premennej vedie k strate jemnej štruktúry závislosti.
-  \item \textit{Interpretácia} – štruktúra závislosti medzi kategoriálnou a spojitou premennou je pri tomto prístupe ťažko interpretovateľná.
-\end{itemize}
+Podmienená hustota spojitej premennej $C$ vzhľadom na kategóriu $D=d$ sa vypočíta ako:
 
-Z týchto dôvodov sa v aplikáciách uplatňujú alternatívne stratégie ako napríklad \textit{conditional copula modeling}, kde sa predpokladá, že rozdelenie spojitej premennej $C$ vzhľadom na diskrétnu premennú $D = d$ má vlastnú kopulu (alebo marginálne rozdelenie aj s vlastnou kopulou), a teda sa modelujú podmienené distribúcie $\mathbb{C}_d$ osobitne pre každú triedu $d$~\parencite{pleisMixtureDissertation}. Tento prístup zároveň umožňuje riešiť problém nejednoznačnosti tým, že sa každá trieda modeluje ako samostatný „blok“ so špecifickou štruktúrou závislosti.
+\begin{equation}
+f_{C \mid D}(c \mid d) = \frac{f_{D,C}(d, c)}{\Pr(D = d)},
+\end{equation}
 
-Podrobnejšie rozpracovanie týchto techník (vrátane napr. latentného modelovania diskrétnych premenných alebo zohľadnenia ordinality) však presahuje rámec tejto práce a preto sa im ďalej venovať nebudeme.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{cond_dens_mix_contresp.png}
+    \caption{Podmienená hustota (parametrická: normálne rozdelenie) spojitej premennej \textit{Hmotnosť} vzhľadom na diskrétnu premennú \textit{Druh} tučniakov}
+    \label{fig:cond_dens_mix_contresp}
+\end{figure}
 
+Podmienenú pravdepodobnostnú funkciu kategórie vzhľadom na spojitú hodnotu počítame nasledovne:
+
+\begin{equation}
+\Pr(D = d \mid C = c) = \frac{\Pr(D = d) \cdot f_{C \mid D}(c \mid d)}{f_C(c)}.
+\end{equation}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{cond_dens_mix_discresp.png}
+    \caption{Podmienená pravdepodobnostná funkcia diskrétnej premennej \textit{Druh} vzhľadom na spojitú premennú \textit{Hmotnosť} tučniakov}
+    \label{fig:cond_dens_mix_contresp}
+\end{figure}
+
+\subsubsection{Stredná hodnota a kvantilová funkcia}
+
+Podmienená stredná hodnota spojitej premennej vzhľadom na kategóriu $D = d$ je definovaná ako:
+
+\begin{equation}
+\mathbb{E}[C \mid D = d] = \int_{\mathbb{R}} c \cdot f_{C \mid D}(c \mid d) \, dc,
+\end{equation}
+
+Kvantilová funkcia spojitej premennej $C$ podmienená kategóriou $D = d$:
+
+\begin{equation}
+Q_C^{(d)}(q) := \inf \left\{ c \in \mathbb{R} \mid \int_{-\infty}^c f_{C \mid D}(t \mid d) \, dt \geq q \right\}.
+\end{equation}
+
+Podmienená stredná hodnota diskrétnej premennej vzhľadom na hodnotu spojitej:
+
+\begin{equation} 
+\mathbb{E}[D \mid C = c] = \sum_{k = 1}^{K} d_k \cdot \Pr(D = d_k \mid C = c), \end{equation}
+
+Kvantilová funkcia diskrétnej premennej $D$ vzhľadom na $C = c$:
+
+\begin{equation} 
+Q_D^{(c)}(q) := \min \left\{ d_k \in \mathcal{D} \mid \sum_{j=1}^{k} \Pr(D = d_j \mid C = c) \geq q \right\}, 
+\end{equation}
+
+kde $\mathcal{D} = \{ d_1, \ldots, d_K \}$ je množina všetkých možných hodnôt diskrétnej premennej $D$.
