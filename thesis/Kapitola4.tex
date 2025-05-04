@@ -167,10 +167,194 @@ Príslušné implementácie sú naprogramované tak, aby používateľ mohol jed
 
 Nasledujúce podkapitoly opisujú jednotlivé implementácie podľa typu vstupného vektora.
 
-\subsection{Implementácia pre homogénny vektor}\label{subsec:homo_vector_implementation}
+\subsection{Implementácia pre diskrétny náhodný vektor}\label{subsec:homo_vector_implementation}
 
-\subsubsection{Diskrétny vektor}
+V tejto podsekcii sa zameriavame na prípady, keď obe premenné $(X, Y)$ majú rovnaký typ – buď sú obe diskrétne, alebo obe spojité. Ide o jednoduchší scenár, kde môžeme priamo modelovať ich spoločné rozdelenie bez potreby špeciálnych techník na spájanie rôznych typov dát.
 
-\subsubsection{Spojitý vektor}
+V diskrétnom prípade je cieľom vypočítať pravdepodobnosť každej kombinácie $(x_i, y_j)$, teda pravdepodobnostnú funkciu~\ref{eq:pmf}.
 
-\subsection{Implementácia pre zmiešaný vektor}
+Na túto úlohu slúži funkcia \texttt{model\_joint\_pmf()}, ktorá automaticky:
+\begin{itemize}
+  \item konvertuje premenné na faktory (ak ešte nie sú),
+  \item vytvorí tabuľku výskytov a následne vypočíta príslušné pravdepodobnosti,
+  \item priradí súradnice pre vizualizáciu (číselné pozície úrovní),
+  \item zostaví sumarizačnú tabuľku s kľúčovými štatistikami a kontrolou správnosti (súčet pravdepodobností $\approx 1$).
+\end{itemize}
+
+\subsubsection{Vstupné parametre}
+Funkcia očakáva ako vstup nasledujúce argumenty:
+
+\begin{itemize}
+  \item \texttt{data} – dátová tabuľka vo forme \texttt{data.frame}, ktorá obsahuje dvojicu diskrétnych premenných. Tieto premenné môžu byť zadané ako znaky, faktory alebo celé čísla s obmedzeným počtom hodnôt.
+  \item \texttt{discrete\_vars} – znakový vektor dĺžky 2 obsahujúci mená dvoch diskrétnych premenných, ktoré budú použité na výpočet združeného rozdelenia.
+\end{itemize}
+
+\subsubsection{Výstup modelu}
+Výsledkom je štruktúrovaný objekt obsahujúci:
+\begin{itemize}
+  \item \texttt{tab} – tabuľka s kombináciami $(x_i, y_j)$, ich frekvenciami a pravdepodobnosťami,
+  \item \texttt{x\_labels}, \texttt{y\_labels} – zoznam úrovní oboch premenných,
+  \item \texttt{summary} – prehľadná \texttt{gt} tabuľka s hlavným zhrnutím modelu,
+  \item \texttt{vector\_type = "discrete"} – značka typu vstupných dát.
+\end{itemize}
+
+\subsubsection{Vizualizácia}
+Vizualizačná funkcia \texttt{render\_joint\_pmf()} následne vykresľuje pravdepodobnostnú štruktúru buď
+
+\begin{itemize}
+  \item ako 2D heatmapu doplnenú o marginálne rozdelenia,
+  \item alebo ako 3D bodový graf s výškou zodpovedajúcou hodnote $\Pr(X,Y)$.
+\end{itemize}
+
+Tento model poskytuje základný, ale veľmi efektívny nástroj na pochopenie závislosti medzi dvoma diskrétnymi premennými. Je užitočný napríklad pri analýze kontingenčných tabuliek alebo pravdepodobnostného modelovania klasifikátorov.
+
+\subsection{Implementácia pre spojitý náhodný vektor}
+
+V prípade, že sú obidve premenné \textit{spojité}, prirodzenou stratégiou pre modelovanie ich združeného správania je odhad \textit{združenej hustoty pravdepodobnosti} $f_{X,Y}(x, y)$ nad dvojrozmerným priestorom.
+
+V tejto podkapitole najskôr predstavujeme prístup, v ktorom je \textit{združená hustota modelovaná ako celok} pomocou jedného z troch typov modelov:
+
+\begin{itemize}
+  \item \textit{Neparametrický model} pomocou \textit{jadrového vyhladzovania} (KDE),
+  \item \textit{Parametrický model} s predpokladom bivariantného \textit{normálneho rozdelenia},
+  \item \textit{Parametrický model} na báze \textit{bivariantného t-rozdelenia}, vhodný pre robustné odhady.
+\end{itemize}
+
+Modelovanie je realizované prostredníctvom funkcie \texttt{model\_continuous\_density()}.
+
+\subsubsection{Vstupné parametre}
+
+\begin{itemize}
+  \item \texttt{data} – dátová tabuľka obsahujúca numerické hodnoty pre aspoň dve spojité premenné,
+  \item \texttt{continuous\_vars} – vektor dĺžky 2 obsahujúci názvy dvoch spojitých premenných,
+  \item \texttt{model\_type} – typ modelu, ktorý má byť použitý na odhad hustoty: \texttt{"kernel"} (jadrové vyhladzovanie), \texttt{"normal"} (bivariantné normálne rozdelenie), alebo \texttt{"t"} (bivariantné t-rozdelenie).
+\end{itemize}
+
+\subsubsection{Modely hustoty}
+
+\begin{itemize}
+  \item \textit{Kernel Density Estimation (KDE)}:  
+  V tomto prípade je hustota odhadovaná pomocou funkcie \texttt{MASS::kde2d()}, ktorá vytvára mriežku 100 × 100 bodov a vypočítava hustotu v každom bode. Tento prístup je flexibilný a nevyžaduje žiadne špecifické predpoklady o tvare rozdelenia.
+
+  \item \textit{Bivariantné normálne rozdelenie}:  
+  Hustota je vypočítaná pomocou analytického výrazu pre normálnu hustotu v dvojrozmernom priestore. Parametre (stredné hodnoty, smerodajné odchýlky a korelačný koeficient) sú odhadnuté z dát.
+
+  \item \textit{Bivariantné t-rozdelenie}:  
+  Ide o robustnejší variant normálneho modelu, ktorý lepšie odoláva odľahlým hodnotám. Počet stupňov voľnosti sa nastaví ako $df = n - 1$, kde $n$ je počet pozorovaní.
+\end{itemize}
+
+\subsubsection{Výstup modelu}
+
+Funkcia vracia štruktúrovaný objekt obsahujúci:
+
+\begin{itemize}
+  \item \texttt{x\_vals}, \texttt{y\_vals} – vektory hodnôt pozdĺž osi $X$ a $Y$ použité na vytvorenie hustotnej mriežky,
+  \item \texttt{z\_matrix} – matica rozmeru $100 \times 100$ s vypočítanými hodnotami hustoty $f_{X,Y}(x_i, y_j)$,
+  \item \texttt{model\_type} – použitý typ modelu (\texttt{"kernel"}, \texttt{"normal"}, alebo \texttt{"t"}),
+  \item \texttt{continuous\_vars} – názvy použitých spojitých premenných,
+  \item \texttt{params} – zoznam parametrov použitých v modelovaní (napr. $\mu_X$, $\sigma_X$, $\mu_Y$, $\sigma_Y$, korelácia, $df$),
+  \item \texttt{summary\_info} – prehľadná tabuľka základných štatistík, vrátane dimenzie hustotnej matice,
+  \item \texttt{vector\_type} = \texttt{"continuous"} – typ indikujúci, že ide o dvojicu spojitých premenných.
+\end{itemize}
+
+Vizualizácia výsledku je zabezpečená pomocou funkcie \texttt{render\_continuous\_density()}, ktorá podporuje ako 2D kontúrové zobrazenie s rozložením marginálnych hustôt, tak aj 3D plošné zobrazenie celej združenej hustoty.
+
+\bigskip
+
+Okrem modelovania združenej hustoty dvoch spojitých premenných ako celku, bola implementovaná aj logika založená na rozklade na \textit{marginálie} a \textit{kopulovú funkciu}.
+
+Implementácia tejto stratégie je realizovaná vo funkcii \texttt{model\_continuous\_density\_copula()}, ktorá podporuje tri režimy modelovania:
+
+\begin{itemize}
+  \item \textit{Neparametrický režim}: marginálne rozdelenia aj kopula sú odhadované neparametricky (pomocou jadrového vyhladzovania a beta vyhladenej empirickej kopuly).
+  \item \textit{Parametrický režim}: marginálne rozdelenia aj kopula sú modelované pomocou špecifikovaných distribúcií (napr. normálne, t, log-normálne) a známych kopulových funkcií (Clayton, Gumbel, Frank, Joe, t).
+  \item \textit{Hybridný režim}: každá marginálna premenná môže mať iný typ rozdelenia (napr. KDE pre jednu a normálne pre druhú) a kopula môže byť buď empirická, alebo parametrická.
+\end{itemize}
+
+\subsubsection{Vstupné parametre}
+
+\begin{itemize}
+  \item \texttt{data} – dátová tabuľka s dvoma spojitými premennými,
+  \item \texttt{continuous\_vars} – mená týchto dvoch premenných,
+  \item \texttt{model\_type} – typ modelovania: \texttt{"nonparametric"}, \texttt{"parametric"}, alebo \texttt{"hybrid"},
+  \item \texttt{copula\_type} – typ použitej kopuly: napr. \texttt{"}\texttt{empirical (beta)"}, \texttt{"Clayton"}, \texttt{"t"}, atď.,
+  \item \texttt{marginal\_densities} – vektor typov marginálnych modelov (napr. \texttt{c("normal", "KDE")}); povinný pre \texttt{"parametric"} a \texttt{"hybrid"} režimy.
+\end{itemize}
+
+\subsubsection{Modelovanie hustoty}
+
+Každý režim vykonáva odhad podľa nasledovnej schémy:
+
+\begin{itemize}
+  \item Neparametrický režim vytvára aproximácie marginálnych CDF a hustôt pomocou \texttt{density()} a využíva \texttt{empCopula()} s vyhladzovaním typu \texttt{"beta"}.
+  \item Parametrický režim využíva analytické rozdelenia (napr. normálne, t) pre výpočet $F_X$, $F_Y$, $f_X$, $f_Y$, a odhaduje parametre kopuly pomocou metódy maximálnej vierohodnosti (\texttt{fitCopula()}).
+  \item Hybridný režim umožňuje kombináciu oboch vyššie uvedených, pričom zvlášť definuje každé marginálne rozdelenie a voliteľne používa empirickú alebo parametrickú kopulu.
+\end{itemize}
+
+\subsubsection{Výstup modelu}
+
+Výstupom je štruktúrovaný objekt s nasledovnými prvkami:
+
+\begin{itemize}
+  \item \texttt{x\_vals}, \texttt{y\_vals} – vektory bodov použité na vytvorenie hustotnej siete,
+  \item \texttt{z\_matrix} – matica vypočítanej hustoty $f_{X,Y}(x,y)$ s rozmerom $100 \times 100$,
+  \item \texttt{model\_type} – typ použitého modelovania (\texttt{"nonparametric"}, \texttt{"parametric"}, \texttt{"hybrid"}),
+  \item \texttt{copula\_type} – názov použitej kopuly,
+  \item \texttt{marginal\_densities} – typy marginálnych modelov pre každú premennú,
+  \item \texttt{copula\_model\_fitted} – fitted kopula objekt (napr. \texttt{empCopula} alebo \texttt{tCopula}),
+  \item \texttt{rho\_copula}, \texttt{df\_copula} – odhadnuté parametre kopuly (ak sú dostupné),
+  \item \texttt{bw\_x}, \texttt{bw\_y} – rozsahy vyhladzovania pre KDE (ak boli použité),
+  \item \texttt{continuous\_vars} – názvy vstupných premenných,
+  \item \texttt{vector\_type} = \texttt{"continuous\_copula"} – značka typu vstupných dát.
+\end{itemize}
+
+Funkcia \texttt{render\_continuous\_density\_copula()} poskytuje možnosť vizualizácie výstupu vo forme 2D kontúrových grafov s marginálnymi hustotami alebo 3D grafu plochy združenej hustoty. Súčasťou výstupu je aj sumarizačná tabuľka s parametrami modelu a typmi použitých rozdelení.
+
+\subsection{Implementácia pre zmiešaný náhodný vektor}
+
+V prípade, že uvažujeme dvojicu náhodných premenných, z ktorých jedna je diskrétna a druhá spojitá, klasické bivariátne modely nie sú priamo aplikovateľné. Namiesto toho využívame \emph{stratifikované modelovanie}~\ref{subsec:glom_joint_mixture}, kde celková združená hustota pravdepodobnosti je tvorená váženým súčtom podmienených hustôt spojitej premennej, podmienených na jednotlivé kategórie diskrétnej premennej. Každá z týchto hustôt reprezentuje rozdelenie spojitej premennej v rámci danej kategórie, pričom váhy zodpovedajú relatívnej početnosti kategórií.
+
+Implementácia tohto prístupu je realizovaná vo funkcii \texttt{model\_mixture\_density()}, ktorá podporuje tri rôzne typy modelov podmienených hustôt:
+
+\begin{itemize}
+  \item \textit{Jadrové vyhladzovanie (kernel):} flexibilný neparametrický prístup, kde sa hustota odhaduje samostatne v každej kategórii pomocou funkcie \texttt{density()} s individuálne voleným rozsahom vyhladzovania (bandwidth).
+  \item \textit{Normálne rozdelenie:} hustota je v každej kategórii odhadnutá pomocou normálneho rozdelenia so stredom a rozptylom zodpovedajúcim empirickým hodnotám.
+  \item \textit{t-rozdelenie:} robustnejšia alternatíva k normálnemu rozdeleniu, vhodná najmä pri menšom počte pozorovaní alebo pri výskyte odľahlých hodnôt.
+\end{itemize}
+
+\subsubsection{Vstupné parametre}
+
+\begin{itemize}
+  \item \texttt{data} – dátová tabuľka obsahujúca jednu diskrétnu a jednu spojitú premennú,
+  \item \texttt{discrete\_vars} – názov stĺpca s diskrétnou premennou,
+  \item \texttt{continuous\_vars} – názov stĺpca so spojitou premennou,
+  \item \texttt{model\_type} – typ modelu pre podmienené hustoty: \texttt{"kernel"}, \texttt{"normal"} alebo \texttt{"t"},
+  \item \texttt{bw} – špecifikovaný rozsah vyhladzovania pre KDE, alebo \texttt{NULL} pre automatický výpočet.
+\end{itemize}
+
+\subsubsection{Výstup modelu}
+
+Výsledkom modelovania je štruktúrovaný objekt s týmito komponentmi:
+
+\begin{itemize}
+  \item \texttt{density\_data} – tabuľka s odhadnutou hustotou pre každú kategóriu (stĺpce: \texttt{Continuous\_Var}, \texttt{Density}, \texttt{Discrete\_Var}),
+  \item \texttt{category\_probs} – vektor pravdepodobností jednotlivých kategórií,
+  \item \texttt{summary\_info} – zoznam s doplňujúcimi informáciami o modeli:
+    \begin{itemize}
+      \item počet kategórií a ich názvy,
+      \item typ použitého modelu (\texttt{"kernel"}, \texttt{"normal"}, \texttt{"t"}),
+      \item použitý rozsah vyhladzovania (alebo zoznam podľa kategórií),
+      \item hodnota celkového integrálu hustoty (slúžiaca ako kontrola správnosti).
+    \end{itemize}
+  \item \texttt{discrete\_var}, \texttt{continuous\_var} – názvy vstupných premenných,
+  \item \texttt{category\_colors} – farebné priradenia jednotlivým kategóriám pre vizualizáciu,
+  \item \texttt{data} – prefiltrovaná vstupná tabuľka (bez \texttt{NA}),
+  \item \texttt{vector\_type} = \texttt{"mix"} – značka typu náhodného vektora.
+\end{itemize}
+
+Model je vizualizovaný ako kombinácia podmienených hustôt, kde jednotlivé hustoty sú odlíšené farbou a ich výška zohľadňuje relatívnu početnosť danej kategórie. Renderovanie prebieha pomocou funkcie \texttt{render\_mixture\_density()}, ktorá podporuje 2D aj 3D zobrazenia vrátane sprievodných grafov pre marginálne rozdelenia.
+
+
+\section{Aplikácia združeného rozdelenia}\label{sec:app_joint_dist}
+
+
