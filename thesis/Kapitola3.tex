@@ -749,16 +749,16 @@ Podmienenú pravdepodobnostnú funkciu kategórie vzhľadom na spojitú hodnotu 
 
 \subsubsection{Stredná hodnota a kvantilová funkcia}
 
-Podmienená stredná hodnota spojitej premennej vzhľadom na kategóriu $D = d$ je definovaná ako:
+Podmienená stredná hodnota spojitej premennej vzhľadom na kategóriu $D = d_k$ je definovaná ako:
 
 \begin{equation}
-\mathbb{E}[C \mid D = d] = \int_{\mathbb{R}} c \cdot f_{C \mid D}(c \mid d) \, dc,
+\mathbb{E}[C \mid D = d_k] = \int_{\mathbb{R}} c \cdot f_{C \mid D}(c \mid d_k) \, dc,
 \end{equation}
 
-Kvantilová funkcia spojitej premennej $C$ podmienená kategóriou $D = d$:
+Kvantilová funkcia spojitej premennej $C$ podmienená kategóriou $D = d_k$:
 
 \begin{equation}
-Q_C^{(d)}(q) := \inf \left\{ c \in \mathbb{R} \mid \int_{-\infty}^c f_{C \mid D}(t \mid d) \, dt \geq q \right\}.
+Q_C^{(d_k)}(q) := \inf \left\{ c \in \mathbb{R} \mid \int_{-\infty}^c f_{C \mid D}(t \mid d_k) \, dt \geq q \right\}.
 \end{equation}
 
 Podmienená stredná hodnota diskrétnej premennej vzhľadom na hodnotu spojitej:

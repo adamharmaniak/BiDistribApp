@@ -4,64 +4,173 @@ V tejto kapitole budeme prezentovať implementáciu vybraných štatistických m
 
 \section{Regresný a klasifikačný model}\label{sec:app_regression_class}
 
-V tejto časti prezentujeme implementáciu základných regresných a klasifikačných modelov, ktoré nám umožňujú odhadovať podmienenú strednú hodnotu a kvantilovú funkciu odozvy vzhľadom na zvolený prediktor. Cieľom týchto modelov je nielen získať presný odhad očakávanej hodnoty alebo kvantilu, ale aj zachytiť nelineárne alebo neštandardné vzťahy v dátach.
+V tejto časti prezentujeme implementáciu základných regresných a klasifikačných modelov, ktoré nám umožňujú odhadovať podmienenú strednú hodnotu a kvantilovú funkciu odozvy vzhľadom na zvolený prediktor. Cieľom týchto modelov je nielen získať rozdelenie odozvy, ale aj zachytiť nelineárne alebo neštandardné vzťahy v dátach.
 
 \subsection{Implementácia regresných modelov}\label{subsec:regression_implementation}
 
-Pre flexibilné modelovanie podmienenej závislosti medzi dvojicou premenných — spojitej odozvy $Y$ a ľubovoľného prediktora $X$ bola navrhnutá a implementovaná hlavná funkcia \texttt{combine\_conditional\_models()}, ktorá podľa typu vstupných premenných a používateľom zvolených parametrov zabezpečuje výber vhodnej modelovacej metódy.
+Pre flexibilné modelovanie podmienenej závislosti medzi dvojicou premenných — spojitej odozvy $Y$ a prediktora $X$ (ktorý môže byť spojitý aj diskrétny) — bola implementovaná hlavná riadiaca funkcia \texttt{combine\_conditional\_models()}. Táto funkcia podľa typu vstupných premenných a používateľom zadaných parametrov zabezpečuje:
 
-Táto funkcia slúži ako zastrešujúce rozhranie pre:
 \begin{itemize}
-  \item odhad \textit{podmienenej strednej hodnoty} $\mathbb{E}[Y \mid X = x]$ pre spojité aj diskrétne premenné,
-  \item odhad \textit{kvantilových funkcií} $Q_Y^{(X)}(q)$ pre zadané úrovne kvantilu,
-  \item vizualizáciu výstupov (regresné krivky, odhady v konkrétnom bode, boxplot),
-  \item sumarizáciu výpočtových výstupov v tabuľkovej forme.
+  \item výber vhodného regresného modelu pre odhad \textit{podmienenej strednej hodnoty} $\mathbb{E}[Y \mid X = x]$,
+  \item odhad viacerých \textit{kvantilových funkcií} $Q_Y^{(X)}(q)$ pre zvolené úrovne kvantilu,
+  \item spracovanie prípadov, kde je prediktor \textit{diskrétny} — výber medzi lineárnym a GLM prístupom,
+  \item zjednotenú \textit{vizualizáciu} (regresné krivky, odhady v konkrétnom bode $x^*$),
+  \item a sumarizáciu výstupov v prehľadných tabuľkách typu \texttt{gt}.
 \end{itemize}
 
-V nasledujúcich podkapitolách bližšie popisujeme jednotlivé moduly, ktoré sú touto funkciou využívané.
+Funkcia tiež obsahuje vstavanú validáciu vstupov, automaticky rozpoznáva typ premenných a v prípade potreby ich transformuje na číselné. Výpočtové časti deleguje na nižšie opísané pomocné moduly podľa zvolených metód modelovania.
 
 \subsubsection{Modelovanie podmienenej strednej hodnoty}\label{subsec:app_cond_mean}
 
-Funkcia \texttt{model\_conditional\_mean()} implementuje rôzne prístupy k odhadu podmienenej strednej hodnoty $\mathbb{E}[Y \mid X = x]$ pri spojitom prediktore. Používateľ si môže vybrať z nasledujúcich modelov:
+Odhad podmienenej strednej hodnoty $\mathbb{E}[Y \mid X = x]$ je zabezpečený pomocou funkcie \texttt{model\_conditional\_mean()}, ktorá podporuje nasledovné metódy:
 
 \begin{itemize}
   \item \textbf{Parametrické modely:}
   \begin{itemize}
-    \item \textit{Lineárny model} – klasická regresia 1. stupňa,
-    \item \textit{Polynomiálny model} – vyššie stupne polynómu,
-    \item \textit{Exponenciálny model} – model špecifikovaný ako $Y = a \cdot \exp(bX)$,
-    \item \textit{B-spline} – model na báze spline funkcií ($\texttt{df = 5}$).
+    \item "\texttt{linear}" – klasická lineárna regresia,
+    \item "\texttt{poly}" – polynomiálna regresia (vyžaduje stupeň \texttt{poly\_mean\_degree}),
+    \item "\texttt{exp}" – exponenciálny model $Y = a \cdot \exp(bX)$ (fitovaný cez \texttt{nls}),
+    \item "\texttt{spline}" – B-spline bázy s počtom stupňov voľnosti \texttt{df = 5}.
   \end{itemize}
-  
   \item \textbf{Neparametrické modely:}
   \begin{itemize}
-    \item \textit{LOESS} – lokálne vyhladzovaný regresný model (span $= 0.75$),
-    \item \textit{GAM} – generalizovaný aditívny model s hladkou spline funkciou.
+    \item "\texttt{loess}" – lokálne vyhladzovaný model (LOESS, \texttt{span = 0.75}),
+    \item "\texttt{gam}" – generalizovaný aditívny model s hladkou spline funkciou (\texttt{mgcv::gam}).
   \end{itemize}
 \end{itemize}
 
-Pre každý model sa vypočítavajú základné metriky presnosti (R$^2$, MSE) a generuje sa vizuálny výstup vrátane výpočtu podmienenej strednej hodnoty v zadanom bode $x^*$.
+Funkcia vracia predikovanú hodnotu podmienenej strednej hodnoty pre celú mriežku hodnôt prediktora, ako aj konkrétnu hodnotu $\mathbb{E}[Y \mid X = x^*]$ pre zvolenú hodnotu $x^*$. Súčasťou výstupu je aj tabuľka s metrikami kvality modelu (R$^2$, MSE) a prípadne aj s parametrami modelu (odhad ± štandardná chyba).
 
-\subsubsection{Modelovanie podmienenej kvantilovej funkcie}
+\subsubsection{Modelovanie podmienenej kvantilovej funkcie}\label{subsec:app_cond_quantile}
 
-Funkcia \texttt{model\_conditional\_quantiles()} slúži na odhad kvantilových funkcií $Q_Y^{(X)}(q)$ pre rôzne hodnoty kvantilu $q \in (0, 1)$. Podporované sú:
+Podmienené kvantilové funkcie $Q_Y^{(X)}(q)$ sú odhadované pomocou funkcie \texttt{model\_conditional\_quantiles()}, ktorá umožňuje odhad pre viaceré kvantily naraz. Podporované metódy sú:
 
 \begin{itemize}
-  \item \textit{Lineárna kvantilová regresia},
-  \item \textit{Polynomiálna kvantilová regresia},
-  \item \textit{Sploštená spline regresia} (natural splines s $\texttt{df = 4}$).
+  \item \texttt{"linear"} – lineárna kvantilová regresia,
+  \item \texttt{"poly"} – kvantilová regresia s polynomiálnou bázou (vyžaduje \texttt{poly\_quant\_degree}),
+  \item \texttt{"spline"} – kvantilová regresia s B-spline funkciou (\texttt{df = 4}).
 \end{itemize}
 
-\subsubsection{Modelovanie pri diskrétnom prediktore}
+Výstupom je dátová tabuľka so všetkými vypočítanými hodnotami $Q_q(Y \mid X = x)$ pre každý kvantil $q$ a mriežku hodnôt $x$, ako aj samostatné bodové odhady pre konkrétne $x^*$. Súčasťou výstupu sú tiež tabuľky so štatistikami a parametrami každého modelu: odhady, chyby, AIC, deviance atď.
 
-V prípade, že prediktor nadobúda diskrétne hodnoty, bol implementovaný samostatný modul \texttt{model\_discrete\_predictor()}, ktorý využíva modely:
+\subsubsection{Modelovanie pri diskrétnom prediktore}\label{subsec:app_discrete_pred}
+
+V prípade, že prediktor $X$ je diskrétneho typu (napr. faktor alebo textová premenná), funkcia \texttt{combine\_conditional\_models()} automaticky použije modul \texttt{model\_discrete\_predictor()}, ktorý podporuje:
+
 \begin{itemize}
-  \item \textit{Lineárny model} s faktormi,
-  \item \textit{GLM s logaritmickou linkou}.
+  \item \texttt{"lm"} – klasický lineárny model so zaobchádzaním s faktormi,
+  \item \texttt{"glm\_log"} – GLM model s logaritmickou linkou pre pozitívne odozvy.
 \end{itemize}
 
-Výstupom je graf vo forme boxplotu pre jednotlivé kategórie doplnený o odhady $\mathbb{E}[Y \mid X = d_k]$ spolu s intervalmi spoľahlivosti. Rovnako ako v prípade spojitých modelov sú generované sumarizačné tabuľky s odhadmi parametrov a hodnotami R$^2$.
+Vizualizácia je realizovaná pomocou boxplotu s naznačenými bodovými odhadmi $\mathbb{E}[Y \mid X = d_k]$ a príslušnými intervalmi spoľahlivosti. Súčasťou výstupu sú aj štandardné regresné tabuľky s parametrami a R$^2$.
 
 \subsubsection{Zhrnutie funkcionality}
 
-Všetky regresné modely sú implementované vo forme samostatných funkcií s jednotným rozhraním. Ich výstup je vizualizovaný pomocou balíka \texttt{ggplot2} a sumarizačné tabuľky sú vytvárané pomocou balíka \texttt{gt} so štýlovaným výstupom. V prípade zadania konkrétnej hodnoty prediktora $x^*$ sa do výstupu zahrnú aj bodové odhady očakávanej hodnoty a kvantilov.
+Všetky moduly regresného modelovania sú implementované ako samostatné funkcie s jednotným rozhraním, čo umožňuje ich nezávislé testovanie a využitie. Riadiaca funkcia \texttt{combine\_conditional\_models()} zabezpečuje výber správneho postupu podľa typu vstupných premenných a parametrov. Vizualizácie sú vytvárané pomocou balíka \texttt{ggplot2} a sumarizačné výstupy vo forme prehľadných tabuliek pomocou \texttt{gt}.
+
+Významnou vlastnosťou je aj jednotné spracovanie bodových odhadov pre konkrétnu hodnotu prediktora $x^*$, ktoré sú automaticky počítané pre oba typy modelov (stredná hodnota aj kvantily) a vizuálne vyznačené na grafe.
+
+
+\subsection{Implementácia klasifikačných modelov}\label{subsec:classification_implementation}
+
+Na modelovanie diskrétnej (kategoriálnej) odozvy vzhľadom na jeden alebo dva prediktory bola implementovaná univerzálna funkcia \texttt{classification\_model()}, ktorá pokrýva najpoužívanejšie klasifikačné prístupy. Používateľ si môže zvoliť vhodnú metódu podľa typu údajov a požiadaviek na interpretáciu alebo flexibilitu modelu.
+
+Táto funkcia umožňuje používateľovi jednoducho:
+
+\begin{itemize}
+  \item špecifikovať typ klasifikačnej metódy (logistická regresia, LDA, QDA, KNN),
+  \item modelovať úlohy s jedným prediktorom (dodatočne aj s dvomi),
+  \item automaticky zvoliť optimálny počet susedov pre KNN (ak nie je zadaný),
+  \item vizualizovať rozhodovacie hranice alebo klasifikačné prahy,
+  \item získať sumarizáciu výkonu modelu a odhadnutých parametrov.
+\end{itemize}
+
+\subsubsection{Podporované metódy klasifikácie}
+
+Funkcia \texttt{classification\_model()} podporuje nasledovné typy modelov:
+
+\begin{itemize}
+  \item \textit{Logistická regresia} ("\texttt{logistic}") – vhodná pre binárne aj multinomické klasifikačné úlohy. Binarizácia prebieha automaticky podľa počtu úrovní cieľovej premennej.
+  \item \textit{Lineárna diskriminačná analýza ("\texttt{lda}")} – predpokladá rovnaké kovariančné matice naprieč triedami.
+  \item \textit{Kvadratická diskriminačná analýza ("\texttt{qda}")} – umožňuje odlišné kovariančné štruktúry pre jednotlivé triedy. Triedy s menej ako štyrmi pozorovaniami sú automaticky vyradené.
+  \item \textit{K najbližších susedov ("\texttt{knn}")} – výber optimálneho $k$ v rozsahu $1 \leq k \leq 20$ na základe maximalizácie presnosti.
+\end{itemize}
+
+\subsubsection{Vstupné a výstupné prvky}
+
+Funkcia vyžaduje nasledovné vstupné argumenty:
+
+\begin{itemize}
+  \item \texttt{data} – dátový rámec so vstupnými premennými,
+  \item \texttt{response\_name} – meno cieľovej premennej (diskrétna),
+  \item \texttt{predictor\_names} – meno jedného prediktora (umožňuje však aj dva),
+  \item \texttt{method} – typ modelu (napr. \texttt{"logistic"}, \texttt{"qda"}, ...),
+  \item \texttt{k} – počet susedov pre KNN (voliteľné).
+\end{itemize}
+
+Výstupom funkcie je štruktúrovaný zoznam s nasledujúcimi komponentmi:
+
+\begin{itemize}
+  \item \texttt{model} – fitovaný klasifikačný model,
+  \item \texttt{predictions} – vektor predikovaných tried,
+  \item \texttt{accuracy} – presnosť modelu na trénovacej množine,
+  \item \texttt{confusion\_matrix} – matica zámien (confusion matrix),
+  \item \texttt{summary\_gt} – sumarizačná tabuľka v štýle \texttt{gt} s parametrami modelu,
+  \item \texttt{decision\_plot} – vizualizácia rozhodovacích hraníc (ak počet prediktorov $\leq 2$).
+\end{itemize}
+
+\subsubsection{Vizualizácia}
+
+Výsledky klasifikácie sú doplnené aj o interaktívnu vizualizáciu:
+
+\begin{itemize}
+  \item Pri jednom prediktore sa zobrazuje rozhodovací prah a podmienené pravdepodobnosti (pomocou funkcie \texttt{plot\_classification\_1D\_combined()}).
+  \item Pri dvoch prediktoroch sa vykreslí rozhodovacia hranica v prediktorovom priestore (pomocou funkcie \texttt{plot\_decision\_boundary()}).
+\end{itemize}
+
+\subsubsection{Sumarizačná tabuľka}
+
+Súčasťou každého modelu je prehľadná sumarizačná tabuľka obsahujúca:
+
+\begin{itemize}
+  \item názov použitej metódy,
+  \item celkovú presnosť klasifikácie,
+  \item (ak sú dostupné) parametre $\beta$ so štandardnými chybami,
+  \item pre LDA/QDA: priemery a smerodajné odchýlky podľa tried.
+\end{itemize}
+
+Táto implementácia ponúka užívateľsky jednoduchý, ale výpočtovo robustný nástroj na vizuálne aj kvantitatívne porovnanie rôznych klasifikačných metód v závislosti od typu dát.
+
+
+\section{Odhad združeného rozdelenia}\label{sec:joint_dist_estimation}
+
+V tejto kapitole sa zameriavame na implementáciu nástrojov pre odhad združeného rozdelenia dvoch náhodných premenných. Hlavným cieľom je získať čo najpresnejší model spoločného rozdelenia premenných na základe typu dát — či už ide o diskrétne, spojité alebo zmiešané premenné.
+
+Zatiaľ čo regresné modely z predchádzajúcej kapitoly opisovali podmienené charakteristiky (napr. $\mathbb{E}[Y \mid X]$), v tejto časti budujeme celkový model združeného rozdelenia $f_{X,Y}(x, y)$ alebo $p_{X,Y}(x, y)$, ktorý následne umožňuje vykonávať:
+
+\begin{itemize}
+  \item výpočet marginálnych a podmienených rozdelení,
+  \item odhad hustoty alebo pravdepodobnostnej funkcie,
+  \item generovanie syntetických pozorovaní (napr. sampling),
+  \item výpočty momentov, kvantilov alebo pravdepodobností pre rôzne oblasti rozdelenia.
+\end{itemize}
+
+Podľa typu vstupného vektora $(X, Y)$ implementujeme riešenie troch základných situácií:
+
+\begin{enumerate}
+  \item oba atribúty sú \textit{diskrétne} – modelujeme pravdepodobnostnú funkciu (PMF),
+  \item oba atribúty sú \textit{spojité} – modelujeme združenú hustotu pomocou parametrických, neparametrických alebo kopulových modelov,
+  \item ide o \textit{zmiešaný vektor} – využívame prístup založený na vážených hustotách pre jednotlivé kategórie diskrétneho atribútu.
+\end{enumerate}
+
+Príslušné implementácie sú naprogramované tak, aby používateľ mohol jednoducho prepínať medzi rôznymi prístupmi (napr. jadrové vyhladzovanie, normálne či t-rozdelenie, rôzne typy kopúl) a zároveň mal k dispozícii komplexný výstup vo forme vizualizácií a sumarizačných tabuliek.
+
+Nasledujúce podkapitoly opisujú jednotlivé implementácie podľa typu vstupného vektora.
+
+\subsection{Implementácia pre homogénny vektor}\label{subsec:homo_vector_implementation}
+
+\subsubsection{Diskrétny vektor}
+
+\subsubsection{Spojitý vektor}
+
+\subsection{Implementácia pre zmiešaný vektor}
