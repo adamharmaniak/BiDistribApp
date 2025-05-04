@@ -57,6 +57,16 @@ apply_dark_gt_theme <- function(gt_tbl, highlight_rows = NULL, highlight_color =
   return(gt_tbl)
 }
 
+standardize_gt_table <- function(gt_tbl) {
+  gt_tbl %>%
+    gt::tab_options(
+      table.font.size = px(13),
+      data_row.padding = px(6),
+      table.width = pct(100),
+      heading.title.font.size = px(14)
+    )
+}
+
 identify_variables <- function(data) {
   variable_types <- sapply(data, function(col) {
     if (is.factor(col) || is.character(col) || (is.numeric(col) && length(unique(col)) < 10)) {
@@ -93,8 +103,19 @@ printVariables <- function(data) {
 
 model_mixture_density <- function(data, discrete_vars, continuous_vars, model_type = "kernel", bw = NULL, abort_signal = NULL) {
   
+  all_levels <- sort(unique(data[[discrete_vars]]))
+  data <- data %>% filter(!is.na(.data[[discrete_vars]]), !is.na(.data[[continuous_vars]]))
+  
+  if (is.factor(data[[continuous_vars]]) || is.character(data[[continuous_vars]])) {
+    if (all(grepl("^-?\\d+(\\.\\d+)?$", as.character(data[[continuous_vars]])))) {
+      data[[continuous_vars]] <- as.numeric(as.character(data[[continuous_vars]]))
+    } else {
+      stop("Spojitá premenná obsahuje nečíselné hodnoty. Zmeň alebo uprav dáta.")
+    }
+  }
+  
   # Konverzia diskretnej premennej na faktor
-  data[[discrete_vars]] <- factor(data[[discrete_vars]])
+  data[[discrete_vars]] <- factor(data[[discrete_vars]], levels = all_levels)
   categories <- levels(data[[discrete_vars]])
   
   category_colors <- setNames(RColorBrewer::brewer.pal(length(categories), "Set1"), categories)
@@ -103,6 +124,13 @@ model_mixture_density <- function(data, discrete_vars, continuous_vars, model_ty
   category_probs <- prop.table(table(data[[discrete_vars]]))
   
   bw_used_list <- list()
+  
+  if (is.factor(data[[continuous_vars]]) || is.character(data[[continuous_vars]])) {
+    data[[continuous_vars]] <- as.numeric(as.character(data[[continuous_vars]]))
+  }
+  
+  x_global_vals <- as.numeric(as.character(data[[continuous_vars]]))
+  x_range <- range(x_global_vals, na.rm = TRUE)
   
   # Funkcia na vypocet hustoty podla model_type
   calculate_density <- switch(
@@ -115,10 +143,11 @@ model_mixture_density <- function(data, discrete_vars, continuous_vars, model_ty
         bw_used_list[[category]] <<- bw_use
         kde <- density(sub_data[[continuous_vars]], bw = bw_use)
         kde_fun <- approxfun(kde$x, kde$y, rule = 2)
-        x <- seq(min(data[[continuous_vars]]), max(data[[continuous_vars]]), length.out = 100)
+        #x_range <- range(data[[continuous_vars]], na.rm = TRUE)
+        x <- seq(x_range[1], x_range[2], length.out = 100)
         density <- kde_fun(x)
         weighted_density <- density * category_probs[[category]]
-        tibble::tibble(Continuous_Var = x, Density = weighted_density, Discrete_Var = category)
+        tibble::tibble(Continuous_Var = x, Density = weighted_density, Discrete_Var = as.character(category))
       } else {
         tibble::tibble(Continuous_Var = numeric(0), Density = numeric(0), Discrete_Var = character(0))
       }
@@ -126,53 +155,110 @@ model_mixture_density <- function(data, discrete_vars, continuous_vars, model_ty
     
     "normal" = function(data, category) {
       sub_data <- dplyr::filter(data, .data[[discrete_vars]] == category)
-      if (nrow(sub_data) > 1) {
-        mu <- mean(sub_data[[continuous_vars]])
-        sigma <- sd(sub_data[[continuous_vars]])
-        x <- seq(min(data[[continuous_vars]]), max(data[[continuous_vars]]), length.out = 100)
+      x_vals <- as.numeric(as.character(sub_data[[continuous_vars]]))
+      x_vals <- x_vals[!is.na(x_vals)]
+      
+      if (length(x_vals) > 1 && !is.na(sd(x_vals)) && sd(x_vals) > 0) {
+        x_range <- range(x_global_vals, na.rm = TRUE)
+        mu <- mean(x_vals)
+        sigma <- sd(x_vals)
+        x <- seq(x_range[1], x_range[2], length.out = 100)
         density <- dnorm(x, mean = mu, sd = sigma)
-        weighted_density <- density * category_probs[[category]]
-        tibble::tibble(Continuous_Var = x, Density = weighted_density, Discrete_Var = category)
+        weighted_density <- density * category_probs[[as.character(category)]]
+        message("Category: ", category, ", Length: ", length(x_vals), ", sd: ", sd(x_vals))
+        return(tibble::tibble(
+          Continuous_Var = x,
+          Density = weighted_density,
+          Discrete_Var = as.character(category)
+        ))
       } else {
-        tibble::tibble(Continuous_Var = numeric(0), Density = numeric(0), Discrete_Var = character(0))
+        return(tibble::tibble(
+          Continuous_Var = numeric(0),
+          Density = numeric(0),
+          Discrete_Var = character(0)
+        ))
       }
     },
     
     "t" = function(data, category) {
       sub_data <- dplyr::filter(data, .data[[discrete_vars]] == category)
-      if (nrow(sub_data) > 2) {
-        mu <- mean(sub_data[[continuous_vars]])
-        sigma <- sd(sub_data[[continuous_vars]])
-        df <- nrow(sub_data) - 1
-        x <- seq(min(data[[continuous_vars]]), max(data[[continuous_vars]]), length.out = 100)
+      x_vals <- as.numeric(as.character(sub_data[[continuous_vars]]))
+      x_vals <- x_vals[!is.na(x_vals)]
+      
+      if (length(x_vals) > 2 && !is.na(sd(x_vals)) && sd(x_vals) > 0) {
+        x_range <- range(x_global_vals, na.rm = TRUE)
+        mu <- mean(x_vals)
+        sigma <- sd(x_vals)
+        df <- length(x_vals) - 1
+        x <- seq(x_range[1], x_range[2], length.out = 100)
         density <- dt((x - mu) / sigma, df = df) / sigma
-        weighted_density <- density * category_probs[[category]]
-        tibble::tibble(Continuous_Var = x, Density = weighted_density, Discrete_Var = category)
+        weighted_density <- density * category_probs[[as.character(category)]]
+        tibble::tibble(Continuous_Var = x, Density = weighted_density, Discrete_Var = as.character(category))
+        message("Category: ", category, ", Length: ", length(x_vals), ", sd: ", sd(x_vals))
+        
+        return(tibble::tibble(
+          Continuous_Var = x,
+          Density = weighted_density,
+          Discrete_Var = as.character(category)
+        ))
+        
       } else {
-        tibble::tibble(Continuous_Var = numeric(0), Density = numeric(0), Discrete_Var = character(0))
+        return(tibble::tibble(
+          Continuous_Var = numeric(0),
+          Density = numeric(0),
+          Discrete_Var = character(0)
+        ))
       }
     }
   )
   
+  valid_categories <- categories[sapply(categories, function(cat) {
+    sub_data <- dplyr::filter(data, .data[[discrete_vars]] == cat)
+    x_vals <- as.numeric(as.character(sub_data[[continuous_vars]]))
+    x_vals <- x_vals[!is.na(x_vals)]
+    length(x_vals) > 2 && !is.na(sd(x_vals)) && sd(x_vals) > 0
+  })]
+  
   # Vypocet hustot pre vsetky kategorie
-  density_data <- dplyr::bind_rows(lapply(categories, function(cat) calculate_density(data, cat)))
+  density_data <- dplyr::bind_rows(lapply(valid_categories, function(cat) calculate_density(data, cat)))
+  missing_categories <- setdiff(categories, unique(density_data$Discrete_Var))
+  
+  if (length(missing_categories) > 0) {
+    empty_rows <- dplyr::bind_rows(lapply(missing_categories, function(cat) {
+      tibble::tibble(
+        Continuous_Var = mean(x_global_vals, na.rm = TRUE),
+        Density = 0,
+        Discrete_Var = as.character(cat)
+      )
+    }))
+    density_data <- dplyr::bind_rows(density_data, empty_rows)
+  }
   
   # Vypocet celkoveho integralu pre kontrolu
   total_integral <- sum(sapply(categories, function(cat) {
-    sub_density <- dplyr::filter(density_data, Discrete_Var == cat)
+    sub_density <- density_data[density_data$Discrete_Var == cat, ]
     if (nrow(sub_density) > 1) {
-      dx <- diff(sub_density$Continuous_Var)[1]
-      sum(sub_density$Density) * dx
-    } else {
-      0
+      dx_values <- diff(sub_density$Continuous_Var)
+      dx <- if (length(dx_values) > 0) dx_values[1] else NA
+      if (!is.na(dx)) {
+        return(sum(sub_density$Density) * dx)
+      }
     }
+    return(0)
   }))
   
   # Vystup
-  bw_detail <- if (is.null(bw)) {
-    paste(paste0(names(bw_used_list), ": ", round(unlist(bw_used_list), 4)), collapse = "; ")
-  } else {
+  bw_detail <- if (model_type == "kernel" && is.null(bw)) {
+    bw_vals <- unlist(bw_used_list)
+    if (length(bw_vals) > 0) {
+      paste(paste0(names(bw_vals), ": ", round(bw_vals, 4)), collapse = "; ")
+    } else {
+      "Nepodarilo sa vypočítať rozsahy vyhladzovania."
+    }
+  } else if (model_type == "kernel" && !is.null(bw)) {
     as.character(bw)
+  } else {
+    "Nepoužité"
   }
   
   return(list(
@@ -435,6 +521,7 @@ render_continuous_density <- function(model_output, data, plot_type = "2D") {
         title = paste("Scatter plot s vrstevnicami", ifelse(model_output$model_type == "kernel", "(jadrové vyhladzovanie)", ifelse(model_output$model_type == "normal", "(bivariátne normálne)", "(bivariátne t-rozdelenie)")))
       ) +
       scale_color_gradient(low = "blue", high = "red") +
+      guides(color = "none") +
       theme_minimal()
     
     if (model_output$model_type == "t") {
@@ -483,7 +570,8 @@ render_continuous_density <- function(model_output, data, plot_type = "2D") {
       title = gt::md("**Model Summary**")
     ) %>%
     gt::opt_row_striping() %>%
-    gt::opt_table_font(font = "Arial")
+    gt::opt_table_font(font = "Arial") %>%
+    standardize_gt_table()
   
   summary_table <- apply_dark_gt_theme(
     gt_tbl = summary_table,
@@ -867,7 +955,8 @@ render_continuous_density_copula <- function(model_output, data, model_type = "n
       ) %>%
       gt::cols_width(Name ~ px(260), Value ~ px(460)) %>%
       gt::opt_row_striping() %>%
-      gt::opt_table_font(font = "Arial")
+      gt::opt_table_font(font = "Arial") %>%
+      standardize_gt_table()
     
     summary_table <- apply_dark_gt_theme(
       gt_tbl = summary_table,
@@ -976,7 +1065,8 @@ render_continuous_density_copula <- function(model_output, data, model_type = "n
       ) %>%
       gt::cols_width(Name ~ px(260), Value ~ px(460)) %>%
       gt::opt_row_striping() %>%
-      gt::opt_table_font(font = "Arial")
+      gt::opt_table_font(font = "Arial") %>%
+      standardize_gt_table()
     
     summary_table <- apply_dark_gt_theme(
       gt_tbl = summary_table,
@@ -1108,7 +1198,8 @@ render_continuous_density_copula <- function(model_output, data, model_type = "n
       gt::cols_width(Component ~ px(200), Type ~ px(200), Parameters ~ px(420)) %>%
       gt::fmt_markdown(columns = "Parameters") %>%
       gt::opt_row_striping() %>%
-      gt::opt_table_font(font = "Arial")
+      gt::opt_table_font(font = "Arial") %>%
+      standardize_gt_table()
     
     summary_table <- apply_dark_gt_theme(
       gt_tbl = summary_table,
@@ -1179,7 +1270,8 @@ model_joint_pmf <- function(data, discrete_vars, abort_signal = NULL) {
     gt::cols_width(Name ~ px(200), Value ~ px(500)) %>%
     gt::fmt_markdown(columns = "Value") %>%
     gt::opt_row_striping() %>%
-    gt::opt_table_font(font = "Arial")
+    gt::opt_table_font(font = "Arial") %>%
+    standardize_gt_table()
   
   summary_table_gt <- apply_dark_gt_theme(
     gt_tbl = base_table,
@@ -1218,6 +1310,7 @@ render_joint_pmf <- function(model_output, plot_type = "2D") {
       geom_tile(color = "white") +
       scale_fill_gradient(low = "blue", high = "red") +
       labs(x = discrete_vars[1], y = discrete_vars[2], fill = "Pravdepodobnosť") +
+      guides(fill = "none") +
       theme_minimal()
     
     marginal_x_plot <- ggplot(marginal_x, aes_string(x = discrete_vars[1], y = "Prob_X")) +
@@ -1453,7 +1546,8 @@ model_conditional_mean <- function(data, selected_variables, mean_method = "line
       ) %>%
       gt::cols_width(Name ~ px(240), Value ~ px(460)) %>%
       gt::opt_row_striping() %>%
-      gt::opt_table_font(font = "Arial")
+      gt::opt_table_font(font = "Arial") %>%
+      standardize_gt_table()
   )
   
   # Vizualizacia
@@ -1555,7 +1649,8 @@ model_conditional_quantiles <- function(data, selected_variables, quantile_metho
           ) %>%
           gt::cols_width(Name ~ gt::px(240), Value ~ gt::px(460)) %>%
           gt::opt_row_striping() %>%
-          gt::opt_table_font(font = "Arial")
+          gt::opt_table_font(font = "Arial") %>%
+          standardize_gt_table()
       )
     )
   }
@@ -1657,7 +1752,8 @@ model_discrete_predictor <- function(data, selected_variables, discrete_model_ty
       ) %>%
       gt::cols_width(Name ~ gt::px(240), Value ~ gt::px(460)) %>%
       gt::opt_row_striping() %>%
-      gt::opt_table_font(font = "Arial")
+      gt::opt_table_font(font = "Arial") %>%
+      standardize_gt_table()
   )
   
   # Boxplot
@@ -2286,7 +2382,8 @@ classification_model <- function(data, response_name, predictor_names, method = 
       ) %>%
       gt::cols_width(Name ~ gt::px(260), Value ~ gt::px(460)) %>%
       gt::opt_row_striping() %>%
-      gt::opt_table_font(font = "Arial")
+      gt::opt_table_font(font = "Arial") %>%
+      standardize_gt_table()
   )
   
   # Vystup
@@ -2438,7 +2535,7 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
             if (max(f_scaled) > 0) {
               f_scaled <- f_scaled / max(f_scaled) * density_scaling
               density_data[[length(density_data) + 1]] <- data.frame(
-                x = xi_numeric + f_scaled,
+                x = xi_numeric - f_scaled,
                 y = y_seq,
                 section = level_label,
                 type = "KDE"
@@ -2460,7 +2557,7 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
             if (max(f_scaled) > 0) {
               f_scaled <- f_scaled / max(f_scaled) * density_scaling
               density_data[[length(density_data) + 1]] <- data.frame(
-                x = xi_numeric + f_scaled,
+                x = xi_numeric - f_scaled,
                 y = y_seq,
                 section = level_label,
                 type = "normal"
@@ -2527,7 +2624,7 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
           scale_factor <- if (max_n_local > 0) sqrt(n_local / max_n_local) else 1
           f_scaled <- f_scaled / max(f_scaled) * density_scaling * scale_factor
           density_data[[length(density_data) + 1]] <- data.frame(
-            x = xi + f_scaled, y = y_seq,
+            x = xi - f_scaled, y = y_seq,
             section = section_label, type = "KDE"
           )
         }
@@ -2544,7 +2641,7 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
         f_scaled <- f_cond * fade_factor
         f_scaled <- f_scaled / max(f_scaled) * density_scaling
         density_data[[length(density_data) + 1]] <- data.frame(
-          x = xi + f_scaled, y = y_seq,
+          x = xi - f_scaled, y = y_seq,
           section = section_label, type = "normal"
         )
       }
@@ -2641,7 +2738,8 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
       ) %>%
       gt::cols_width(everything() ~ gt::px(130)) %>%
       gt::opt_row_striping() %>%
-      gt::opt_table_font(font = "Arial")
+      gt::opt_table_font(font = "Arial") %>%
+      standardize_gt_table()
   )
   
   return(list(
@@ -2721,7 +2819,7 @@ plot_conditional_discrete_densities <- function(df, n_breaks, density_scaling, o
     labs(
       title = paste("Podmienené pravdepodobnostné funkcie pre", response_name, "podľa", predictor_name),
       x = paste(predictor_name, "(Prediktor)"),
-      y = paste(response_name, "(Diskrétna odozva)")
+      y = paste(response_name, "(Odozva)")
     ) +
     geom_vline(xintercept = breaks, linetype = "dashed", color = "grey50") +
     scale_y_continuous(
@@ -2798,7 +2896,8 @@ plot_conditional_discrete_densities <- function(df, n_breaks, density_scaling, o
         ) %>%
         gt::cols_label(.list = setNames(paste0("Y = ", colnames(probability_summary)[-1]), colnames(probability_summary)[-1])) %>%
         gt::cols_width(everything() ~ gt::px(140)) %>%
-        gt::opt_table_font(font = "Arial")
+        gt::opt_table_font(font = "Arial") %>%
+        standardize_gt_table()
     )
   }
   

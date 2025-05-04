@@ -742,7 +742,7 @@ server <- function(input, output, session) {
             summary_ui <- list(
               h4("Summary Table"),
               div(
-                style = "max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 5px;",
+                style = "max-height: 300px; min-height: 150px; overflow-y: auto; min-width: 300px; border: 1px solid #ccc; padding: 5px;",
                 gt_output("summary_table")
               )
             )
