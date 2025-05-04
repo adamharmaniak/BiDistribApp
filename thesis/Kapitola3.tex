@@ -51,7 +51,7 @@ Táto pravdepodobnosť je daná explicitne pre jednotlivé kombinácie hodnôt, 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.7\linewidth]{SK_verzia_praca/figures/pravdeb_funk_ostrov_druhy_3D.png}
-    \caption{Pravdepodobnosti premenných \textit{Ostrov ako miesto výskytu} a \textit{Druh} tučniakov.}
+    \caption{Združená pravdepodobnostná funkcia premenných \textit{Ostrov ako miesto výskytu} a \textit{Druh} tučniakov.}
     \label{fig:miesto_druh_joint_density}
 \end{figure}
 
@@ -103,6 +103,12 @@ pričom vo vzťahu k združenej hustote dvoch spojitých premenných platia nasl
 F(x_1, x_2) = \int_{-\infty}^{x_1} \int_{-\infty}^{x_2} f(y_1, y_2) \, dy_1 dy_2
 \end{equation}
 
+a pre diskrétne premenné platí:
+
+\begin{equation}
+    F(x_1,x_2) = \sum_{y_1\leq x_1}\sum_{y_2\leq x_2} p(y_1,y_2)
+\end{equation}
+
 \subsection{Momentové charakteristiky}\label{joint_moments}
 
 Rovnako ako v jednorozmernom prípade, aj v prípade viacrozmerných náhodných veličín (náhodného vektora) sú základnými charakteristikami rozdelenia \textit{stredná hodnota} a \textit{rozptyl}, pričom tentokrát si zavedieme aj pojmy \textit{kovariancie} a \textit{korelačného koeficientu}.
@@ -130,10 +136,10 @@ alebo pomocou združenej hustoty:
 V prípade, že \(X_1\) je diskrétna náhodná premenná nad množinou hodnôt \(\{x_1^{(i)}\}_{i=1}^{n}\), definujeme jej strednú hodnotu ako:
 
 \begin{equation}
-\mathbb{E}[X_1] = \sum_{i=1}^{n} x_1^{(i)} \cdot \Pr(X_1 = x_1^{(i)}),
+\mathbb{E}[X_1] = \sum_{i=1}^{n} x_1^{(i)} \cdot p_1(x_1^{i}),
 \end{equation}
 
-kde \(\Pr(X_1 = x_1^{(i)})\) je pravdepodobnostná funkcia diskrétnej premennej \(X_1\).
+kde $p_1(x) = Pr(X_1=x)$ je pravdepodobnostná funkcia diskrétnej premennej \(X_1\).
 
 \subsubsection{Rozptyl}\label{subsubsec:joint_variance}
 
@@ -427,7 +433,7 @@ Každá dvojrozmerná kopula $C: [0,1]^2 \to [0,1]$ musí spĺňať
 \subsubsection{Špeciálne prípady}
 
 \begin{itemize}
-  \item \textit{Kopula nezávislosti} (produktová):
+  \item \textit{Kopula nezávislosti} (súčinová):
   \begin{equation}
   \Pi(u_1, u_2) = u_1 u_2.
   \end{equation}
@@ -448,18 +454,20 @@ W(u_1, u_2) \leq C(u_1, u_2) \leq M(u_1, u_2).
 
 \subsubsection{Využitie modelu závislosti}
 
-Kopula predstavuje štruktúru závislosti v združenom modeli. Tak ako každá distribučná funkcia, kopula umožňuje napríklad výpočet:
+Kopula predstavuje štruktúru závislosti v združenom modeli. Tak ako každá distribučná funkcia, kopula umožňuje napríklad výpočet
 
 \begin{itemize}
-  \item Spoločnej pravdepodobnosti: $\Pr(U_1 \leq u_1,\, U_2 \leq u_2) = C(u_1, u_2)$,
-  \item Pravdepodobnosti prekročenia: $\Pr(U_1 > u_1 \vee U_2 > u_2) = 1 - C(u_1, u_2)$,
-  \item Podmienených pravdepodobností:
+  \item spoločnej pravdepodobnosti: $\Pr(U_1 \leq u_1,\, U_2 \leq u_2) = C(u_1, u_2)$,
+  \item pravdepodobnosti prekročenia: $\Pr(U_1 > u_1 \vee U_2 > u_2) = 1 - C(u_1, u_2)$,
+  \item podmienenej pravdepodobnosti:
   \[
   \Pr(U_1 \leq u_1 \mid U_2 = u_2) = \frac{\partial C(u_1, u_2)}{\partial u_2}.
   \]
 \end{itemize}
 
 \subsubsection{Parametrické triedy}\label{subsubsec:parametric_copula}
+
+Najčastejšie používané parametrické triedy dvojrozmerných kopúl sú založené na rôznych typoch štruktúr závislosti a matematických konštrukciách. Patria sem najmä kopuly odvodené z eliptických rozdelení, archimedovské kopuly a kopuly extrémnych hodnôt. V nasledujúcom texte stručne predstavíme ich základné vlastnosti a definičné vzorce:
 
 \begin{itemize}
   \item \textit{Eliptické kopuly} – napr. Gaussova, t-kopula: modelujú lineárnu závislosť a sú konštruované cez štandardizáciu marginálií eliptických rozdelení:
@@ -487,7 +495,7 @@ Pre porovnanie jednotlivých typov kopúl sme si spravili simulácie náhodných
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.95\linewidth]{parametric_copulas.png}
-    \caption{Tvar parametrických kopúl pri pevne nastavenej Kendallovej tau $\tau = 0{,}5$.}
+    \caption{Tvar parametrických kopúl pri pevne nastavenom Kendallovom tau $\tau = 0{,}5$.}
     \label{fig:parametric_copulas}
 \end{figure}
 
@@ -547,10 +555,20 @@ Odhad parametrov $\theta$ pre daný model možno vykonať viacerými spôsobmi, 
   \end{equation}
   pričom získané odhady sú konzistentné, efektívne a asymptoticky normálne rozdelené.
 
-  \item \textit{Metóda najmenších štvorcov} – táto metóda vychádza z minimalizácie vzdialenosti medzi teoretickou distribučnou funkciou modelu a jej empirickým odhadom. Napríklad vo forme:
-  \begin{equation}
-  \hat{\theta} = \arg\min_{\theta \in \Theta} \sum_{i=1}^{n} \left( F(X_{i1}, X_{i2} \mid \theta) - \hat{F}_n(X_{i1}, X_{i2}) \right)^2
-  \end{equation}
+  \item \textit{Metóda najmenších štvorcov} – táto metóda vychádza z minimalizácie vzdialenosti medzi teoretickou distribučnou funkciou modelu \(F(x_1, x_2 \mid \theta)\) a jej empirickým odhadom \(\hat{F}_n(x_1, x_2)\). Odhad parametrov \(\hat{\theta}\) sa získava ako riešenie optimalizačnej úlohy:
+
+\begin{equation}
+\hat{\theta} = \arg\min_{\theta \in \Theta} \sum_{i=1}^{n} \left( F(X_{i1}, X_{i2} \mid \theta) - \hat{F}_n(X_{i1}, X_{i2}) \right)^2
+\end{equation}
+
+kde \(\hat{F}_n(x_1, x_2)\) predstavuje tzv. \textit{empirickú združenú distribučnú funkciu}, definovanú ako:
+
+\begin{equation}
+\hat{F}_n(x_1, x_2) = \frac{1}{n} \sum_{i=1}^{n} \mathbb{I}(X_{i1} \leq x_1, X_{i2} \leq x_2),
+\end{equation}
+
+pričom \(\mathbb{I}(\cdot)\) je indikačná funkcia. Táto funkcia udáva relatívny podiel pozorovaní, ktoré zároveň spĺňajú podmienky \(X_{i1} \leq x_1\) a \(X_{i2} \leq x_2\), a teda slúži ako neparametrický odhad skutočnej distribučnej funkcie rozdelenia.
+  
 \end{itemize}
 
 \subsection{Neparametrické modely}\label{subsec:joint_nonparam_models}
@@ -572,7 +590,7 @@ Rovnako ako v jednorozmernom prípade, \textit{neparametrické prístupy} nevyž
   \begin{equation}
     \hat{C}_n^{\beta}(u, v) = \frac{1}{n} \sum_{i=1}^n B(u; r_i, n - r_i + 1) \cdot B(v; s_i, n - s_i + 1)
   \end{equation}
-  kde $r_i$ a $s_i$ sú poradia $U_i$ a $V_i$ vo vzorke a $B(\cdot; a,b)$ je kumulatívna distribučná funkcia beta s parametrami a,b.
+  kde $r_i$ a $s_i$ sú poradia $U_i$ a $V_i$ vo vzorke a $B(\cdot; a,b)$ je kumulatívna distribučná funkcia beta rozdelenia s parametrami a,b.
   
 \end{itemize}
 
@@ -593,7 +611,7 @@ Rovnako ako v jednorozmernom prípade, \textit{neparametrické prístupy} nevyž
 
 \section{Modelovanie rozdelenia zmiešaného náhodného vektora}\label{sec:joint_mixture_modeling}
 
-V mnohých praktických aplikáciách sa stretávame so situáciami, kde niektoré komponenty náhodného vektora sú diskrétne, zatiaľ čo iné sú spojité. Takéto náhodné vektory označujeme ako \textit{zmiešané} (angl. \textit{mixed-type random vectors}). Typickým príkladom sú meteorologické, poisťovacie alebo simulačné modely, kde napr. výskyt udalosti je diskrétny, ale jej rozsah je spojitý. 
+V mnohých praktických aplikáciách sa stretávame so situáciami, kde niektoré komponenty náhodného vektora sú diskrétne, zatiaľ čo iné sú spojité. Takéto náhodné vektory označujeme ako \textit{zmiešané} (angl. \textit{mixed-type random vectors}). Typickým príkladom sú meteorologické, poisťovacie alebo simulačné modely. 
 
 Modelovanie týchto štruktúr je komplikované najmä preto, že štandardné pravdepodobnostné modely predpokladajú homogénny typ premenných (všetky spojité alebo všetky diskrétne).
 
@@ -602,20 +620,14 @@ Modelovanie týchto štruktúr je komplikované najmä preto, že štandardné p
 Podľa práce ~\textcite{pleisMixtureDissertation} môžeme pri tvorbe združeného rozdelenia zmiešaných premenných uvažovať tri základné prístupy:
 
 \subsubsection{Rozklad na podmienené a marginálne rozdelenia}
+
 Ak máme diskrétnu premennú $D$ a spojitú premennú $C$, môžeme využiť základný princíp:
 
 \begin{equation}
-f_{D,C}(d, c) = \Pr(D = d) \cdot f_{C \mid D}(c \mid d).
+f_{D,C}(d, c) = \Pr(D = d) \cdot f_{C \mid D}(c \mid d),
 \end{equation}
 
-alebo alternatívne:
-
-\begin{equation}
-f_{D,C}(d, c) = f_C(c) \cdot \Pr(D = d \mid C=c).
-\end{equation}
-
-Tento prístup možno nazývať ako stratifikované modelovanie, kde každá kategória diskrétnej premennej má svoje vlastné rozdelenie spojitej zložky.
-
+Tento prístup možno nazývať ako \textit{stratifikované modelovanie}, kde každá kategória diskrétnej premennej má svoje vlastné rozdelenie spojitej zložky. Práve tejto stratégii – konkrétne v podobe tzv. \textit{general location modelu} – sa budeme v nasledujúcich častiach venovať podrobnejšie. Ukážeme si, ako je možné pomocou vhodne zvolených podmienených hustôt zostaviť združené rozdelenie, vykonávať marginalizáciu, podmieňovanie a odhadovať momenty a kvantily.
 
 \subsubsection{Modelovanie pomocou kopúl}\label{copula_joint_density}
 
@@ -649,7 +661,7 @@ f_{D,C}(d, c) = \Pr(D = d) \cdot f_{C \mid D}(c \mid d).
 Z toho následne vyplýva \textit{marginálna hustota spojitej premennej} ako vážený súčet:
 
 \begin{equation}
-f_C(c) = \sum_{d=1}^{K} \Pr(D = d) \cdot f_{C \mid D}(c \mid d),
+f_C(c) = \sum_{j=k}^{K} \Pr(D = d_k) \cdot f_{C \mid D}(c \mid d_k),
 \end{equation}
 
 pričom váhy $\Pr(D = d)$ zodpovedajú výskytom jednotlivých kategórií v dátach a $f_{C \mid D}(c \mid d)$ predstavuje podmienenú hustotu spojitej premennej v rámci danej kategórie.
@@ -675,7 +687,7 @@ Tento model možno implementovať nasledovne:
 Táto stratégia zodpovedá konštrukcii konečnej zmesi:
 
 \begin{equation}
-f_C(c) = \sum_{d=1}^{K} \pi_d \cdot f_{C|D=d}(c), \quad \text{kde } \sum_{d=1}^{K} \pi_d = 1.
+f_C(c) = \sum_{k=1}^{K} \pi_{d_k} \cdot f_{C|D=d_k}(c), \quad \text{kde } \sum_{k=1}^{K} \pi_{d_k} = 1.
 \end{equation}
 
 Tento prístup má niekoľko výhod oproti metódam, ktoré sa snažia modelovať združené rozdelenie zmiešaných premenných priamo, napríklad pomocou spojitých kopúl alebo binarizáciou kategoriálnej premennej:
@@ -685,7 +697,7 @@ Tento prístup má niekoľko výhod oproti metódam, ktoré sa snažia modelova�
   \item Model má prirodzenú generatívnu interpretáciu: najskôr sa podľa pravdepodobnosti $\Pr(D = d)$ vyberie konkrétna hodnota diskrétnej premennej $D$, a následne sa hodnota spojitej premennej $C$ modeluje podmieneným rozdelením $f_{C \mid D}(c \mid d)$. 
 \end{itemize}
 
-Na druhej strane, použitie tejto stratégie predpokladá, že pre každú kategóriu $D = d$ je možné spoľahlivo odhadnúť parametre rozdelenia spojitej premennej. V prípade veľmi malých kategórií môže byť však tento odhad nestabilný.
+Na druhej strane, použitie tejto stratégie predpokladá, že pre každú kategóriu $D = d$ je možné spoľahlivo odhadnúť parametre rozdelenia spojitej premennej. V prípade kategórií s nízkym výskytom môže byť však tento odhad nestabilný.
 
 \bigskip
 
@@ -722,7 +734,7 @@ f_{C \mid D}(c \mid d) = \frac{f_{D,C}(d, c)}{\Pr(D = d)},
     \label{fig:cond_dens_mix_contresp}
 \end{figure}
 
-Podmienenú pravdepodobnostnú funkciu kategórie vzhľadom na spojitú hodnotu počítame nasledovne:
+Podmienenú pravdepodobnostnú funkciu kategórie vzhľadom na spojitú hodnotu vypočítame z Bayesovho vzťahu:
 
 \begin{equation}
 \Pr(D = d \mid C = c) = \frac{\Pr(D = d) \cdot f_{C \mid D}(c \mid d)}{f_C(c)}.
