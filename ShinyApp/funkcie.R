@@ -2602,11 +2602,6 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
       subset_y <- y[abs(x - xi) <= epsilon]
       n_local <- length(subset_y)
       
-      if (n_local <= 3) {
-        warning(paste("Preskakujem bod xi =", round(xi, 2), "- má len", n_local, "bodov v okolí"))
-        next
-      }
-      
       section_label <- as.factor(round(xi, 2))
       fade_density <- density(rep(0, 100), bw = 0.3, n = length(y_seq), from = -1, to = 1)
       fade_factor <- fade_density$y / max(fade_density$y)
@@ -2639,7 +2634,9 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
         f_cond <- fxy_norm / fx_norm
         f_cond[is.na(f_cond)] <- 0
         f_scaled <- f_cond * fade_factor
-        f_scaled <- f_scaled / max(f_scaled) * density_scaling
+        scale_factor <- if (max_n_local > 0) sqrt(n_local / max_n_local) else 1
+        if (n_local < 5) scale_factor <- scale_factor^2
+        f_scaled <- f_scaled / max(f_scaled) * density_scaling * scale_factor
         density_data[[length(density_data) + 1]] <- data.frame(
           x = xi - f_scaled, y = y_seq,
           section = section_label, type = "normal"
@@ -2748,153 +2745,183 @@ plot_conditional_continuous_densities <- function(df, n_breaks, density_scaling,
   ))
 }
 
-plot_conditional_discrete_densities <- function(df, n_breaks, density_scaling, ordinal) {
-  
-  summary_gt <- NULL
-  
+plot_conditional_discrete_densities <- function(df, n_breaks = 4, density_scaling = 1, ordinal = FALSE) {
   response_name <- attr(df, "response_var")
   predictor_name <- attr(df, "predictor_var")
-  
-  var_types <- identify_variables(df)
-  predictor_is_discrete <- "predictor" %in% var_types$Diskretne
   
   df$response_cat <- df$response
   response_levels <- levels(factor(df$response_cat))
   df$response <- as.numeric(factor(df$response_cat, levels = response_levels))
   
-  breaks <- NULL
+  var_types <- identify_variables(df)
+  predictor_is_discrete <- "predictor" %in% var_types$Diskretne
+  
+  density_data <- list()
   
   if (predictor_is_discrete) {
-    df$predictor_cat <- df$predictor
-    df$predictor <- as.numeric(factor(df$predictor_cat))
-    unique_pred_vals <- sort(unique(df$predictor))
-    df$section <- factor(df$predictor, levels = unique_pred_vals)
+    # Diskretny prediktor
+    df$predictor_cat <- factor(df$predictor)
+    predictor_levels <- levels(df$predictor_cat)
+    predictor_numeric <- as.numeric(df$predictor_cat)
+    
+    for (i in seq_along(predictor_levels)) {
+      level_label <- predictor_levels[i]
+      x_val <- i
+      sub_df <- df[df$predictor_cat == level_label, ]
+      if (nrow(sub_df) < 1) next
+      
+      prob_table <- prop.table(table(sub_df$response))
+      for (d in names(prob_table)) {
+        d_val <- as.numeric(d)
+        prob <- as.numeric(prob_table[[d]])
+        
+        density_data[[length(density_data) + 1]] <- data.frame(
+          x_center = x_val,
+          x_center_numeric = x_val,
+          section = level_label,
+          d = d_val,
+          Category = response_levels[d_val],
+          prob = prob,
+          y = d_val
+        )
+      }
+    }
+    
   } else {
+    # Spojity prediktor
     breaks <- seq(min(df$predictor, na.rm = TRUE),
                   max(df$predictor, na.rm = TRUE),
                   length.out = n_breaks + 1)
-    df$section <- cut(df$predictor, breaks = breaks, include.lowest = TRUE)
-  }
-  
-  # Vypocet pravdepodobnostnych funkcii v jednotlivych sekciach
-  density_data <- do.call(rbind, lapply(split(df, df$section), function(sub_df) {
+    centers <- (head(breaks, -1) + tail(breaks, -1)) / 2
+    center_labels <- paste0("(", round(head(breaks, -1), 1), ", ", round(tail(breaks, -1), 1), "]")
     
-    if (nrow(sub_df) < 3) return(NULL)
+    prior_probs <- prop.table(table(df$response))
+    f_C <- density(df$predictor)
+    f_C_fun <- approxfun(f_C$x, f_C$y, rule = 2)
     
-    # Pravdepodobnosti kategorii odozvy v ramci tejto sekcie
-    prob_table <- prop.table(table(sub_df$response))
-    response_labels <- response_levels[as.integer(names(prob_table))] 
-    
-    # Y su hodnoty odozvy, X su dlzky ciar podla pravdepodobnosti
-    y_vals <- as.numeric(levels(factor(names(prob_table))))
-    #y_vals <- as.integer(names(prob_table))
-    
-    section_range <- range(sub_df$predictor, na.rm = TRUE)
-    x_center <- mean(section_range)
-    
-    x_start <- x_center
-    x_end <- x_start + (as.numeric(prob_table) * density_scaling)
-    
-    # Vysledny dataframe pre geom_segment + body
-    df_segment <- data.frame(
-      y = y_vals + runif(length(y_vals), -0.20, 0.20),
-      Category = response_labels,
-      x_start = x_center,
-      x_end = x_start + (as.numeric(prob_table) * density_scaling),
-      prob = as.numeric(prob_table),
-      section = unique(sub_df$section)
-    )
-    
-    return(df_segment)
-  }))
-  
-  if (is.null(density_data)) {
-    warning("Nebolo mozne vypocitat ziadne pravdepodobnosti!")
-  }
-  
-  # Vykreslenie grafu
-  p <- ggplot(df, aes(x = predictor, y = as.numeric(response))) +
-    geom_jitter(width = 0.1, height = 0.1, alpha = 0.5, color = "orange") +
-    theme_bw() +
-    labs(
-      title = paste("Podmienené pravdepodobnostné funkcie pre", response_name, "podľa", predictor_name),
-      x = paste(predictor_name, "(Prediktor)"),
-      y = paste(response_name, "(Odozva)")
-    ) +
-    geom_vline(xintercept = breaks, linetype = "dashed", color = "grey50") +
-    scale_y_continuous(
-      breaks = seq_along(response_levels),
-      labels = response_levels
-    )
-  
-  if (predictor_is_discrete) {
-    p <- p + scale_x_continuous(
-      breaks = unique(df$predictor),
-      labels = levels(factor(df$predictor_cat))
-    )
-  } else {
-    p <- p + geom_vline(xintercept = breaks, linetype = "dashed", color = "grey50")
-  }
-  
-  # Podmienene pravdepodobnostne funkcie
-  if (!is.null(density_data) && nrow(density_data) > 0) {
-    
-    # Segmenty (vodorovne ciary)
-    p <- p + geom_segment(
-      data = density_data,
-      aes(x = x_start, xend = x_end, y = y, yend = y),
-      color = "blue",
-      size = 1
-    )
-    
-    # Body (konce pravdepodobnostnych funkcii)
-    p <- p + geom_point(
-      data = density_data,
-      aes(x = x_end, y = y),
-      shape = 15,
-      color = "red",
-      size = 1.5
-    )
-    
-    # Ak je premenna ordinalna, spojime body ciarou
-    if (ordinal) {
-      sections <- unique(density_data$section)
+    for (d in names(prior_probs)) {
+      d_val <- as.numeric(d)
+      sub_df <- df[df$response == d_val, ]
+      if (nrow(sub_df) < 2) next
       
-      for (s in sections) {
+      f_c_given_d <- density(sub_df$predictor)
+      f_c_given_d_fun <- approxfun(f_c_given_d$x, f_c_given_d$y, rule = 2)
+      
+      for (j in seq_along(centers)) {
+        c <- centers[j]
+        section_label <- center_labels[j]
+        numerator <- prior_probs[d] * f_c_given_d_fun(c)
+        denominator <- f_C_fun(c)
+        cond_prob <- ifelse(denominator > 0, numerator / denominator, 0)
+        jitter_y <- d_val + runif(1, -0.1, 0.1)
         
-        sub_density <- density_data %>%
-          dplyr::filter(section == s) %>%
-          dplyr::arrange(y)
-        
-        
-        if (nrow(sub_density) >= 2) {
-          p <- p + geom_path(
-            data = sub_density,
-            aes(x = x_end, y = y),
-            color = "darkorchid",
-            linewidth = 1
-          )
-        }
+        density_data[[length(density_data) + 1]] <- data.frame(
+          x_center = c,
+          x_center_numeric = c,
+          section = section_label,
+          d = d_val,
+          Category = response_levels[d_val],
+          prob = cond_prob,
+          y = jitter_y
+        )
       }
     }
   }
   
-  if (!is.null(density_data) && nrow(density_data) > 0) {
-    probability_summary <- density_data %>%
+  density_df <- dplyr::bind_rows(density_data)
+  density_df$d <- factor(density_df$d, labels = response_levels)
+  density_df$x_end <- density_df$x_center + density_scaling * density_df$prob
+  
+  if (predictor_is_discrete) {
+    df$predictor_cat <- factor(df$predictor)
+    df$predictor_numeric <- as.numeric(df$predictor_cat)
+    x_vals <- df$predictor_numeric
+    x_labels <- levels(df$predictor_cat)
+  } else {
+    df$predictor_numeric <- df$predictor
+    x_vals <- df$predictor
+    x_labels <- waiver()
+  }
+  
+  # Vizualizácia
+  p <- ggplot(df, aes(x = predictor_numeric, y = as.numeric(response))) +
+    geom_jitter(width = 0.1, height = 0.1, alpha = 0.5, color = "orange") +
+    theme_bw() +
+    labs(title = paste("Podmienené pravdepodobnosti pre", response_name, "podľa", predictor_name),
+         x = paste(predictor_name, "(Prediktor)"),
+         y = paste(response_name, "(Odozva)")) +
+    scale_y_continuous(breaks = seq_along(response_levels), labels = response_levels)
+  
+  p <- p + scale_x_continuous(
+    breaks = if (predictor_is_discrete) seq_along(x_labels) else waiver(),
+    labels = if (predictor_is_discrete) x_labels else waiver()
+  )
+  
+  if (!predictor_is_discrete) {
+    p <- p + geom_vline(xintercept = centers, linetype = "dashed", color = "grey50")
+  }
+  
+  # Vizualizácia pravdepodobností
+  if (ordinal) {
+    p <- p + geom_segment(
+      data = density_df,
+      aes(x = x_center_numeric, xend = x_end, y = y, yend = y, color = d),
+      size = 1
+    ) +
+      geom_point(
+        data = density_df,
+        aes(x = x_end, y = y, color = d),
+        shape = 15, size = 2
+      )
+    
+    sections <- unique(density_df$section)
+    
+    for (s in sections) {
+      sub_density <- density_df %>%
+        dplyr::filter(section == s) %>%
+        dplyr::arrange(y)
+      
+      if (nrow(sub_density) >= 2) {
+        p <- p + geom_path(
+          data = sub_density,
+          aes(x = x_end, y = y),
+          color = "darkorchid",
+          linewidth = 1
+        )
+      }
+    }
+  } else {
+    p <- p + geom_segment(
+      data = density_df,
+      aes(x = x_center_numeric, xend = x_end, y = y, yend = y, color = d),
+      size = 1
+    ) +
+      geom_point(
+        data = density_df,
+        aes(x = x_end, y = y, color = d),
+        shape = 15, size = 2
+      )
+  }
+  
+  # Sumarizačná tabuľka
+  summary_gt <- NULL
+  if (!is.null(density_df) && nrow(density_df) > 0) {
+    probability_summary <- density_df %>%
       dplyr::mutate(
         Section = as.character(section),
         Probability = round(prob, 4)
       ) %>%
       dplyr::select(Section, Category, Probability) %>%
       tidyr::pivot_wider(names_from = Category, values_from = Probability, values_fill = 0)
-  
+    
     summary_gt <- apply_dark_gt_theme(
       gt::gt(probability_summary) %>%
         gt::tab_header(
           title = gt::md("**Estimated Conditional Probabilities**"),
           subtitle = "Across predictor sections"
         ) %>%
-        gt::cols_label(.list = setNames(paste0("Y = ", colnames(probability_summary)[-1]), colnames(probability_summary)[-1])) %>%
+        gt::cols_label(.list = setNames(paste0("Y = ", colnames(probability_summary)[-1]),
+                                        colnames(probability_summary)[-1])) %>%
         gt::cols_width(everything() ~ gt::px(140)) %>%
         gt::opt_table_font(font = "Arial") %>%
         standardize_gt_table()
@@ -2903,7 +2930,7 @@ plot_conditional_discrete_densities <- function(df, n_breaks, density_scaling, o
   
   return(list(
     plot = p,
-    probability_table = density_data,
+    probability_table = density_df,
     summary_gt = summary_gt
   ))
 }
