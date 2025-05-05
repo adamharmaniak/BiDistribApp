@@ -11,6 +11,8 @@ V tejto časti prezentujeme implementáciu základných regresných a klasifika�
 Pre flexibilné modelovanie podmienenej závislosti medzi dvojicou premenných — spojitej odozvy $Y$ a prediktora $X$ (ktorý môže byť spojitý aj diskrétny) — bola implementovaná hlavná riadiaca funkcia \texttt{combine\_conditional\_models()}. Táto funkcia podľa typu vstupných premenných a používateľom zadaných parametrov zabezpečuje:
 
 \begin{itemize}
+  \setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item výber vhodného regresného modelu pre odhad \textit{podmienenej strednej hodnoty} $\mathbb{E}[Y \mid X = x]$,
   \item odhad viacerých \textit{kvantilových funkcií} $Q_Y^{(X)}(q)$ pre zvolené úrovne kvantilu,
   \item spracovanie prípadov, kde je prediktor \textit{diskrétny} — výber medzi lineárnym a GLM prístupom,
@@ -27,6 +29,8 @@ Odhad podmienenej strednej hodnoty $\mathbb{E}[Y \mid X = x]$ je zabezpečený p
 \begin{itemize}
   \item \textbf{Parametrické modely:}
   \begin{itemize}
+  \setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
     \item "\texttt{linear}" – klasická lineárna regresia,
     \item "\texttt{poly}" – polynomiálna regresia (vyžaduje stupeň \texttt{poly\_mean\_degree}),
     \item "\texttt{exp}" – exponenciálny model $Y = a \cdot \exp(bX)$ (fitovaný cez \texttt{nls}),
@@ -34,6 +38,8 @@ Odhad podmienenej strednej hodnoty $\mathbb{E}[Y \mid X = x]$ je zabezpečený p
   \end{itemize}
   \item \textbf{Neparametrické modely:}
   \begin{itemize}
+  \setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
     \item "\texttt{loess}" – lokálne vyhladzovaný model (LOESS, \texttt{span = 0.75}),
     \item "\texttt{gam}" – generalizovaný aditívny model s hladkou spline funkciou (\texttt{mgcv::gam}).
   \end{itemize}
@@ -46,6 +52,8 @@ Funkcia vracia predikovanú hodnotu podmienenej strednej hodnoty pre celú mrie�
 Podmienené kvantilové funkcie $Q_Y^{(X)}(q)$ sú odhadované pomocou funkcie \texttt{model\_conditional\_quantiles()}, ktorá umožňuje odhad pre viaceré kvantily naraz. Podporované metódy sú:
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item \texttt{"linear"} – lineárna kvantilová regresia,
   \item \texttt{"poly"} – kvantilová regresia s polynomiálnou bázou (vyžaduje \texttt{poly\_quant\_degree}),
   \item \texttt{"spline"} – kvantilová regresia s B-spline funkciou (\texttt{df = 4}).
@@ -58,6 +66,8 @@ Výstupom je dátová tabuľka so všetkými vypočítanými hodnotami $Q_q(Y \m
 V prípade, že prediktor $X$ je diskrétneho typu (napr. faktor alebo textová premenná), funkcia \texttt{combine\_conditional\_models()} automaticky použije modul \texttt{model\_discrete\_predictor()}, ktorý podporuje:
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item \texttt{"lm"} – klasický lineárny model so zaobchádzaním s faktormi,
   \item \texttt{"glm\_log"} – GLM model s logaritmickou linkou pre pozitívne odozvy.
 \end{itemize}
@@ -78,6 +88,8 @@ Na modelovanie diskrétnej (kategoriálnej) odozvy vzhľadom na jeden alebo dva 
 Táto funkcia umožňuje používateľovi jednoducho:
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item špecifikovať typ klasifikačnej metódy (logistická regresia, LDA, QDA, KNN),
   \item modelovať úlohy s jedným prediktorom (dodatočne aj s dvomi),
   \item automaticky zvoliť optimálny počet susedov pre KNN (ak nie je zadaný),
@@ -90,6 +102,8 @@ Táto funkcia umožňuje používateľovi jednoducho:
 Funkcia \texttt{classification\_model()} podporuje nasledovné typy modelov:
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item \textit{Logistická regresia} ("\texttt{logistic}") – vhodná pre binárne aj multinomické klasifikačné úlohy. Binarizácia prebieha automaticky podľa počtu úrovní cieľovej premennej.
   \item \textit{Lineárna diskriminačná analýza ("\texttt{lda}")} – predpokladá rovnaké kovariančné matice naprieč triedami.
   \item \textit{Kvadratická diskriminačná analýza ("\texttt{qda}")} – umožňuje odlišné kovariančné štruktúry pre jednotlivé triedy. Triedy s menej ako štyrmi pozorovaniami sú automaticky vyradené.
@@ -101,6 +115,8 @@ Funkcia \texttt{classification\_model()} podporuje nasledovné typy modelov:
 Funkcia vyžaduje nasledovné vstupné argumenty:
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item \texttt{data} – dátový rámec so vstupnými premennými,
   \item \texttt{response\_name} – meno cieľovej premennej (diskrétna),
   \item \texttt{predictor\_names} – meno jedného prediktora (umožňuje však aj dva),
@@ -111,6 +127,8 @@ Funkcia vyžaduje nasledovné vstupné argumenty:
 Výstupom funkcie je štruktúrovaný zoznam s nasledujúcimi komponentmi:
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item \texttt{model} – fitovaný klasifikačný model,
   \item \texttt{predictions} – vektor predikovaných tried,
   \item \texttt{accuracy} – presnosť modelu na trénovacej množine,
@@ -124,6 +142,8 @@ Výstupom funkcie je štruktúrovaný zoznam s nasledujúcimi komponentmi:
 Výsledky klasifikácie sú doplnené aj o interaktívnu vizualizáciu:
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item Pri jednom prediktore sa zobrazuje rozhodovací prah a podmienené pravdepodobnosti (pomocou funkcie \texttt{plot\_classification\_1D\_combined()}).
   \item Pri dvoch prediktoroch sa vykreslí rozhodovacia hranica v prediktorovom priestore (pomocou funkcie \texttt{plot\_decision\_boundary()}).
 \end{itemize}
@@ -133,6 +153,8 @@ Výsledky klasifikácie sú doplnené aj o interaktívnu vizualizáciu:
 Súčasťou každého modelu je prehľadná sumarizačná tabuľka obsahujúca:
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item názov použitej metódy,
   \item celkovú presnosť klasifikácie,
   \item (ak sú dostupné) parametre $\beta$ so štandardnými chybami,
@@ -149,6 +171,8 @@ V tejto kapitole sa zameriavame na implementáciu nástrojov pre odhad združen�
 Zatiaľ čo regresné modely z predchádzajúcej kapitoly opisovali podmienené charakteristiky (napr. $\mathbb{E}[Y \mid X]$), v tejto časti budujeme celkový model združeného rozdelenia $f_{X,Y}(x, y)$ alebo $p_{X,Y}(x, y)$, ktorý následne umožňuje vykonávať:
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item výpočet marginálnych a podmienených rozdelení,
   \item odhad hustoty alebo pravdepodobnostnej funkcie,
   \item generovanie syntetických pozorovaní (napr. sampling),
@@ -158,6 +182,8 @@ Zatiaľ čo regresné modely z predchádzajúcej kapitoly opisovali podmienené 
 Podľa typu vstupného vektora $(X, Y)$ implementujeme riešenie troch základných situácií:
 
 \begin{enumerate}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item oba atribúty sú \textit{diskrétne} – modelujeme pravdepodobnostnú funkciu (PMF),
   \item oba atribúty sú \textit{spojité} – modelujeme združenú hustotu pomocou parametrických, neparametrických alebo kopulových modelov,
   \item ide o \textit{zmiešaný vektor} – využívame prístup založený na vážených hustotách pre jednotlivé kategórie diskrétneho atribútu.
@@ -175,6 +201,8 @@ V diskrétnom prípade je cieľom vypočítať pravdepodobnosť každej kombiná
 
 Na túto úlohu slúži funkcia \texttt{model\_joint\_pmf()}, ktorá automaticky:
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item konvertuje premenné na faktory (ak ešte nie sú),
   \item vytvorí tabuľku výskytov a následne vypočíta príslušné pravdepodobnosti,
   \item priradí súradnice pre vizualizáciu (číselné pozície úrovní),
@@ -185,6 +213,8 @@ Na túto úlohu slúži funkcia \texttt{model\_joint\_pmf()}, ktorá automaticky
 Funkcia očakáva ako vstup nasledujúce argumenty:
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item \texttt{data} – dátová tabuľka vo forme \texttt{data.frame}, ktorá obsahuje dvojicu diskrétnych premenných. Tieto premenné môžu byť zadané ako znaky, faktory alebo celé čísla s obmedzeným počtom hodnôt.
   \item \texttt{discrete\_vars} – znakový vektor dĺžky 2 obsahujúci mená dvoch diskrétnych premenných, ktoré budú použité na výpočet združeného rozdelenia.
 \end{itemize}
@@ -192,6 +222,8 @@ Funkcia očakáva ako vstup nasledujúce argumenty:
 \subsubsection{Výstup modelu}
 Výsledkom je štruktúrovaný objekt obsahujúci:
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item \texttt{tab} – tabuľka s kombináciami $(x_i, y_j)$, ich frekvenciami a pravdepodobnosťami,
   \item \texttt{x\_labels}, \texttt{y\_labels} – zoznam úrovní oboch premenných,
   \item \texttt{summary} – prehľadná \texttt{gt} tabuľka s hlavným zhrnutím modelu,
@@ -202,6 +234,8 @@ Výsledkom je štruktúrovaný objekt obsahujúci:
 Vizualizačná funkcia \texttt{render\_joint\_pmf()} následne vykresľuje pravdepodobnostnú štruktúru buď
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item ako 2D heatmapu doplnenú o marginálne rozdelenia,
   \item alebo ako 3D bodový graf s výškou zodpovedajúcou hodnote $\Pr(X,Y)$.
 \end{itemize}
@@ -215,6 +249,8 @@ V prípade, že sú obidve premenné \textit{spojité}, prirodzenou stratégiou 
 V tejto podkapitole najskôr predstavujeme prístup, v ktorom je \textit{združená hustota modelovaná ako celok} pomocou jedného z troch typov modelov:
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item \textit{Neparametrický model} pomocou \textit{jadrového vyhladzovania} (KDE),
   \item \textit{Parametrický model} s predpokladom bivariantného \textit{normálneho rozdelenia},
   \item \textit{Parametrický model} na báze \textit{bivariantného t-rozdelenia}, vhodný pre robustné odhady.
@@ -225,6 +261,8 @@ Modelovanie je realizované prostredníctvom funkcie \texttt{model\_continuous\_
 \subsubsection{Vstupné parametre}
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item \texttt{data} – dátová tabuľka obsahujúca numerické hodnoty pre aspoň dve spojité premenné,
   \item \texttt{continuous\_vars} – vektor dĺžky 2 obsahujúci názvy dvoch spojitých premenných,
   \item \texttt{model\_type} – typ modelu, ktorý má byť použitý na odhad hustoty: \texttt{"kernel"} (jadrové vyhladzovanie), \texttt{"normal"} (bivariantné normálne rozdelenie), alebo \texttt{"t"} (bivariantné t-rozdelenie).
@@ -233,6 +271,8 @@ Modelovanie je realizované prostredníctvom funkcie \texttt{model\_continuous\_
 \subsubsection{Modely hustoty}
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item \textit{Kernel Density Estimation (KDE)}:  
   V tomto prípade je hustota odhadovaná pomocou funkcie \texttt{MASS::kde2d()}, ktorá vytvára mriežku 100 × 100 bodov a vypočítava hustotu v každom bode. Tento prístup je flexibilný a nevyžaduje žiadne špecifické predpoklady o tvare rozdelenia.
 
@@ -248,6 +288,8 @@ Modelovanie je realizované prostredníctvom funkcie \texttt{model\_continuous\_
 Funkcia vracia štruktúrovaný objekt obsahujúci:
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item \texttt{x\_vals}, \texttt{y\_vals} – vektory hodnôt pozdĺž osi $X$ a $Y$ použité na vytvorenie hustotnej mriežky,
   \item \texttt{z\_matrix} – matica rozmeru $100 \times 100$ s vypočítanými hodnotami hustoty $f_{X,Y}(x_i, y_j)$,
   \item \texttt{model\_type} – použitý typ modelu (\texttt{"kernel"}, \texttt{"normal"}, alebo \texttt{"t"}),
@@ -266,6 +308,8 @@ Okrem modelovania združenej hustoty dvoch spojitých premenných ako celku, bol
 Implementácia tejto stratégie je realizovaná vo funkcii \texttt{model\_continuous\_density\_copula()}, ktorá podporuje tri režimy modelovania:
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item \textit{Neparametrický režim}: marginálne rozdelenia aj kopula sú odhadované neparametricky (pomocou jadrového vyhladzovania a beta vyhladenej empirickej kopuly).
   \item \textit{Parametrický režim}: marginálne rozdelenia aj kopula sú modelované pomocou špecifikovaných distribúcií (napr. normálne, t, log-normálne) a známych kopulových funkcií (Clayton, Gumbel, Frank, Joe, t).
   \item \textit{Hybridný režim}: každá marginálna premenná môže mať iný typ rozdelenia (napr. KDE pre jednu a normálne pre druhú) a kopula môže byť buď empirická, alebo parametrická.
@@ -274,6 +318,8 @@ Implementácia tejto stratégie je realizovaná vo funkcii \texttt{model\_contin
 \subsubsection{Vstupné parametre}
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item \texttt{data} – dátová tabuľka s dvoma spojitými premennými,
   \item \texttt{continuous\_vars} – mená týchto dvoch premenných,
   \item \texttt{model\_type} – typ modelovania: \texttt{"nonparametric"}, \texttt{"parametric"}, alebo \texttt{"hybrid"},
@@ -286,6 +332,8 @@ Implementácia tejto stratégie je realizovaná vo funkcii \texttt{model\_contin
 Každý režim vykonáva odhad podľa nasledovnej schémy:
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item Neparametrický režim vytvára aproximácie marginálnych CDF a hustôt pomocou \texttt{density()} a využíva \texttt{empCopula()} s vyhladzovaním typu \texttt{"beta"}.
   \item Parametrický režim využíva analytické rozdelenia (napr. normálne, t) pre výpočet $F_X$, $F_Y$, $f_X$, $f_Y$, a odhaduje parametre kopuly pomocou metódy maximálnej vierohodnosti (\texttt{fitCopula()}).
   \item Hybridný režim umožňuje kombináciu oboch vyššie uvedených, pričom zvlášť definuje každé marginálne rozdelenie a voliteľne používa empirickú alebo parametrickú kopulu.
@@ -296,6 +344,8 @@ Každý režim vykonáva odhad podľa nasledovnej schémy:
 Výstupom je štruktúrovaný objekt s nasledovnými prvkami:
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item \texttt{x\_vals}, \texttt{y\_vals} – vektory bodov použité na vytvorenie hustotnej siete,
   \item \texttt{z\_matrix} – matica vypočítanej hustoty $f_{X,Y}(x,y)$ s rozmerom $100 \times 100$,
   \item \texttt{model\_type} – typ použitého modelovania (\texttt{"nonparametric"}, \texttt{"parametric"}, \texttt{"hybrid"}),
@@ -317,6 +367,8 @@ V prípade, že uvažujeme dvojicu náhodných premenných, z ktorých jedna je 
 Implementácia tohto prístupu je realizovaná vo funkcii \texttt{model\_mixture\_density()}, ktorá podporuje tri rôzne typy modelov podmienených hustôt:
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item \textit{Jadrové vyhladzovanie (kernel):} flexibilný neparametrický prístup, kde sa hustota odhaduje samostatne v každej kategórii pomocou funkcie \texttt{density()} s individuálne voleným rozsahom vyhladzovania (bandwidth).
   \item \textit{Normálne rozdelenie:} hustota je v každej kategórii odhadnutá pomocou normálneho rozdelenia so stredom a rozptylom zodpovedajúcim empirickým hodnotám.
   \item \textit{t-rozdelenie:} robustnejšia alternatíva k normálnemu rozdeleniu, vhodná najmä pri menšom počte pozorovaní alebo pri výskyte odľahlých hodnôt.
@@ -325,6 +377,8 @@ Implementácia tohto prístupu je realizovaná vo funkcii \texttt{model\_mixture
 \subsubsection{Vstupné parametre}
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item \texttt{data} – dátová tabuľka obsahujúca jednu diskrétnu a jednu spojitú premennú,
   \item \texttt{discrete\_vars} – názov stĺpca s diskrétnou premennou,
   \item \texttt{continuous\_vars} – názov stĺpca so spojitou premennou,
@@ -337,10 +391,14 @@ Implementácia tohto prístupu je realizovaná vo funkcii \texttt{model\_mixture
 Výsledkom modelovania je štruktúrovaný objekt s týmito komponentmi:
 
 \begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
   \item \texttt{density\_data} – tabuľka s odhadnutou hustotou pre každú kategóriu (stĺpce: \texttt{Continuous\_Var}, \texttt{Density}, \texttt{Discrete\_Var}),
   \item \texttt{category\_probs} – vektor pravdepodobností jednotlivých kategórií,
   \item \texttt{summary\_info} – zoznam s doplňujúcimi informáciami o modeli:
     \begin{itemize}
+    \setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
       \item počet kategórií a ich názvy,
       \item typ použitého modelu (\texttt{"kernel"}, \texttt{"normal"}, \texttt{"t"}),
       \item použitý rozsah vyhladzovania (alebo zoznam podľa kategórií),
@@ -354,7 +412,176 @@ Výsledkom modelovania je štruktúrovaný objekt s týmito komponentmi:
 
 Model je vizualizovaný ako kombinácia podmienených hustôt, kde jednotlivé hustoty sú odlíšené farbou a ich výška zohľadňuje relatívnu početnosť danej kategórie. Renderovanie prebieha pomocou funkcie \texttt{render\_mixture\_density()}, ktorá podporuje 2D aj 3D zobrazenia vrátane sprievodných grafov pre marginálne rozdelenia.
 
-
 \section{Aplikácia združeného rozdelenia}\label{sec:app_joint_dist}
+
+Jednou z kľúčových výhod modelovania združeného rozdelenia pravdepodobnosti je možnosť odvodenia podmienených rozdelení. Tieto umožňujú študovať správanie jednej náhodnej premennej vzhľadom na pevnú hodnotu druhej, teda modelovať podmienenú pravdepodobnosť alebo hustotu $f_{Y \mid X}(y \mid x)$.
+
+V tejto časti popisujeme implementácie pre prípay, keď
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
+  \item odozvou je \textit{spojitá} premenná a prediktor môže byť spojitý alebo diskrétny,
+  \item odozvou je \textit{diskrétna} premenná, kde podmienime jej rozdelenie na spojitú veličinu.
+\end{itemize}
+
+\subsection{Implementácia pre spojitú odozvu}
+
+V prípade, že odozva $Y$ je spojitá, funkcia \texttt{model\_conditional\_continuous\_densities()} umožňuje modelovanie jej podmieneného rozdelenia vzhľadom na daný typ prediktora $X$.
+
+\subsubsection{Princíp}  
+Na základe združeného rozdelenia $(X,Y)$ sa konštruujú podmienené hustoty $f_{Y \mid X = x}$ pre rôzne hodnoty prediktora $x$. Tieto hustoty sú počítané pomocou
+
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
+  \item \textit{Jadrového vyhladzovania}: neparametrický prístup.
+  \item \textit{Vzťahu pre hustotu normálneho rozdelenia}: hustota sa odhaduje ako normálne rozdelenie na základe lokálnych štatistík (parametrický prístup).
+\end{itemize}
+
+Funkcia zároveň umožňuje doplniť výstup o:
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
+  \item podmienenú strednú hodnotu $\mathbb{E}[Y \mid X=x]$ (modelovanú ako polynóm),
+  \item podmienené kvantilové krivky.
+\end{itemize}
+
+\subsubsection{Vstupné parametre}
+
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
+  \item \texttt{df} – vstupný \texttt{data.frame} s premennými \texttt{response\_var} (spojitá odozva) a \texttt{predictor\_var},
+  \item \texttt{n\_breaks} – počet bodov, v ktorých sa počíta podmienená hustota,
+  \item \texttt{density\_scaling} – mierka výšky hustôt pre vizualizáciu,
+  \item \texttt{mean\_curve} – logická hodnota, či sa má pridať stredná hodnota ako krivka,
+  \item \texttt{quantiles} – zoznam kvantilov pre vizualizáciu (napr. \texttt{c(0.25, 0.5, 0.75)}),
+  \item \texttt{mean\_poly\_degree} – stupeň polynómu pre strednú hodnotu,
+  \item \texttt{quantile\_poly\_degree} – stupeň polynómu pre kvantily,
+  \item \texttt{normal\_density} – či sa má modelovať aj normálna hustota,
+  \item \texttt{kernel\_density} – či sa má zahrnúť jadrový odhad hustoty (KDE),
+  \item \texttt{bw\_scale} – rozsah vyhladzovania pre KDE.
+\end{itemize}
+
+\subsubsection{Spracovanie a logika}
+
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
+  \item Ak je prediktor diskrétny, vypočíta sa samostatná hustota pre každú kategóriu (sekcia).
+  \item Pri spojitom prediktore sa pri zadanom počte \texttt{n\_breaks} rozdelí jeho rozsah a v jednotlivých bodoch sa vypočítajú lokálne podmienené hustoty podľa vzťahu ~\ref{eq:cond_cont_dens}.
+  \item Hustoty sa počítajú buď pomocou \texttt{density()} (KDE), alebo pomocou parametrov normálneho rozdelenia (\texttt{dnorm}).
+  \item V prípade požiadavky sa pripočítavajú aj regresné a kvantilové krivky.
+\end{itemize}
+
+\subsubsection{Výstup modelu}
+
+Funkcia vracia zoznam s nasledovnými komponentmi:
+
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
+  \item \texttt{df} – upravený dátový rámec (s číselným prediktorom),
+  \item \texttt{density\_data} – zoznam dátových rámcov s výstupnými hustotami (pre každú sekciu a typ hustoty),
+  \item \texttt{breaks} – vektor hodnôt, v ktorých sa počítali hustoty,
+  \item \texttt{x\_seq} – vektor hodnôt prediktora pre vykreslenie,
+  \item \texttt{mean\_curve\_data} – regresná krivka strednej hodnoty (ak \texttt{mean\_curve = TRUE}),
+  \item \texttt{quantile\_data} – kvantilové krivky ako zoznam tabuliek,
+  \item \texttt{summary\_table} – sumarizačná tabuľka s počtom pozorovaní, priemerom, smerodajnou odchýlkou, min a max v jednotlivých deleniach,
+  \item \texttt{meta} – metadáta ako korelácia medzi premennými, priemery, štandardné odchýlky, epsilon (hustotný prah) a použité škálovanie.
+\end{itemize}
+
+Vizualizácia výstupu sa realizuje cez funkciu \texttt{render\_conditional\_continuous\_densities()}, ktorá zobrazuje hustoty aj krivky, a umožňuje kombinovať rôzne typy modelov (napr. KDE vs. normálne hustoty) na jednej ploche.
+
+\subsection{Diskrétna odozva}
+
+V prípade, že odozvou $Y$ je diskrétna premenná, cieľom je modelovať podmienenú pravdepodobnosť $p_{Y \mid X}(y \mid x)$ – teda pravdepodobnosť výskytu konkrétnej kategórie odozvy vzhľadom na hodnotu prediktora $X$. 
+
+Táto úloha je riešená prostredníctvom funkcie \texttt{model\_conditional\_discrete\_densities()}, ktorá rozlišuje medzi prípadom, keď je prediktor $X$ diskrétny, a prípadom, keď je spojitý. Vo všeobecnosti sa modelovanie opiera o Bayesovo pravidlo~\ref{eq:Bayes_cond}.
+
+\subsubsection{Modelovacie prístupy}
+
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
+  \item Pri \textit{diskrétnom prediktore} sa používajú empirické frekvencie na výpočet pravdepodobností – teda podiel počtu výskytov každej kombinácie kategórií vzhľadom na celkový počet príslušných pozorovaní.
+  \item Pri \textit{spojitom prediktore} sa hustoty odhadujú buď pomocou
+  \begin{itemize}
+    \item neparametrického jadrového vyhladzovania (KDE),
+    \item parametrického normálneho (Gaussovho) modelu.
+  \end{itemize}
+  Výsledné pravdepodobnosti sa potom získavajú aplikáciou Bayesovho pravidla v bodoch prediktora rozdelených do \texttt{n\_breaks} sekcií.
+\end{itemize}
+
+\subsubsection{Vstupné parametre}
+
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
+  \item \texttt{df} – vstupný \texttt{data.frame} s premennými \texttt{response\_var} a \texttt{predictor\_var},
+  \item \texttt{n\_breaks} – počet sekcií pre rozdelenie spojitého prediktora,
+  \item \texttt{density\_scaling} – faktor pre škálovanie výšky pravdepodobností vo vizualizácii,
+  \item \texttt{normal\_density} – použitie Gaussovho modelu pre odhad hustoty,
+  \item \texttt{kernel\_density} – použitie neparametrického KDE.
+\end{itemize}
+
+\subsubsection{Spracovanie a logika}
+
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
+  \item Odozva je konvertovaná na číselnú reprezentáciu (pre výpočty), pričom sa uchová pôvodné označenie kategórií.
+  \item Ak je prediktor diskrétny:
+  \begin{itemize}
+    \item Pre každú kombináciu prediktora a odozvy sa vypočíta podiel výskytov – výstup je typu \texttt{"}\texttt{Empirical"}.
+  \end{itemize}
+  \item Ak je prediktor spojitý:
+  \begin{itemize}
+    \item V každej sekcii sa odhadne:
+    \begin{itemize}
+      \item marginálna hustota $f_C(c)$,
+      \item podmienené hustoty $f_{C \mid D}(c \mid d)$ pre každú kategóriu $d$ odozvy.
+    \end{itemize}
+    \item Následne sa aplikuje Bayesov vzorec na výpočet~\ref{eq:Bayes_cond}.
+  \end{itemize}
+\end{itemize}
+
+\subsubsection{Výstup modelu}
+
+Funkcia vracia \texttt{list} s nasledujúcimi komponentmi:
+
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
+  \item \texttt{df} – upravený dátový rámec (s numerickým prediktorom),
+  \item \texttt{density\_df} – podmienené pravdepodobnosti v jednotlivých sekciách prediktora,
+  \item \texttt{response\_levels} – úrovne kategórií odozvy,
+  \item \texttt{predictor\_is\_discrete} – indikátor typu prediktora,
+  \item \texttt{response\_name}, \texttt{predictor\_name} – názvy premenných.
+\end{itemize}
+
+\subsubsection{Metódy výpočtu}
+
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
+  \item \texttt{Empirical} – jednoduchý výpočet frekvencií (iba pre diskrétny prediktor),
+  \item \texttt{KDE} – neparametrický jadrový odhad hustoty,
+  \item \texttt{Normal} – parametrický odhad hustoty ako Gaussovo rozdelenie.
+\end{itemize}
+
+\subsubsection{Vizualizácia}
+
+Vizualizáciu zabezpečuje funkcia \texttt{render\_conditional\_discrete\_densities()}, ktorá zobrazuje výsledné podmienené pravdepodobnosti ako segmenty, pričom:
+
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+  \setlength{\parskip}{0pt}
+  \item tvary a čiary sú rozlíšené podľa použitej metódy výpočtu (\texttt{linetype}, \texttt{shape}),
+  \item v prípade usporiadanej odozvy (\texttt{ordinal = TRUE}) sa hodnoty prepájajú krivkami pre lepšiu čitateľnosť.
+\end{itemize}
+
+
+\section{Ukážka aplikácie}\label{sec:app_preview}
 
 
