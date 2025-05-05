@@ -456,145 +456,154 @@ Funkcia vracia `list` s nasledovnými komponentmi:
 - Multinomická logistická regresia využíva `nnet::multinom()`.
 
 
-## `plot_conditional_continuous_densities()`
+
+## `model_conditional_continuous_densities()`
 
 **Popis:**  
-Funkcia vizualizuje **podmienené hustoty pravdepodobnosti** pre spojitú odozvu vzhľadom na prediktor. Funguje pre **diskrétny aj spojitý prediktor**, a modeluje:
-- parametrické aj neparametrické hustoty (normálne rozdelenie, KDE),
-- regresné krivky, stredná hodnota a kvantilové funkcie,
-- súhrnné informácie ku každému rozdeleniu.
+Funkcia **modeluje podmienené hustoty pravdepodobnosti spojitej odozvy vzhľadom na daný prediktor**. Podporuje ako diskrétne, tak aj spojité prediktory.
 
 ---
 
-**Parametre:**
+**Vstupné parametre:**
 
-| Parameter            | Typ            | Popis |
-|----------------------|----------------|-------|
-| `df`                 | `data.frame`   | Vstupné dáta s atribútmi `response_var` a `predictor_var` |
-| `n_breaks`           | `integer`      | Počet rezov/cutoffov pre odhad podmienených hustôt |
-| `density_scaling`    | `numeric`      | Faktor na vertikálne škálovanie hustôt |
-| `mean_curve`         | `logical`      | Zobraziť podmienenú strednú hodnotu - TRUE/FALSE |
-| `quantiles`          | `numeric`      | Vektor kvantilov (napr. `c(0.25, 0.5, 0.75)`) |
-| `mean_poly_degree`   | `integer`      | Stupeň polynómu pre strednú hodnotu |
-| `quantile_poly_degree`| `integer`     | Stupeň polynómu pre kvantilové funkcie |
-| `normal_density`     | `logical`      | Vykresliť parametrickú hustotu (normálnu) - TRUE/FALSE |
-| `kernel_density`     | `logical`      | Vykresliť jadrový (KDE) odhad hustoty - TRUE/FALSE |
-| `bw_scale`           | `numeric`/NULL | Škálovanie predvoleného bandwidth pre KDE |
+| Názov                | Typ               | Popis |
+|----------------------|-------------------|-------|
+| `df`                 | `data.frame`      | Vstupný dátový rámec s atribútmi `"response_var"` a `"predictor_var"` |
+| `n_breaks`           | `integer`         | Počet sekcií (rezov) prediktora pre podmienené hustoty |
+| `density_scaling`    | `numeric`         | Škálovací koeficient hustôt pre lepšiu vizualizáciu |
+| `mean_curve`         | `logical`         | Či sa má pridať podmienená stredná hodnota |
+| `quantiles`          | `numeric` vector  | Zoznam požadovaných kvantilov (napr. `c(0.25, 0.5, 0.75)`) |
+| `mean_poly_degree`   | `integer`         | Stupeň polynómu pre strednú hodnotu |
+| `quantile_poly_degree` | `integer`       | Stupeň polynómu pre kvantilové funkcie |
+| `normal_density`     | `logical`         | Či zahrnúť normálnu hustotu do vizualizácie |
+| `kernel_density`     | `logical`         | Či zahrnúť KDE (jadrový odhad hustoty) do vizualizácie |
+| `bw_scale`           | `numeric` alebo `NULL` | Miera škálovania rozsahu vyhladzovania pre KDE |
 
 ---
 
-**Funkcionalita:**
+**Spracovanie:**
 
-- **Spojitý prediktor**:
-  - Rozdelí osi X na `n_breaks` miest pomocou rovnomerného rozdelenia.
-  - Odhaduje podmienenú hustotu `f(Y | X = x)` pomocou:
-    - neparametrického KDE z 2D hustoty `f(X, Y)`,
-    - normálneho rozdelenia z kovariančnej matice.
-  - Hustoty sú posunuté doľava od pozície `x`, škálované podľa počtu bodov.
-
-- **Diskrétny prediktor**:
-  - Hustoty `f(C | D = d_k)` sú počítané pre každú kategóriu osobitne.
-  - Odozva `C` je vizualizovaná ako vertikálne hustoty s farebným rozlíšením podľa typu (KDE vs normal).
-  
-- **Regresné krivky** (iba pre spojitý prediktor):
-  - Podmienená stredná hodnota `E[Y | X]` pomocou polynomiálnej regresie.
-  - Kvantilové funkcie `Q_τ(Y | X)` pre zadané τ (napr. 0.25, 0.5, 0.75).
+- Funkcia najprv zistí, či je prediktor diskrétny alebo spojitý (pomocou `identify_variables()`, čo je funkcia na identifikáciu premenných).
+- Pri **diskrétnych prediktoroch**:
+  - Hustoty sa modelujú osobitne pre každú kategóriu.
+  - Hustoty (KDE a/alebo normálne) sú škálované podľa ich výšky a počtu pozorovaní.
+- Pri **spojitých prediktoroch**:
+  - Modeluje sa buď pomocou neparametrického `kde2d` alebo parametrického viacrozmerného normálneho rozdelenia.
+  - V každom `n_breaks` bode sa počíta podmienená hustota odozvy `Y | X = x`.
 
 ---
 
 **Výstup:**
 
-Funkcia vracia `list` s komponentami:
+Funkcia vracia `list` s nasledujúcimi komponentmi:
 
-| Komponent     | Popis |
-|---------------|-------|
-| `plot`        | Objekt `ggplot2` s vykreslenými hustotami, bodmi a regresnými krivkami |
-| `summary_gt`  | Tabuľka `gt` so štatistikami (počet, priemer, SD, Min, Max) pre každé `x_i` |
+| Komponent             | Popis |
+|-----------------------|-------|
+| `df`                  | Upravený dátový rámec s číselným prediktorom |
+| `density_data`        | Zoznam dátových rámcov pre každú hustotu (`x`, `y`, `section`, `type`) |
+| `breaks`              | Hodnoty prediktora, v ktorých sa počítali podmienené hustoty |
+| `x_seq`               | Sekvencia hodnôt prediktora pre vizualizáciu |
+| `mean_curve_data`     | Dátový rámec pre podmienenú strednú hodnotu (ak `mean_curve = TRUE`) |
+| `quantile_data`       | Zoznam dátových rámcov pre každú kvantilovú krivku |
+| `summary_table`       | Tabuľka sumarizujúca počet, priemer, SD, min a max odozvy v okolí každého delenia |
+| `meta`                | Metadáta: mená premenných, typ prediktora, štatistiky (`mu`, `sd`, korelácia, epsilon, h_scaled`) |
 
 ---
 
-**Použité techniky:**
+**Podporované hustoty:**
 
-- Neparametrické hustoty: `MASS::kde2d()` a `density()`
-- Parametrické hustoty: `dnorm()`, `mvtnorm::dmvnorm()`
-- Regresia: `lm()` a `quantreg::rq()`
-- Vizualizácia: `ggplot2::geom_path()` a `geom_line()`
+- **KDE (jadrový odhad)** – pomocou `density()` a `approx()`
+- **Normálna hustota** – pomocou `dnorm()` alebo viacrozmerného `dmvnorm()`
 
 ---
 
 **Poznámky:**
 
-- Hustoty sú vizualizované ako horizontálne posunuté grafy hustôt v osi `X` z dôvodu lepšej prehľadnosti.
-- `fade_factor` aplikuje mierne zoslabenie hustôt smerom k okrajom pre vizuálne zvýraznenie.
-- Pre diskrétny prediktor nie je možné zobraziť regresné krivky (`mean_curve` a `quantiles`).
+- Hustoty sú škálované pomocou `fade_factor` (dočasná hustota slúžiaca na tlmenie) pre hladšie zobrazenie.
+- `n_breaks` pre diskrétne premenné sa automaticky skracuje, ak je menej kategórií.
+- Funkcia zahŕňa rozsiahle kontroly validnosti hustôt, `y_seq` a vyhladzovania.
+- Výpočty hustôt sú doplnené aj o možnosť modelovať **podmienenú strednú hodnotu** a **kvantilové funkcie**.
+
+---
+
+**Vizualizácia:**
+
+- Výstup tejto funkcie sa renderuje samostatne vo funkcii `render_conditional_continuous_densities()`.
+- Každá hustota má svoj typ (`"KDE"` alebo `"normal"`), čo umožňuje farebne alebo štýlovo ich odlíšiť.
 
 
-## `plot_conditional_discrete_densities()`
+## `model_conditional_discrete_densities()`
 
 **Popis:**  
-Funkcia vizualizuje **podmienené pravdepodobnosti diskrétnej odozvy vzhľadom na diskrétny alebo spojitý prediktor**. Umožňuje zobraziť odhady pomocou:
-- empirickej distribúcie (pri diskrétnych prediktoroch),
-- jadrového vyhladzovania (KDE),
-- hustoty normálneho rozdelenia.
+Funkcia **modeluje podmienenú pravdepodobnostnú funkciu diskrétnej odozvy vzhľadom na diskrétny alebo spojitý prediktor** pomocou Bayesovho pravidla. Podporuje viacero odhadových metód: empirický výpočet (pri diskrétnom prediktore), jadrový odhad hustoty (KDE) a parametrický normálny (Gaussov) model.
 
 ---
 
-**Parametre:**
+**Vstupné parametre:**
 
-| Parameter          | Typ          | Popis |
-|--------------------|--------------|-------|
-| `df`               | `data.frame` | Vstupný dataset s atribútmi `response_var` a `predictor_var` |
-| `n_breaks`         | `integer`    | Počet rezov (sekcií) pre spojitý prediktor (default = 4) |
-| `density_scaling`  | `numeric`    | Horizontálne škálovanie vizualizovaných pravdepodobností |
-| `ordinal`          | `logical`    | Ak TRUE, prepája pravdepodobnosti cez krivky (vhodné pre ordinálne premenné) |
-| `normal_density`   | `logical`    | Ak TRUE, vypočíta podmienené pravdepodobnosti aj cez normálne rozdelenie |
-| `kernel_density`   | `logical`    | Ak TRUE, použije KDE odhad podmienených pravdepodobností |
+| Názov              | Typ              | Popis |
+|--------------------|------------------|-------|
+| `df`               | `data.frame`     | Dátový rámec s atribútmi `"response_var"` a `"predictor_var"` |
+| `n_breaks`         | `integer`        | Počet sekcií pre spojitý prediktor, kde sa budú počítať podmienené pravdepodobnosti |
+| `density_scaling`  | `numeric`        | Činiteľ škálovania pravdepodobností pre vizualizáciu |
+| `normal_density`   | `logical`        | Či sa má použiť Gaussov model pre odhad hustoty \( f_{C \mid D}(c \mid d) \) |
+| `kernel_density`   | `logical`        | Či sa má použiť neparametrický jadrový odhad hustoty \( f_{C \mid D}(c \mid d) \) |
 
 ---
 
-**Funkcionalita:**
+**Spracovanie:**
 
-- **Diskrétny prediktor:**
-  - Pre každú kategóriu `X = xᵢ` sa spočíta podiel výskytu každej úrovne `Y = yⱼ`.
-  - Vizualizácia ako horizontálne segmenty so symbolmi, farebne odlíšené podľa metódy ("Empirical").
-
-- **Spojitý prediktor:**
-  - Prediktor je rozdelený na `n_breaks` intervalov podľa hodnôt.
-  - Pre každý stred intervalu `cⱼ` sa pre každé `Y = yᵢ` použije Bayesov vzorec:
+- Funkcia najprv konvertuje odozvu na číselné hodnoty (pre interné výpočty) a uchová pôvodné kategórie.
+- **Ak je prediktor diskrétny**:
+  - Vypočíta podmienené pravdepodobnosti pre každú kombináciu kategórie prediktora a odozvy.
+  - Pravdepodobnosti sa označia ako `"Empirical"`.
+- **Ak je prediktor spojitý**:
+  - Vygenerujú sa `n_breaks` sekcie (stredy intervalov), v ktorých sa počítajú podmienené pravdepodobnosti.
+  - Pre každú úroveň odozvy sa odhadne hustota prediktora podmienená touto úrovňou (`KDE` alebo `Normal`), aj marginálna hustota prediktora.
+  - Výsledná pravdepodobnosť sa počíta podľa Bayesovho vzorca:  
     \[
-    P(Y = y_i \mid X = c_j) = \frac{P(Y = y_i) \cdot f_{X \mid Y=y_i}(c_j)}{f_X(c_j)}
+    \Pr(D = d \mid C = c) = \frac{\Pr(D = d) \cdot f_{C \mid D}(c \mid d)}{f_C(c)}
     \]
-  - Odhad hustôt \( f_X \) a \( f_{X \mid Y} \) sa robí pomocou KDE alebo normálnej aproximácie.
-  - Výstup obsahuje súbežné vizualizácie zvolených metód (napr. KDE aj Normal).
 
 ---
 
 **Výstup:**
 
-| Výstupný objekt        | Popis |
-|------------------------|-------|
-| `plot`                 | Objekt `ggplot` s vizualizáciou podmienených pravdepodobností |
-| `probability_table`    | Dátový rámec s výpočtom pravdepodobností pre každú kategóriu a metódu |
-| `summary_gt`           | `gt` tabuľka s hodnotami `P(Y = y | X ∈ sekcia)` pre každú sekciu a kategóriu |
+Funkcia vracia `list` s nasledovnými komponentmi:
+
+| Komponent             | Popis |
+|-----------------------|-------|
+| `df`                  | Upravený dátový rámec vrátane `predictor_numeric` |
+| `density_df`          | Výsledné podmienené pravdepodobnosti (obsahuje `x_center`, `prob`, `Category`, `method`, `section`) |
+| `response_levels`     | Úrovne kategórií odozvy |
+| `predictor_is_discrete` | Boolean hodnota indikujúca typ prediktora |
+| `response_name`       | Názov odozvy |
+| `predictor_name`      | Názov prediktora |
 
 ---
 
-**Vizualizačné možnosti:**
-- Farebné línie pre každú metódu (`KDE`, `Normal`, `Empirical`)
-- Legenda rozlišuje `linetype` a `shape` podľa metódy odhadu
-- Ak `ordinal = TRUE`, pravdepodobnosti v rámci sekcie sa prepájajú cez `geom_path`
+**Podporované metódy výpočtu:**
+
+| Metóda      | Popis |
+|-------------|-------|
+| `Empirical` | Výpočet frekvenčným pomerom (iba pre diskrétny prediktor) |
+| `KDE`       | Neparametrický jadrový odhad hustoty |
+| `Normal`    | Parametrický Gaussov model hustoty |
 
 ---
 
-**Použité balíky:**
-- `ggplot2`, `dplyr`, `tidyr`, `gt`, `stats` (KDE, dnorm), `approxfun`
+**Vizualizácia:**
+
+- Vizualizáciu zabezpečuje funkcia `render_conditional_discrete_densities()`, ktorá:
+  - zobrazuje podmienené pravdepodobnosti ako horizontálne segmenty škálované podľa výšky pravdepodobnosti,
+  - používa rôzne **tvary a čiary** podľa typu metódy (`linetype`, `shape`),
+  - voliteľne spája hodnoty podľa úrovní odozvy pomocou `geom_path()` (ak `ordinal = TRUE`).
 
 ---
 
 **Poznámky:**
-- Použitie `kernel_density` a `normal_density` sú nezávislé, môžu byť zapnuté zároveň.
-- Ak je `predictor` diskrétny, použije sa výhradne empirické rozdelenie.
-- Ak `density_df` neobsahuje dáta, funkcia vráti varovanie.
 
-
+- Výstupná tabuľka s pravdepodobnosťami sa sumarizuje a zobrazuje pomocou `gt`.
+- Odozva je považovaná za **diskrétnu s usporiadanými kategóriami** (ak sa používa `ordinal = TRUE`).
+- Pri malej vzorke pre konkrétnu kategóriu alebo extrémnych hustotách sa môžu niektoré sekcie vynechať.
 
