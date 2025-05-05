@@ -34,6 +34,19 @@ Modelovanie zmesi spojitých a diskrétnych náhodných premenných, ako špecif
 
 Podobne ako to bolo v jednorozmernom prípade, aj viacrozmerné združené rozdelenie možno reprezentovať rôznymi funkciami. My sa v tejto práci budeme zaoberať iba dvojrozmerným prípadom. Dve náhodné premenné $X_1$ a $X_2$ sú najčastejšie charakterizované združenou pravdepodobnostnou funkciou, hustotou alebo distribučnou funkciou, a to v závislosti od typu premenných a existencie uzavretej podoby funkčného vzťahu.
 
+\bigskip
+
+Ak sú obe premenné $X_1$ a $X_2$ diskrétne, predpokladáme, že nadobúdajú hodnoty v konečných množinách
+\[
+\mathcal{X}_1 = \{x_{1}^{(1)}, x_{1}^{(2)}, \dots, x_{1}^{(m)}\} \quad \text{a} \quad
+\mathcal{X}_2 = \{x_{2}^{(1)}, x_{2}^{(2)}, \dots, x_{2}^{(n)}\}.
+\]
+Súbor všetkých možných kombinácií hodnôt týchto premenných je potom daný kartézskym súčinom
+\[
+\mathcal{X}_1 \times \mathcal{X}_2 = \{(x_1, x_2) \mid x_1 \in \mathcal{X}_1,\, x_2 \in \mathcal{X}_2\},
+\]
+na ktorom bude definovaná príslušná pravdepodobnostná funkcia.
+
 \subsubsection{Hustota pravdepodobnosti}\label{subsec:joint_pdf}
 
 V prípade diskrétnych premenných sa namiesto hustoty používa \textit{združená pravdepodobnostná funkcia} (angl. joint probability mass function), ktorá každému páru hodnôt $(x_1, x_2)$ priraďuje konkrétnu pravdepodobnosť výskytu: 
@@ -297,9 +310,32 @@ Týmto sme zaviedli pojem podmienenej hustoty, ktorý bude ďalej kľúčový pr
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.8\linewidth]{cond_normal_densities.png}
+    \includegraphics[width=0.6\linewidth]{cond_normal_densities.png}
     \caption{Podmienené hustoty pre premenné (Odozva) $Y=$ \textit{Dĺžka zobáka tučniaka} a (Prediktor) $X=$ \textit{Hmotnosť tučniaka} (parametrický prístup: \textit{normálne rozdelenie}, kap.~\ref{subsubsec:parametric_models})}
     \label{fig:cond_normal_densities}
+\end{figure}
+
+\bigskip
+
+Analogický vzťah platí aj v prípade diskrétnych premenných. Ak $X_1$ a $X_2$ sú diskrétne náhodné premenné, potom podmienená pravdepodobnostná funkcia premennej $X_2$ vzhľadom na $X_1 = x_1$ je definovaná ako:
+
+\begin{equation}
+p_{2 \mid 1}(x_2 \mid x_1) = \frac{p(x_1, x_2)}{p_1(x_1)},
+\end{equation}
+
+kde:
+\begin{itemize}
+  \item $p(x_1, x_2)$ je združená pravdepodobnostná funkcia,
+  \item $p_1(x_1) = \sum_{x_2 \in \mathcal{X}_2} p(x_1, x_2)$ je marginálna pravdepodobnosť premennej $X_1$.
+\end{itemize}
+
+Tento vzťah vychádza priamo z definície podmienenej pravdepodobnosti a vyjadruje pravdepodobnosť konkrétnej hodnoty $x_2$, za predpokladu, že hodnota $x_1$ už nastala.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\linewidth]{cond_probs.png}
+    \caption{Podmienená pravdepodobnostná funkcia pre premenné (Odozva) $Y=$ \textit{Druh} a (Prediktor) $X=$ \textit{Ostrov ako miesto výskytu}}
+    \label{fig:cond_probs}
 \end{figure}
 
 \subsubsection{Stredná hodnota}\label{subsubsec:conditional_mean}
@@ -309,7 +345,7 @@ Vo všeobecnosti podmienená stredná hodnota vyjadruje očakávanú hodnotu jed
 Pre diskrétne náhodné premenné $X$ a $Y$ je podmienená stredná hodnota premennej $Y$ vzhľadom na to, že $X = x$, definovaná ako:
 
 \begin{equation}
-\mu_{Y|X} = \mathbb{E}[Y|X = x] = \sum_{y} y \cdot \mathrm{Pr}(Y = y \mid X = x)
+\mu_{Y|X} = \mathbb{E}[Y|X = x] = \sum_{y} y \cdot p_{Y \mid X}(y \mid x)
 \end{equation}
 
 Analogicky, ak ide o spojité premenné, tak platí:
@@ -648,7 +684,15 @@ Z týchto dôvodov sa v aplikáciách uplatňujú alternatívne stratégie ako n
 
 Latentný prístup modeluje diskrétnu premennú ako \textit{prahovanie (thresholding)} nepozorovanej spojitej veličiny. Tento model je obzvlášť vhodný pre ordinálne premenné, no pre nominálne nemusí byť vždy interpretovateľný alebo vhodný.
 
-Podrobnejšie rozpracovanie týchto techník však presahuje rámec tejto práce a preto sa im ďalej venovať nebudeme.
+Latentné premenné sa bežne uplatňujú aj v kopulovom modelovaní, najmä v prípadoch, keď chceme využiť spojitú kopulu pre diskrétnu alebo ordinálnu premennú. V tomto prístupe sa každá diskrétna premenná modeluje ako prahovanie latentnej spojitej veličiny. Napríklad ordinálna premenná $D$ vzniká ako:
+
+\[
+D = j \quad \text{ak} \quad \alpha_{j-1} < Z \leq \alpha_j, \quad j = 1, \dots, K,
+\]
+
+kde $Z$ je latentná spojitá premenná (často štandardne normálna) a $\{\alpha_j\}$ sú prahy. Následne sa kopula modeluje medzi spojitou premennou a latentnou $Z$ namiesto pozorovanej diskrétnej $D$. Tento prístup umožňuje zachovať výhody spojitých kopúl a zároveň rozšíriť ich použitie na zmiešané typy premenných (\textcite[Kapitola~1.1.2: Copulas]{pleisMixtureDissertation}).
+
+Takýto latentný prístup je teda veľmi cenným riešením aj v prípadoch, kde bežná aplikácia kopúl zlyháva kvôli nespojitosti marginálnych distribúcií.
 
 \subsection{Modelovanie združeného rozdelenia ako kombináciu podmienených hustôt}\label{subsec:glom_joint_mixture}
 
