@@ -101,7 +101,7 @@ printVariables <- function(data) {
   )
 }
 
-model_mixture_density <- function(data, discrete_vars, continuous_vars, model_type = "kernel", bw = NULL, abort_signal = NULL) {
+model_mixture_density <- function(data, discrete_vars, continuous_vars, model_type = "kernel", bw = NULL) {
   
   all_levels <- sort(unique(data[[discrete_vars]]))
   data <- data %>% filter(!is.na(.data[[discrete_vars]]), !is.na(.data[[continuous_vars]]))
@@ -376,7 +376,7 @@ render_mixture_density <- function(model_output, plot_type = "2D") {
   ))
 }
 
-model_continuous_density <- function(data, continuous_vars, model_type = "kernel", abort_signal = NULL) {
+model_continuous_density <- function(data, continuous_vars, model_type = "kernel") {
   
   result <- list()
   
@@ -585,9 +585,7 @@ render_continuous_density <- function(model_output, data, plot_type = "2D") {
   ))
 }
 
-model_continuous_density_copula <- function(data, continuous_vars, model_type = "nonparametric", copula_type = "empirical (beta)", marginal_densities = NULL, abort_signal = NULL) {
-  
-  if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
+model_continuous_density_copula <- function(data, continuous_vars, model_type = "nonparametric", copula_type = "empirical (beta)", marginal_densities = NULL) {
   
   # Modelovanie zdruzenej hustoty cez kopulovu funkciu a marginalne rozdelenie (vsetko neparametricke)
   if (model_type == "nonparametric") {
@@ -603,8 +601,6 @@ model_continuous_density_copula <- function(data, continuous_vars, model_type = 
     kde_y_density <- approxfun(kde_y$x, kde_y$y, rule = 2)
     kde_y_cdf <- approxfun(kde_y$x, cumsum(kde_y$y) / sum(kde_y$y), rule = 2)
     
-    if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
-    
     u1 <- kde_x_cdf(data[[continuous_vars[1]]])
     u2 <- kde_y_cdf(data[[continuous_vars[2]]])
     empirical_data <- pobs(cbind(u1, u2))
@@ -615,14 +611,11 @@ model_continuous_density_copula <- function(data, continuous_vars, model_type = 
       stop("Unsupported copula_type. Only 'empirical (beta)' is allowed here.")
     }
     
-    if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
-    
     x_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
     y_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
     grid <- expand.grid(x = x_vals, y = y_vals)
     
     copula_density_function <- function(x, y) {
-      if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
       
       u1 <- kde_x_cdf(x)
       u2 <- kde_y_cdf(y)
@@ -1214,9 +1207,7 @@ render_continuous_density_copula <- function(model_output, data, model_type = "n
   }
 }
 
-model_joint_pmf <- function(data, discrete_vars, abort_signal = NULL) {
-  
-  if (!is.null(abort_signal) && isTRUE(abort_signal())) stop("Aborted by user.")
+model_joint_pmf <- function(data, discrete_vars) {
   
   tab <- as.data.frame(table(data[, discrete_vars]))
   tab$Probability <- tab$Freq / sum(tab$Freq)
@@ -1373,10 +1364,7 @@ render_joint_pmf <- function(model_output, plot_type = "2D") {
   )
 }
 
-model_joint_distribution_density <- function(data, selected_variables, model_type = NULL, bw = NULL, use_copula = FALSE, copula_type = NULL, marginal_densities = c("dnorm", "dnorm"), abort_signal = NULL) {
-  if (!is.null(abort_signal) && isTRUE(abort_signal())) {
-    stop("Aborted by user.")
-  }
+model_joint_distribution_density <- function(data, selected_variables, model_type = NULL, bw = NULL, use_copula = FALSE, copula_type = NULL, marginal_densities = c("dnorm", "dnorm")) {
   
   # Identifikacia typov premennych
   variable_types <- identify_variables(data)
@@ -1385,11 +1373,11 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
   variables_count <- length(discrete_vars) + length(continuous_vars)
   
   if (length(selected_variables) == 2 && length(continuous_vars) == 0) {
-    result <- model_joint_pmf(data, discrete_vars, abort_signal)
+    result <- model_joint_pmf(data, discrete_vars)
     return(result)
   } else if (length(selected_variables) == 2 && length(discrete_vars) == 0) {
     if (use_copula == FALSE) {
-      result <- model_continuous_density(data, continuous_vars, model_type, abort_signal)
+      result <- model_continuous_density(data, continuous_vars, model_type)
       return(result)
     }
     else {
@@ -1397,12 +1385,12 @@ model_joint_distribution_density <- function(data, selected_variables, model_typ
         stop("Ak je 'use_copula' = 'TRUE', musi byt specifikovany aj parameter 'copula_type'.")
       }
       else {
-        result <- model_continuous_density_copula(data, continuous_vars, model_type, copula_type, marginal_densities, abort_signal)
+        result <- model_continuous_density_copula(data, continuous_vars, model_type, copula_type, marginal_densities)
         return(result)
       }
     }
   } else if (length(selected_variables) == 2 && length(discrete_vars) == 1) {
-    result <- model_mixture_density(data, discrete_vars, continuous_vars, model_type, bw, abort_signal)
+    result <- model_mixture_density(data, discrete_vars, continuous_vars, model_type, bw)
     return(result)
   }
 }
@@ -1550,23 +1538,7 @@ model_conditional_mean <- function(data, selected_variables, mean_method = "line
       standardize_gt_table()
   )
   
-  # Vizualizacia
-  p <- ggplot(data, aes_string(x = predictor_name, y = response_name)) +
-    geom_point(alpha = 0.4, color = "orange") +
-    geom_line(aes(x = x_seq, y = mean_pred), color = "blue", size = 1.2) +
-    geom_point(aes(x = specific_x, y = specific_mean), color = "blue", size = 3) +
-    annotate("text", x = specific_x, y = specific_mean,
-             label = paste0("E[Y|X=", round(specific_x, 2), "]=", round(specific_mean, 2)),
-             hjust = -0.1, color = "blue") +
-    labs(
-      title = paste0("Podmienená stredná hodnota (R² = ", round(r_squared, 3), ")"),
-      x = paste0(predictor_name, " (Prediktor)"),
-      y = paste0(response_name, " (Odozva)")
-    ) +
-    theme_minimal()
-  
   return(list(
-    plot = p,
     conditional_mean = data.frame(X = x_seq, E_Y_given_X = mean_pred),
     specific_x = specific_x,
     specific_mean = specific_mean,
@@ -1655,42 +1627,13 @@ model_conditional_quantiles <- function(data, selected_variables, quantile_metho
     )
   }
   
-  # Vizualizacia
   plot_data <- data.frame(X = x_seq)
   for (q in quantiles) {
     plot_data[[paste0("Quantile_", q)]] <- quantile_preds[[as.character(q)]]
   }
   
-  p <- ggplot(data, aes_string(x = predictor_name, y = response_name)) +
-    geom_point(alpha = 0.4, color = "orange") +
-    labs(
-      title = "Podmienené kvantilové funkcie",
-      x = paste0(predictor_name, " (Prediktor)"),
-      y = paste0(response_name, " (Odozva)")
-    ) +
-    theme_minimal()
-  
-  for (q in quantiles) {
-    p <- p + geom_line(
-      data = plot_data,
-      aes_string(x = "X", y = paste0("Quantile_", q)),
-      size = 1,
-      linetype = "dashed",
-      color = "red"
-    )
-    
-    p <- p + geom_point(data = data.frame(specific_x = specific_x, y_val = specific_quantiles[[as.character(q)]]),
-                        mapping = aes(x = specific_x, y = y_val),
-                        color = "red", size = 3)
-    
-    q_label <- paste0("Q_", q, "(Y|X=", round(specific_x, 2), ")=", round(specific_quantiles[[as.character(q)]], 2))
-    p <- p + annotate("text", x = specific_x, y = specific_quantiles[[as.character(q)]],
-                      label = q_label, hjust = -0.1, color = "red")
-  }
-  
   return(list(
-    plot = p,
-    conditional_quantiles = dplyr::select(plot_data, X, dplyr::starts_with("Quantile_")),
+    conditional_quantiles = plot_data,
     specific_x = specific_x,
     specific_quantiles = specific_quantiles,
     summaries = summary_tables
@@ -1859,11 +1802,15 @@ combine_conditional_models <- function(data, selected_variables, mean_method = "
   
   p <- ggplot(data, aes_string(x = predictor_name, y = response_name)) +
     geom_point(alpha = 0.4, color = "orange") +
-    geom_line(data = mean_result$conditional_mean, aes(x = X, y = E_Y_given_X),
-              color = "blue", size = 1.2, linetype = "solid") +
-    geom_point(data = data.frame(specific_x = mean_result$specific_x, specific_mean = mean_result$specific_mean),
-               mapping = aes(x = specific_x, y = specific_mean),
-               color = "blue", size = 3) +
+    geom_line(
+      data = mean_result$conditional_mean, aes(x = X, y = E_Y_given_X),
+      color = "blue", size = 1.2, linetype = "solid"
+    ) +
+    geom_point(
+      data = data.frame(specific_x = mean_result$specific_x, specific_mean = mean_result$specific_mean),
+      mapping = aes(x = specific_x, y = specific_mean),
+      color = "blue", size = 3
+    ) +
     annotate("text",
              x = mean_result$specific_x,
              y = mean_result$specific_mean,
@@ -2409,8 +2356,8 @@ classification_model <- function(data, response_name, predictor_names, method = 
 }
 
 model_conditional_continuous_densities <- function(df, n_breaks, density_scaling, mean_curve, quantiles,
-                                                  mean_poly_degree, quantile_poly_degree,
-                                                  normal_density, kernel_density, bw_scale) {
+                                                   mean_poly_degree, quantile_poly_degree,
+                                                   normal_density, kernel_density, bw_scale) {
   
   response_name <- attr(df, "response_var")
   predictor_name <- attr(df, "predictor_var")
@@ -2444,18 +2391,18 @@ model_conditional_continuous_densities <- function(df, n_breaks, density_scaling
     df$predictor_numeric <- df$predictor
   } 
   
-    if (predictor_is_discrete) {
-      
-      x_factor_original <- factor(df$predictor)
-      category_levels <- levels(x_factor_original)
-      category_numeric <- seq_along(category_levels)
-      names(category_numeric) <- category_levels
-      
-      df$predictor_numeric <- as.numeric(x_factor_original)
-      x_numeric <- df$predictor_numeric
-      x <- x_numeric
-      
-      unique_vals <- sort(unique(x))
+  if (predictor_is_discrete) {
+    
+    x_factor_original <- factor(df$predictor)
+    category_levels <- levels(x_factor_original)
+    category_numeric <- seq_along(category_levels)
+    names(category_numeric) <- category_levels
+    
+    df$predictor_numeric <- as.numeric(x_factor_original)
+    x_numeric <- df$predictor_numeric
+    x <- x_numeric
+    
+    unique_vals <- sort(unique(x))
     if (n_breaks > length(unique_vals)) {
       n_breaks <- length(unique_vals)
     }
@@ -2753,7 +2700,7 @@ render_conditional_continuous_densities <- function(model_output) {
   ))
 }
 
-model_conditional_discrete_densities <- function(df, n_breaks = 4, density_scaling = 1) {
+model_conditional_discrete_densities <- function(df, n_breaks = 4, density_scaling = 1, normal_density = TRUE, kernel_density = TRUE) {
   response_name <- attr(df, "response_var")
   predictor_name <- attr(df, "predictor_var")
   
@@ -2788,7 +2735,8 @@ model_conditional_discrete_densities <- function(df, n_breaks = 4, density_scali
           d = d_val,
           Category = response_levels[d_val],
           prob = prob,
-          y = d_val
+          y = d_val,
+          method = "Empirical"
         )
       }
     }
@@ -2798,34 +2746,65 @@ model_conditional_discrete_densities <- function(df, n_breaks = 4, density_scali
     center_labels <- paste0("(", round(head(breaks, -1), 1), ", ", round(tail(breaks, -1), 1), "]")
     
     prior_probs <- prop.table(table(df$response))
-    f_C <- density(df$predictor)
-    f_C_fun <- approxfun(f_C$x, f_C$y, rule = 2)
+    
+    if (kernel_density) {
+      f_C <- density(df$predictor)
+      f_C_fun <- approxfun(f_C$x, f_C$y, rule = 2)
+    } else if (normal_density) {
+      mu_c <- mean(df$predictor, na.rm = TRUE)
+      sigma_c <- sd(df$predictor, na.rm = TRUE)
+      f_C_fun <- function(c) dnorm(c, mean = mu_c, sd = sigma_c)
+    }
     
     for (d in names(prior_probs)) {
       d_val <- as.numeric(d)
       sub_df <- df[df$response == d_val, ]
       if (nrow(sub_df) < 2) next
       
-      f_c_given_d <- density(sub_df$predictor)
-      f_c_given_d_fun <- approxfun(f_c_given_d$x, f_c_given_d$y, rule = 2)
+      if (kernel_density) {
+        f_c_given_d <- density(sub_df$predictor)
+        f_c_given_d_fun <- approxfun(f_c_given_d$x, f_c_given_d$y, rule = 2)
+      }
+      if (normal_density) {
+        mu <- mean(sub_df$predictor)
+        sigma <- sd(sub_df$predictor)
+      }
       
       for (j in seq_along(centers)) {
         c <- centers[j]
         section_label <- center_labels[j]
-        numerator <- prior_probs[d] * f_c_given_d_fun(c)
         denominator <- f_C_fun(c)
-        cond_prob <- ifelse(denominator > 0, numerator / denominator, 0)
-        jitter_y <- d_val + runif(1, -0.1, 0.1)
         
-        density_data[[length(density_data) + 1]] <- data.frame(
-          x_center = c,
-          x_center_numeric = c,
-          section = section_label,
-          d = d_val,
-          Category = response_levels[d_val],
-          prob = cond_prob,
-          y = jitter_y
-        )
+        if (kernel_density) {
+          numerator_kde <- prior_probs[d] * f_c_given_d_fun(c)
+          cond_prob_kde <- ifelse(denominator > 0, numerator_kde / denominator, 0)
+          density_data[[length(density_data) + 1]] <- data.frame(
+            x_center = c,
+            x_center_numeric = c,
+            section = section_label,
+            d = d_val,
+            Category = response_levels[d_val],
+            prob = cond_prob_kde,
+            y = d_val + runif(1, -0.1, 0.1),
+            method = "KDE"
+          )
+        }
+        
+        if (normal_density && is.finite(mu) && is.finite(sigma) && sigma > 0) {
+          f_c_given_d_norm <- dnorm(c, mean = mu, sd = sigma)
+          numerator_norm <- prior_probs[d] * f_c_given_d_norm
+          cond_prob_norm <- ifelse(denominator > 0, numerator_norm / denominator, 0)
+          density_data[[length(density_data) + 1]] <- data.frame(
+            x_center = c,
+            x_center_numeric = c,
+            section = section_label,
+            d = d_val,
+            Category = response_levels[d_val],
+            prob = cond_prob_norm,
+            y = d_val + runif(1, -0.1, 0.1),
+            method = "Normal"
+          )
+        }
       }
     }
     df$predictor_numeric <- df$predictor
@@ -2879,49 +2858,73 @@ render_conditional_discrete_densities <- function(model_output, ordinal = FALSE)
   if (ordinal) {
     p <- p + geom_segment(
       data = density_df,
-      aes(x = x_center_numeric, xend = x_end, y = y, yend = y, color = d),
-      size = 1
+      aes(x = x_center_numeric, xend = x_end, y = y, yend = y, color = d, linetype = method),
+      size = 1,
+      inherit.aes = FALSE
     ) +
       geom_point(
         data = density_df,
-        aes(x = x_end, y = y, color = d),
-        shape = 15, size = 2
+        aes(x = x_end, y = y, color = d, shape = method),
+        size = 2,
+        inherit.aes = FALSE
       )
     
     sections <- unique(density_df$section)
+    methods <- unique(density_df$method)
+    
     for (s in sections) {
-      sub_density <- density_df %>% dplyr::filter(section == s) %>% dplyr::arrange(y)
-      if (nrow(sub_density) >= 2) {
-        p <- p + geom_path(
-          data = sub_density,
-          aes(x = x_end, y = y),
-          color = "darkorchid",
-          linewidth = 1
-        )
+      for (m in methods) {
+        sub_density <- density_df %>% dplyr::filter(section == s, method == m) %>% dplyr::arrange(y)
+        if (nrow(sub_density) >= 2) {
+          p <- p + geom_path(
+            data = sub_density,
+            aes(x = x_end, y = y, group = interaction(section, method)),
+            color = "darkorchid",
+            linewidth = 1,
+            inherit.aes = FALSE
+          )
+        }
       }
     }
   } else {
     p <- p + geom_segment(
       data = density_df,
-      aes(x = x_center_numeric, xend = x_end, y = y, yend = y, color = d),
-      size = 1
+      aes(x = x_center_numeric, xend = x_end, y = y, yend = y, color = d, linetype = method),
+      size = 1,
+      inherit.aes = FALSE
     ) +
       geom_point(
         data = density_df,
-        aes(x = x_end, y = y, color = d),
-        shape = 15, size = 2
+        aes(x = x_end, y = y, color = d, shape = method),
+        size = 2,
+        inherit.aes = FALSE
       )
   }
+  
+  p <- p +
+    scale_linetype_manual(values = c("KDE" = "solid", "Normal" = "dashed", "Empirical" = "solid")) +
+    scale_shape_manual(values = c("KDE" = 15, "Normal" = 17, "Empirical" = 15)) +
+    guides(
+      linetype = guide_legend(title = "Metóda"),
+      shape = guide_legend(title = "Metóda")
+    )
   
   summary_gt <- NULL
   if (!is.null(density_df) && nrow(density_df) > 0) {
     probability_summary <- density_df %>%
       dplyr::mutate(
         Section = as.character(section),
+        Category = as.character(Category),
         Probability = round(prob, 4)
       ) %>%
       dplyr::select(Section, Category, Probability) %>%
-      tidyr::pivot_wider(names_from = Category, values_from = Probability, values_fill = 0)
+      tidyr::pivot_wider(
+        names_from = Category,
+        values_from = Probability,
+        values_fill = as.list(setNames(rep(0, length(unique(density_df$Category))), unique(density_df$Category)))
+      )
+    
+    colnames(probability_summary) <- as.character(colnames(probability_summary))
     
     summary_gt <- apply_dark_gt_theme(
       gt::gt(probability_summary) %>%
@@ -2929,8 +2932,10 @@ render_conditional_discrete_densities <- function(model_output, ordinal = FALSE)
           title = gt::md("**Estimated Conditional Probabilities**"),
           subtitle = "Across predictor sections"
         ) %>%
-        gt::cols_label(.list = setNames(paste0("Y = ", colnames(probability_summary)[-1]),
-                                        colnames(probability_summary)[-1])) %>%
+        gt::cols_label(.list = setNames(
+          paste0("Y = ", colnames(probability_summary)[-1]),
+          colnames(probability_summary)[-1]
+        )) %>%
         gt::cols_width(everything() ~ gt::px(140)) %>%
         gt::opt_table_font(font = "Arial") %>%
         standardize_gt_table()

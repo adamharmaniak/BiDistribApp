@@ -527,6 +527,8 @@ server <- function(input, output, session) {
         
         conditionalPanel(
           condition = "output.condResponseType == 'diskretna'",
+          checkboxInput("normal_density", "Show normal conditional density", value = TRUE),
+          checkboxInput("kernel_density", "Show kernel conditional density", value = TRUE),
           checkboxInput("ordinal", "Ordinal (for discrete responses)", value = FALSE)
         ),
         
@@ -588,8 +590,7 @@ server <- function(input, output, session) {
           bw = bw_value,
           use_copula = use_copula,
           copula_type = copula_type,
-          marginal_densities = marginal_densities,
-          abort_signal = abort_requested
+          marginal_densities = marginal_densities
         )
         
         incProgress(1, detail = "Calculation finished. Proceeding with rendering...")
@@ -1298,7 +1299,7 @@ server <- function(input, output, session) {
           bw_scale = bw_scale
         )
         
-        result <- render_conditional_continuous_densities(model_output)
+        result <- render_conditional_continuous_densities(model_output = model_output)
         
         output$model_outputs_conditional <- renderPlot({ result$plot })
         
@@ -1315,10 +1316,12 @@ server <- function(input, output, session) {
             `attr<-`("response_var", input$cond_response) %>%
             `attr<-`("predictor_var", input$cond_predictor),
           n_breaks = n_breaks,
-          density_scaling = density_scaling
+          density_scaling = density_scaling,
+          normal_density = normal_density,
+          kernel_density = kernel_density
         )
         
-        result <- render_conditional_discrete_densities(model_output, ordinal = ordinal)
+        result <- render_conditional_discrete_densities(model_output = model_output, ordinal = ordinal)
         
         conditional_discrete_result(result)
         
