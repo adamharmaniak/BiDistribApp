@@ -1283,7 +1283,7 @@ server <- function(input, output, session) {
     
     tryCatch({
       if (cond_response_type() == "spojita") {
-        result <- plot_conditional_densities(
+        model_output <- model_conditional_densities(
           data = data,
           selected_variables = selected_vars,
           n_breaks = n_breaks,
@@ -1298,6 +1298,8 @@ server <- function(input, output, session) {
           bw_scale = bw_scale
         )
         
+        result <- render_conditional_continuous_densities(model_output)
+        
         output$model_outputs_conditional <- renderPlot({ result$plot })
         
         output$conditional_density_summary <- gt::render_gt({
@@ -1305,7 +1307,7 @@ server <- function(input, output, session) {
         })
         
       } else if (cond_response_type() == "diskretna") {
-        result <- plot_conditional_discrete_densities(
+        model_output <- model_conditional_discrete_densities(
           df = data.frame(
             predictor = data[[input$cond_predictor]],
             response = data[[input$cond_response]]
@@ -1313,9 +1315,10 @@ server <- function(input, output, session) {
             `attr<-`("response_var", input$cond_response) %>%
             `attr<-`("predictor_var", input$cond_predictor),
           n_breaks = n_breaks,
-          density_scaling = density_scaling,
-          ordinal = ordinal
+          density_scaling = density_scaling
         )
+        
+        result <- render_conditional_discrete_densities(model_output, ordinal = ordinal)
         
         conditional_discrete_result(result)
         
