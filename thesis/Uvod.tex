@@ -1,7 +1,18 @@
 \chapter{Úvod}
 
-Úlohou úvodu je uviesť čitateľa do problematiky práce. Ak ste nepísali Predhovor, tak na tomto mieste môžete popísať ciele práce. Obvykle sa tu nezachádza do detailov teórie a nebýva tu veľa vzorcov. Môžete tu prípadne vysvetliť základné pojmy, s ktorými budete narábať.
+Modelovanie rozdelenia pravdepodobnosti náhodných premenných predstavuje základný nástroj v štatistickej analýze. V reálnych aplikáciách však čoraz častejšie narážame na situácie, kde sa v rámci jedného modelovaného priestoru vyskytujú premenné rôzneho typu – \textit{spojité}, \textit{diskrétne} alebo ich \textit{kombinácia}. Kým klasické štatistické prístupy sa prevažne zameriavajú na homogénne dátové štruktúry, moderné úlohy ako generatívne modelovanie (angl. generative modeling), zhluková analýza, bayesovská štatistika či rozhodovanie sa na základe rôznych predikčných modelov už vyžadujú prácu s takzvanými \textit{zmiešanými náhodnými vektormi}.
 
-Je tu priestor na charakterizáciu stavu poznania v oblasti, ktorá je predmetom záverečnej práce, citovanie literatúry (knihy, vedecké články, iné záverečné práce) ktorá rieši podobnú problematiku, uviesť, z akých zdrojov vychádzate alebo na ne priamo nadväzujete. (Toto je veľmi dôležité v dizertačnej práci.)
+Cieľom tejto práce je navrhnúť a implementovať všeobecný rámec pre modelovanie združeného rozdelenia pravdepodobnosti, ktoré zahŕňa ľubovoľnú dvojrozmernú kombináciu spojitých a diskrétnych náhodných premenných. Za kľúčový koncept môžeme považovať využitie rozkladu na marginálie a kopulovú funkciu pre spojité premenné a \textit{váženého súčtu podmienených hustôt} v prípade zmiešaných rozdelení. Takto definované modely umožňujú nielen spoľahlivý popis štatistickej štruktúry údajov, ale zároveň tvoria základ pre odvodenie podmienených rozdelení, ktoré sú následne použiteľné v úlohách regresie a klasifikácie.
 
-Ak ste nepísali Predhovor, tak je dobré  na konci Úvodu stručne povedať o členení práce -- o čom sú jednotlivé kapitoly, prípadne sekcie práce.
+Práca sa opiera o niekoľko kľúčových odborných zdrojov, predovšetkým o praktickú učebnicu \textit{Pokročilé metódy štatistického modelovania od Tomáša Bacigála (2024)}\cite{bacigalPokrocileMetody}, ktorá poskytuje ucelený teoretický základ pre modelovanie rôznych typov rozdelení, a dizertačnú prácu \textit{Johna Pleisa - Mixtures of Discrete and Continuous Variables: Considerations for Dimension Reduction (2018)}\cite{pleisMixtureDissertation}, ktorá sa venuje teoretickým a praktickým aspektom zmiešaných rozdelení a redukcie dimenzie v ich kontexte. Tieto zdroje boli podkladom pre návrh a špecifikáciu jednotlivých funkcionálnych komponentov navrhnutého systému výslednej aplikácie.
+
+Okrem teoretickej analýzy rozdelení pravdepodobnosti práca obsahuje aj praktickú implementáciu nástrojov na:
+
+\begin{itemize}
+  \item modelovanie dvojrozmerných rozdelení (spojitých, diskrétnych, zmiešaných),
+  \item odhad združeného rozdelenia pravdepodobnosti pomocou parametrických, neparametrických a hybridných prístupov,
+  \item modelovanie podmienených hustôt pre spojité aj diskrétne odozvy a ľubovoľné typy prediktorov,
+  \item vizualizáciu a interpretáciu výstupov prostredníctvom grafov a sumarizačných tabuliek daných modelov
+\end{itemize}
+
+Práca je členená do štyroch hlavných kapitol. V úvodnej kapitole sú zhrnuté základné pojmy a typy modelovania. Druhá kapitola sa venuje teoretickým aspektom združených rozdelení, ako napr. rozkladu na marginálne hustoty a kopulu. Tretia kapitola popisuje implementáciu konkrétnych modelovacích funkcií pre rôzne typy náhodných vektorov. Záver patrí aplikáciám, kde sú prezentované vizualizácie a praktické ukážky použitia modelov na reálnych dátach.

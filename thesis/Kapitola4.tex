@@ -493,7 +493,7 @@ Funkcia vracia zoznam s nasledovnými komponentmi:
 
 Vizualizácia výstupu sa realizuje cez funkciu \texttt{render\_conditional\_continuous\_densities()}, ktorá zobrazuje hustoty aj krivky, a umožňuje kombinovať rôzne typy modelov (napr. KDE vs. normálne hustoty) na jednej ploche.
 
-\subsection{Diskrétna odozva}
+\subsection{Implementácia pre diskrétnu odozvu}
 
 V prípade, že odozvou $Y$ je diskrétna premenná, cieľom je modelovať podmienenú pravdepodobnosť $p_{Y \mid X}(y \mid x)$ – teda pravdepodobnosť výskytu konkrétnej kategórie odozvy vzhľadom na hodnotu prediktora $X$. 
 
@@ -584,4 +584,65 @@ Vizualizáciu zabezpečuje funkcia \texttt{render\_conditional\_discrete\_densit
 
 \section{Ukážka aplikácie}\label{sec:app_preview}
 
+\subsection{Regresný model}
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{preview_regression_part1.png}
+    \caption{Ukážka výstupu regresného modelu - 1.časť}
+    \subcaption{Odozva $Y$: \texttt{Dĺžka krídel}, Prediktor $X$: \texttt{Hmotnosť} + Kvantilové krivky $Q_{Y \mid X}(0.05)$ a $Q_{Y \mid X}(0.95)$ modelované metódou \texttt{"spline"} + stredná hodnota $\mathbb{E}[Y \mid X]$ modelovaná ako polynomiálna funkcia 2. stupňa}
+    \label{fig:preview_regression_part1}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{preview_regression_part2.png}
+    \caption{Ukážka výstupu regresného modelu - 2.časť}
+    \label{fig:preview_regression_part2}
+\end{figure}
+
+\subsection{Klasifikačný model}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\linewidth]{preview_classification.png}
+    \caption{Ukážka výstupu klasifikačného modelu}
+    \subcaption{Odozva $Y$: \texttt{Druh}, Prediktor $X$: \texttt{Dĺžka krídel} + Metóda: Logistická regresia(\texttt{"logistic"})}
+    \label{fig:preview_classification}
+\end{figure}
+
+\subsection{Združené rozdelenie}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.65\linewidth]{preview_joint_dist_cont.png}
+    \caption{Ukážka 3D výstupu združenej hustoty pravdepodobnosti - spojitý vektor}
+    \subcaption{Premenné: \texttt{Hmotnosť} a \texttt{Dĺžka krídel} - modelované cez rozklad na marginálie(odhad obidvoch cez KDE) a kopulu(Frank) + rezy touto hustotou vo vybranom bode}
+    \label{fig:preview_joint_dist_cont}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.65\linewidth]{preview_joint_dist_mix.png}
+    \caption{Ukážka 2D výstupu združenej hustoty pravdepodobnosti - zmiešaný vektor}
+    \subcaption{Premenné: \texttt{Druh} a \texttt{Dĺžka krídel} - hustoty modelované pomocou jadrového vyhladzovania}
+    \label{fig:preview_joint_dist_mix}
+\end{figure}
+
+\subsection{Aplikácie združeného rozdelenia}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.65\linewidth]{preview_cond_dens.png}
+    \caption{Ukážka výstupu podmieňovania združeného rozdelenia - spojitý vektor}
+    \subcaption{Premenné: \texttt{Hmotnosť} a \texttt{Dĺžka krídel} - hustoty modelované pomocou jadrového vyhladzovania (červené) a ako normálne rozdelenie (modré) + kubická podmienená stredná hodnota (tmavomodrá krivka) a kubické kvantilové funkcie (fialové čiarkované krivky)}
+    \label{fig:preview_cond_dens}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.65\linewidth]{preview_cond_prob.png}
+    \caption{Ukážka výstupu podmieňovania združeného rozdelenia - zmiešaný vektor}
+    \subcaption{Premenné: \texttt{Druh} a \texttt{Dĺžka krídel} - pravdepodobnosti modelované z podmienených hustôt pomocou KDE (neprerušované so štvorcom) a ako normálne rozdelenie (prerušované s trojuholníkom)}
+    \label{fig:preview_cond_prob}
+\end{figure}
