@@ -9,6 +9,7 @@ server <- function(input, output, session) {
   quantile_inputs <- reactiveVal(list(0.05))
   cond_quantile_inputs <- reactiveVal(list(0.05))
   cond_response_type <- reactiveVal(NULL)
+  cond_predictor_type <- reactiveVal(NULL)
   loaded_data <- reactiveVal(NULL)
   abort_requested <- reactiveVal(FALSE)
   clicked_points <- reactiveVal(data.frame(x = numeric(), y = numeric()))
@@ -70,6 +71,18 @@ server <- function(input, output, session) {
       cond_response_type("diskretna")
     } else if (input$cond_response %in% var_types$Spojite) {
       cond_response_type("spojita")
+    } else {
+      cond_response_type(NULL)
+    }
+  })
+  
+  observeEvent(input$cond_predictor, {
+    req(loaded_data())
+    var_types <- identify_variables(loaded_data())
+    if (input$cond_predictor %in% var_types$Diskretne) {
+      cond_predictor_type("diskretna")
+    } else if (input$cond_response %in% var_types$Spojite) {
+      cond_predictor_type("spojita")
     } else {
       cond_response_type(NULL)
     }
@@ -486,50 +499,98 @@ server <- function(input, output, session) {
         
         conditionalPanel(
           condition = "output.condResponseType == 'spojita'",
-          checkboxInput("mean_curve", "Visualize Mean Curve", value = FALSE),
-          checkboxInput("quantile_curve", "Show Quantile Curves", value = FALSE),
           
           conditionalPanel(
-            condition = "input.quantile_curve == true",
-            uiOutput("cond_quantiles_ui")
+            condition = "output.condPredictorType == 'spojita'",
+            
+            checkboxInput("mean_curve", "Visualize Mean Curve", value = FALSE),
+            checkboxInput("quantile_curve", "Show Quantile Curves", value = FALSE),
+            
+            conditionalPanel(
+              condition = "input.quantile_curve == true",
+              uiOutput("cond_quantiles_ui")
+            ),
+            
+            selectInput("cond_mean_poly_degree", "Polynomial degree of mean:",
+                        choices = 1:4,
+                        selected = isolate(input$cond_mean_poly_degree) %||% 1),
+            
+            selectInput("cond_quantile_poly_degree", "Polynomial degree of quantiles:",
+                        choices = 1:4,
+                        selected = isolate(input$cond_quantile_poly_degree) %||% 1),
+            
+            checkboxInput("normal_density", "Show normal conditional density", value = FALSE),
+            checkboxInput("kernel_density", "Show kernel conditional density", value = FALSE),
+            checkboxInput("t_density", "Show t conditional density", value = FALSE),
+            checkboxInput("copula_density", "Show copula conditional density", value = FALSE),
+            
+            conditionalPanel(
+              condition = "input.copula_density == true",
+              selectInput("copula_type_cond", "Copula",
+                          choices = c("Clayton", "Gumbel", "Frank", "Joe", "t", "empirical (beta)"),
+                          selected = isolate(input$copula_type_cond) %||% "Clayton"
+              ),
+              selectInput(
+                "marginal_density_cond_1", "Marginal density (X):",
+                choices = c("normal", "log_normal", "t", "KDE"),
+                selected = isolate(input$marginal_density_cond_1)
+              ),
+              selectInput(
+                "marginal_density_cond_2", "Marginal density (Y):",
+                choices = c("normal", "log_normal", "t", "KDE"),
+                selected = isolate(input$marginal_density_cond_2)
+              )
+            ),
+            
+            conditionalPanel(
+              condition = "output.condResponseType != null",
+              numericInput("density_scaling", "Density scaling:",
+                           value = 100, min = 0.1, max = 100000, step = 100)
+            ),
+            
+            numericInput("n_breaks", "Number of subwindows (n_breaks):",
+                         value = 5, min = 1, max = 10, step = 1)
+            
           ),
           
-          selectInput("cond_mean_poly_degree", "Polynomial degree of mean:",
-                      choices = 1:4,
-                      selected = isolate(input$cond_mean_poly_degree) %||% 1),
-          
-          selectInput("cond_quantile_poly_degree", "Polynomial degree of quantiles:",
-                      choices = 1:4,
-                      selected = isolate(input$cond_quantile_poly_degree) %||% 1),
-          
-          checkboxInput("normal_density", "Show normal conditional density", value = TRUE),
-          checkboxInput("kernel_density", "Show kernel conditional density", value = TRUE),
-          checkboxInput("manual_bw_scale", "Manual Scaling of bw", value = FALSE),
-          
           conditionalPanel(
-            condition = "input.manual_bw_scale == true",
-            tagList(
-              numericInput("bw_scale", "Bandwidth scaling (bw_scale):",
-                           value = 1, min = 0.1, max = 50, step = 0.1),
-              helpText("Scaling factor for bandwidth used in estimating kernel density. 
+            condition = "output.condPredictorType == 'diskretna'",
+            
+            checkboxInput("normal_density", "Show normal conditional density", value = FALSE),
+            checkboxInput("kernel_density", "Show kernel conditional density", value = FALSE),
+            checkboxInput("t_density", "Show t conditional density", value = FALSE),
+            checkboxInput("manual_bw", "Manual Setting of Bandwidth", value = FALSE),
+            
+            
+            conditionalPanel(
+              condition = "input.manual_bw == true",
+              tagList(
+                numericInput("bw", "Bandwidth (bw):",
+                             value = 1, min = 0.1, max = 50, step = 0.1),
+                helpText("Bandwidth used in estimating kernel density. 
               Higher values increase smoothing; lower values make the density curve sharper.")
+              )
             )
           )
-        ),
-        
-        conditionalPanel(
-          condition = "output.condResponseType != null",
-          numericInput("n_breaks", "Number of subwindows (n_breaks):",
-                       value = 5, min = 1, max = 10, step = 1),
-          numericInput("density_scaling", "Density scaling:",
-                       value = 100, min = 0.1, max = 100000, step = 100)
+          
         ),
         
         conditionalPanel(
           condition = "output.condResponseType == 'diskretna'",
-          checkboxInput("normal_density", "Show normal conditional density", value = TRUE),
-          checkboxInput("kernel_density", "Show kernel conditional density", value = TRUE),
-          checkboxInput("ordinal", "Ordinal (for discrete responses)", value = FALSE)
+          
+          conditionalPanel(
+            condition = "output.condPredictorType == 'spojita'",
+            checkboxInput("normal_density", "Show normal conditional density", value = FALSE),
+            checkboxInput("kernel_density", "Show kernel conditional density", value = FALSE),
+            checkboxInput("ordinal", "Ordinal (for discrete responses)", value = FALSE),
+            numericInput("n_breaks", "Number of subwindows (n_breaks):",
+                         value = 5, min = 1, max = 10, step = 1)
+          ),
+          
+          conditionalPanel(
+            condition = "output.condPredictorType == 'diskretna'",
+            checkboxInput("ordinal", "Ordinal (for discrete responses)", value = FALSE)
+          )
         ),
         
         div(
@@ -548,6 +609,11 @@ server <- function(input, output, session) {
     cond_response_type()
   })
   outputOptions(output, "condResponseType", suspendWhenHidden = FALSE)
+  
+  output$condPredictorType <- reactive({
+    cond_predictor_type()
+  })
+  outputOptions(output, "condPredictorType", suspendWhenHidden = FALSE)
   
   # Zdruzena hustota
   observeEvent(input$run_density_model, {
@@ -1268,58 +1334,223 @@ server <- function(input, output, session) {
       NULL
     }
     
+    normal_density <- FALSE
+    kernel_density <- FALSE
+    copula_density <- FALSE
+    t_density <- FALSE
+    
     mean_poly_degree <- input$cond_mean_poly_degree
     quant_poly_degree <- input$cond_quantile_poly_degree
-    n_breaks <- input$n_breaks
+    n_breaks <- NULL
     density_scaling <- input$density_scaling
     normal_density <- input$normal_density
     kernel_density <- input$kernel_density
+    copula_density <- input$copula_density
+    t_density <- input$t_density
     ordinal <- input$ordinal
-    bw_scale <- if (isTRUE(input$manual_bw_scale)) input$bw_scale else NULL
+    bw <- if (isTRUE(input$manual_bw)) input$bw else NULL
+    copula_type_cond <- input$copula_type_cond
     
-    if (!normal_density && !kernel_density && cond_response_type() == "spojita") {
-      showNotification("At least one density type (normal or kernel) must be selected.", type = "error")
+    marginal_densities_cond <- NULL
+    if (copula_density) {
+      marginal_densities_cond <- c(input$marginal_density_cond_1, input$marginal_density_cond_2)
+    }
+    
+    if (!normal_density && !kernel_density && !copula_density && !t_density && cond_response_type() == "spojita") {
+      showNotification("At least one density type (normal, kernel, or copula) must be selected.", type = "error")
       return(NULL)
     }
     
     tryCatch({
       if (cond_response_type() == "spojita") {
-        model_output <- model_conditional_densities(
-          data = data,
-          selected_variables = selected_vars,
-          n_breaks = n_breaks,
-          density_scaling = density_scaling,
-          ordinal = ordinal,
-          mean_curve = mean_curve,
-          quantiles = quantiles,
-          mean_poly_degree = mean_poly_degree,
-          quantile_poly_degree = quant_poly_degree,
-          normal_density = normal_density,
-          kernel_density = kernel_density,
-          bw_scale = bw_scale
-        )
+        mixture_model_outputs <- list()
+        model_output_copula <- NULL
+        model_output_normal <- NULL
+        model_output_kernel <- NULL
+        model_output_t <- NULL
         
-        result <- render_conditional_continuous_densities(model_output = model_output)
-        
-        output$model_outputs_conditional <- renderPlot({ result$plot })
-        
-        output$conditional_density_summary <- gt::render_gt({
-          result$summary_gt
-        })
+        if (cond_predictor_type() == "spojita") {
+          n_breaks <- input$n_breaks
+          
+          withProgress(message = "Calculating selected densities...", value = 0, {
+            incProgress(0.1, detail = "Initializing models...")
+            
+            if (copula_density) {
+              model_output_copula <- model_continuous_density_copula(data, selected_vars, model_type = "hybrid", copula_type = copula_type_cond, marginal_densities = marginal_densities_cond)
+              
+              matplot(
+                x = model_output_copula$y_vals,
+                y = model_output_copula$z_matrix[, c(10, 30, 50, 70, 90)],
+                type = "l", lty = 1, col = rainbow(5),
+                xlab = "y (response)", ylab = "f(y | x_j)", main = "Rôzne rezy združenej hustoty (copula)"
+              )
+              legend("topright", legend = paste("x =", round(model_output_copula$x_vals[c(10, 30, 50, 70, 90)], 2)), col = rainbow(5), lty = 1)
+              
+            }
+            if (normal_density) {
+              model_output_normal <- model_continuous_density(data, selected_vars, model_type = "normal")
+              
+              matplot(
+                x = model_output_normal$y_vals,
+                y = model_output_normal$z_matrix[, c(10, 30, 50, 70, 90)],
+                type = "l", lty = 1, col = rainbow(5),
+                xlab = "y (response)", ylab = "f(y | x_j)", main = "Rôzne rezy združenej hustoty (normal)"
+              )
+              legend("topright", legend = paste("x =", round(model_output_normal$x_vals[c(10, 30, 50, 70, 90)], 2)), col = rainbow(5), lty = 1)
+            }
+            if (kernel_density) {
+              model_output_kernel <- model_continuous_density(data, selected_vars, model_type = "kernel")
+              
+              matplot(
+                x = model_output_kernel$y_vals,
+                y = model_output_kernel$z_matrix[, c(10, 30, 50, 70, 90)],
+                type = "l", lty = 1, col = rainbow(5),
+                xlab = "y (response)", ylab = "f(y | x_j)", main = "Rôzne rezy združenej hustoty (kernel)"
+              )
+              legend("topright", legend = paste("x =", round(model_output_kernel$x_vals[c(10, 30, 50, 70, 90)], 2)), col = rainbow(5), lty = 1)
+            }
+            if (t_density) {
+              model_output_t <- model_continuous_density(data, selected_vars, model_type = "t")
+              
+              matplot(
+                x = model_output_t$y_vals,
+                y = model_output_t$z_matrix[, c(10, 30, 50, 70, 90)],
+                type = "l", lty = 1, col = rainbow(5),
+                xlab = "y (response)", ylab = "f(y | x_j)", main = "Rôzne rezy združenej hustoty (t)"
+              )
+              legend("topright", legend = paste("x =", round(model_output_t$x_vals[c(10, 30, 50, 70, 90)], 2)), col = rainbow(5), lty = 1)
+            }
+            incProgress(1, detail = "Calculation finished.")
+            Sys.sleep(1.5)
+          })
+          
+          withProgress(message = "Calculating conditional densities...", value = 0, {
+            incProgress(0.1, detail = "Initializing models...")
+            model_output <- model_conditional_continuous_densities(
+              df = data.frame(
+                predictor = data[[input$cond_predictor]],
+                response = data[[input$cond_response]]
+              ) %>%
+                `attr<-`("response_var", input$cond_response) %>%
+                `attr<-`("predictor_var", input$cond_predictor),
+              n_breaks = n_breaks,
+              density_scaling = density_scaling,
+              mean_curve = mean_curve,
+              quantiles = quantiles,
+              mean_poly_degree = mean_poly_degree,
+              quantile_poly_degree = quant_poly_degree,
+              model_output_kernel = model_output_kernel,
+              model_output_normal = model_output_normal,
+              model_output_t = model_output_t,
+              model_output_copula = model_output_copula
+            )
+            incProgress(1, detail = "Calculation finished. Proceeding with rendering...")
+            Sys.sleep(1.5)
+          })
+          
+          result <- render_conditional_continuous_densities(model_output = model_output)
+          
+          output$model_outputs_conditional <- renderPlot({ result$plot })
+          
+          output$conditional_density_summary <- gt::render_gt({
+            result$summary_gt
+          })
+        } else if (cond_predictor_type() == "diskretna") {
+          
+          withProgress(message = "Calculating selected densities...", value = 0, {
+            incProgress(0.1, detail = "Initializing models...")
+            
+            if (normal_density) {
+              mixture_model_outputs[["normal"]] <- model_mixture_density(
+                data = data,
+                discrete_vars = selected_vars[2],
+                continuous_vars = selected_vars[1],
+                model_type = "normal",
+                bw = bw
+              )
+            }
+            if (kernel_density) {
+              mixture_model_outputs[["kernel"]] <- model_mixture_density(
+                data = data,
+                discrete_vars = selected_vars[2],
+                continuous_vars = selected_vars[1],
+                model_type = "kernel",
+                bw = bw
+              )
+            }
+            if (t_density) {
+              mixture_model_outputs[["t"]] <- model_mixture_density(
+                data = data,
+                discrete_vars = selected_vars[2],
+                continuous_vars = selected_vars[1],
+                model_type = "t",
+                bw = bw
+              )
+            }
+            
+            incProgress(1, detail = "Calculation finished.")
+            Sys.sleep(1.5)
+          })
+          
+          withProgress(message = "Calculating conditional densities...", value = 0, {
+            incProgress(0.1, detail = "Initializing models...")
+            
+            model_output <- model_conditional_continuous_densities(
+              df = data.frame(
+                predictor = data[[input$cond_predictor]],
+                response = data[[input$cond_response]]
+              ) %>%
+                `attr<-`("response_var", input$cond_response) %>%
+                `attr<-`("predictor_var", input$cond_predictor),
+              n_breaks = n_breaks,
+              density_scaling = density_scaling,
+              mean_curve = mean_curve,
+              quantiles = quantiles,
+              mean_poly_degree = mean_poly_degree,
+              quantile_poly_degree = quant_poly_degree,
+              mixture_model_outputs = mixture_model_outputs,
+              model_output_kernel = model_output_kernel,
+              model_output_normal = model_output_normal,
+              model_output_t = model_output_t,
+              model_output_copula = model_output_copula
+            )
+            
+            incProgress(1, detail = "Calculation finished. Proceeding with rendering...")
+            Sys.sleep(1.5)
+          })
+          
+          result <- render_conditional_continuous_densities(model_output = model_output)
+          
+          output$model_outputs_conditional <- renderPlot({ result$plot })
+          
+          output$conditional_density_summary <- gt::render_gt({
+            result$summary_gt
+          })
+          
+        }
         
       } else if (cond_response_type() == "diskretna") {
-        model_output <- model_conditional_discrete_densities(
-          df = data.frame(
-            predictor = data[[input$cond_predictor]],
-            response = data[[input$cond_response]]
-          ) %>%
-            `attr<-`("response_var", input$cond_response) %>%
-            `attr<-`("predictor_var", input$cond_predictor),
-          n_breaks = n_breaks,
-          density_scaling = density_scaling,
-          normal_density = normal_density,
-          kernel_density = kernel_density
-        )
+        n_breaks <- input$n_breaks
+        
+        withProgress(message = "Calculating conditional probabilities...", value = 0, {
+          incProgress(0.1, detail = "Initializing models...")
+          
+          model_output <- model_conditional_discrete_densities(
+            df = data.frame(
+              predictor = data[[input$cond_predictor]],
+              response = data[[input$cond_response]]
+            ) %>%
+              `attr<-`("response_var", input$cond_response) %>%
+              `attr<-`("predictor_var", input$cond_predictor),
+            n_breaks = n_breaks,
+            density_scaling = density_scaling,
+            normal_density = normal_density,
+            kernel_density = kernel_density
+          )
+        
+        incProgress(1, detail = "Calculation finished. Proceeding with rendering...")
+        Sys.sleep(1.5)
+        })
         
         result <- render_conditional_discrete_densities(model_output = model_output, ordinal = ordinal)
         
@@ -1349,6 +1580,14 @@ server <- function(input, output, session) {
     }, error = function(e) {
       showNotification(paste("Chyba:", e$message), type = "error")
     })
+    
+    normal_density <- FALSE
+    kernel_density <- FALSE
+    copula_density <- FALSE
+    t_density <- FALSE
+    
   })
   
-}
+  }
+
+  

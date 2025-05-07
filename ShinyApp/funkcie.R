@@ -118,7 +118,13 @@ model_mixture_density <- function(data, discrete_vars, continuous_vars, model_ty
   data[[discrete_vars]] <- factor(data[[discrete_vars]], levels = all_levels)
   categories <- levels(data[[discrete_vars]])
   
-  category_colors <- setNames(RColorBrewer::brewer.pal(length(categories), "Set1"), categories)
+  palette_size <- length(categories)
+  palette_colors <- if (palette_size <= 9) {
+    RColorBrewer::brewer.pal(palette_size, "Set1")
+  } else {
+    scales::hue_pal()(palette_size)
+  }
+  category_colors <- setNames(palette_colors, categories)
   
   # Pravdepodobnosti kategorii
   category_probs <- prop.table(table(data[[discrete_vars]]))
@@ -314,9 +320,9 @@ render_mixture_density <- function(model_output, plot_type = "2D") {
     
     # Scatter plot
     scatter_plot <- ggplot(raw_data, aes_string(x = continuous_var, y = discrete_var, color = discrete_var)) +
-      geom_point(size = 3, alpha = 0.7) +
+      geom_point(size = 3, alpha = 0.7, show.legend = FALSE) +
       labs(x = continuous_var, y = discrete_var) +
-      scale_color_manual(values = colors) +
+      scale_color_manual(values = colors, guide = "none") +
       theme_minimal() +
       theme(legend.position = "right")
     
@@ -383,8 +389,8 @@ model_continuous_density <- function(data, continuous_vars, model_type = "kernel
   if (model_type == "kernel") {
     
     kde_result <- MASS::kde2d(
-      x = data[[continuous_vars[1]]], 
-      y = data[[continuous_vars[2]]], 
+      x = data[[continuous_vars[2]]], 
+      y = data[[continuous_vars[1]]], 
       n = 100
     )
     
@@ -404,14 +410,14 @@ model_continuous_density <- function(data, continuous_vars, model_type = "kernel
     
   } else if (model_type == "normal" || model_type == "t") {
     
-    mean_x <- mean(data[[continuous_vars[1]]], na.rm = TRUE)
-    sd_x <- sd(data[[continuous_vars[1]]], na.rm = TRUE)
-    mean_y <- mean(data[[continuous_vars[2]]], na.rm = TRUE)
-    sd_y <- sd(data[[continuous_vars[2]]], na.rm = TRUE)
-    cor_val <- cor(data[[continuous_vars[1]]], data[[continuous_vars[2]]], method = "pearson", use = "complete.obs")
+    mean_x <- mean(data[[continuous_vars[2]]], na.rm = TRUE)
+    sd_x <- sd(data[[continuous_vars[2]]], na.rm = TRUE)
+    mean_y <- mean(data[[continuous_vars[1]]], na.rm = TRUE)
+    sd_y <- sd(data[[continuous_vars[1]]], na.rm = TRUE)
+    cor_val <- cor(data[[continuous_vars[2]]], data[[continuous_vars[1]]], method = "pearson", use = "complete.obs")
     
-    x_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
-    y_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
+    x_vals <- seq(min(data[[continuous_vars[2]]], na.rm = TRUE), max(data[[continuous_vars[2]]], na.rm = TRUE), length.out = 100)
+    y_vals <- seq(min(data[[continuous_vars[1]]], na.rm = TRUE), max(data[[continuous_vars[1]]], na.rm = TRUE), length.out = 100)
     grid <- expand.grid(x = x_vals, y = y_vals)
     
     if (model_type == "normal") {
@@ -772,6 +778,8 @@ model_continuous_density_copula <- function(data, continuous_vars, model_type = 
     
     if (copula_type == "empirical (beta)") {
       copula_model_fitted <- empCopula(pobs(cbind(u1, u2)), smoothing = "beta")
+      rho_fitted <- NA
+      df_fitted <- NA
     } else {
       copula_model <- switch(copula_type,
                              "Clayton" = claytonCopula(param = 2, dim = 2),
@@ -826,6 +834,8 @@ model_continuous_density_copula <- function(data, continuous_vars, model_type = 
       copula_part * marginal_x * marginal_y
     }
     
+    fx_vals <- sapply(x_vals, function(xi) marginal_density_function(xi, mean_x, sd_x, 1))
+    
     grid$z <- mapply(copula_density_function, grid$x, grid$y)
     z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
     
@@ -841,6 +851,7 @@ model_continuous_density_copula <- function(data, continuous_vars, model_type = 
       x_vals = x_vals,
       y_vals = y_vals,
       z_matrix = z_matrix,
+      fx_vals = fx_vals,
       continuous_vars = continuous_vars,
       copula_type = copula_type,
       marginal_densities = marginal_densities,
@@ -2357,7 +2368,8 @@ classification_model <- function(data, response_name, predictor_names, method = 
 
 model_conditional_continuous_densities <- function(df, n_breaks, density_scaling, mean_curve, quantiles,
                                                    mean_poly_degree, quantile_poly_degree,
-                                                   normal_density, kernel_density, bw_scale) {
+                                                   mixture_model_outputs = list(),
+                                                   model_output_kernel, model_output_normal, model_output_t, model_output_copula) {
   
   response_name <- attr(df, "response_var")
   predictor_name <- attr(df, "predictor_var")
@@ -2374,25 +2386,27 @@ model_conditional_continuous_densities <- function(df, n_breaks, density_scaling
   x <- x[valid_idx]
   y <- y[valid_idx]
   
-  h_default <- c(
-    if (is.numeric(x)) bandwidth.nrd(x) else NA,
-    bandwidth.nrd(y)
-  )
-  h_scaled <- if (!is.null(bw_scale)) h_default * bw_scale else h_default
-  
   if (!predictor_is_discrete) {
-    dens2d <- MASS::kde2d(x, y, n = 100, h = h_scaled)
-    dens_x <- density(x, bw = if (!is.null(bw_scale)) bw_scale * bandwidth.nrd(x) else "nrd0", n = 100)
+    if (!is.null(model_output_copula)) {
+      dens2d <- list(
+        x = model_output_copula$y_vals,
+        y = model_output_copula$x_vals,
+        z = t(model_output_copula$z_matrix)
+      )
+    } else {
+      dens2d <- MASS::kde2d(x, y, n = 100)
+    }
     
-    x_seq <- dens2d$x 
+    dens_x <- density(x, bw = "nrd0", n = 100)
+    
+    x_seq <- dens2d$x
     y_range <- range(y, na.rm = TRUE)
     y_seq <- seq(y_range[1], y_range[2], length.out = 300)
     
     df$predictor_numeric <- df$predictor
-  } 
+  }
   
   if (predictor_is_discrete) {
-    
     x_factor_original <- factor(df$predictor)
     category_levels <- levels(x_factor_original)
     category_numeric <- seq_along(category_levels)
@@ -2402,13 +2416,8 @@ model_conditional_continuous_densities <- function(df, n_breaks, density_scaling
     x_numeric <- df$predictor_numeric
     x <- x_numeric
     
-    unique_vals <- sort(unique(x))
-    if (n_breaks > length(unique_vals)) {
-      n_breaks <- length(unique_vals)
-    }
-    
-    breaks <- unique_vals[1:n_breaks]
-    x_seq <- sort(unique(x))
+    breaks <- x_numeric[match(category_levels, as.character(df$predictor))]
+    x_seq <- sort(unique(x_numeric))
     
   } else {
     eps <- 0.001 * diff(range(x, na.rm = TRUE))
@@ -2421,94 +2430,83 @@ model_conditional_continuous_densities <- function(df, n_breaks, density_scaling
   
   if (predictor_is_discrete) {
     
-    # Vyberieme prvých n_breaks kategórií (podľa poradia vo faktore)
-    if (n_breaks > length(category_levels)) {
-      warning("Počet požadovaných rezov (n_breaks) je väčší ako počet kategórií. Skracujem.")
-      n_breaks <- length(category_levels)
-    }
-    selected_levels <- category_levels[1:n_breaks]
-    
-    print("Druhá pauza")
-    
-    for (i in seq_along(selected_levels)) {
-      level_label <- selected_levels[i]
-      #xi_numeric <- as.numeric(as.character(level_label))  # pozicia pre vizualizaciu
-      xi_numeric <- category_numeric[level_label]
+    for (model_type in names(mixture_model_outputs)) {
+      safe_approx <- function(x, y, xout, rule = 2) {
+        x <- as.numeric(x)
+        y <- as.numeric(y)
+        
+        valid <- is.finite(x) & is.finite(y)
+        x <- x[valid]
+        y <- y[valid]
+        
+        if (length(x) < 2 || length(unique(x)) < 2 || length(y) != length(x)) {
+          warning("Skipping approx(): insufficient or invalid data")
+          return(rep(0, length(xout)))
+        }
+        
+        tryCatch({
+          approx(x = x, y = y, xout = xout, rule = rule)$y
+        }, error = function(e) {
+          warning(paste("approx() failed:", e$message))
+          rep(0, length(xout))
+        })
+      }
       
-      y_subset <- y[x_factor_original == level_label]
+      output <- mixture_model_outputs[[model_type]]
+      y_min <- suppressWarnings(min(output$density_data$Continuous_Var, na.rm = TRUE))
+      y_max <- suppressWarnings(max(output$density_data$Continuous_Var, na.rm = TRUE))
       
-      print("Tretia pauza")
-      finite_y <- y_subset[is.finite(y_subset)]
-      if (length(finite_y) <= 1) {
-        warning(paste("Preskakujem level", level_label, "- má len", length(finite_y), "validných hodnôt"))
+      if (!is.finite(y_min) || !is.finite(y_max) || y_min == y_max) {
+        warning(paste("Invalid y range for model:", model_type))
         next
       }
-      print(paste("Počet finite hodnôt:", length(finite_y)))
       
-      if (length(finite_y) > 1) {
-        # Definicia spolocnej y-sekvencie pre hustotu
-        y_seq <- seq(min(y_subset, na.rm = TRUE), max(y_subset, na.rm = TRUE), length.out = 300)
+      y_seq <- seq(y_min, y_max, length.out = 100)
+      
+      fade_density <- density(rep(0, 100), bw = 0.3, n = 100, from = -1, to = 1)
+      fade_factor <- fade_density$y / max(fade_density$y)
+      
+      observed_levels <- sort(unique(as.character(output$density_data$Discrete_Var)))
+      category_numeric <- setNames(seq_along(observed_levels), observed_levels)
+      
+      for (cat in observed_levels) {
+        sub_df <- output$density_data[output$density_data$Discrete_Var == cat, ] %>%
+          dplyr::group_by(Continuous_Var) %>%
+          dplyr::summarise(Density = mean(Density), .groups = "drop") %>%
+          dplyr::arrange(Continuous_Var)
         
-        if (length(y_seq) >= 2 && is.finite(min(y_seq)) && is.finite(max(y_seq)) && min(y_seq) < max(y_seq)) {
-          fade_density <- density(rep(0, 100), bw = 0.3, n = length(y_seq), from = -1, to = 1)
-          fade_factor <- fade_density$y / max(fade_density$y)
-        } else {
-          warning(paste("Preskakujem výpočet fade_density pre level:", level_label, "- nevalidná y_seq."))
-          next  # preskoč túto iteráciu
-        }
-        print(paste("y_seq length:", length(y_seq)))
-        print(range(y_seq))
-        
-        # KDE
-        if (kernel_density) {
-          bw_yi <- if (!is.null(bw_scale)) bw_scale * bw.nrd0(y_subset) else bw.nrd0(y_subset)
-          dens_yi <- density(y_subset, bw = bw_yi, n = length(y_seq), from = min(y_seq), to = max(y_seq))
+        if (nrow(sub_df) >= 2 && length(unique(sub_df$Continuous_Var)) >= 2 && length(sub_df$Density) >= 2) {
           
-          valid_idx <- is.finite(dens_yi$x) & is.finite(dens_yi$y)
-          x_vals <- dens_yi$x[valid_idx]
-          y_vals <- dens_yi$y[valid_idx]
+          sub_df <- sub_df[order(sub_df$Continuous_Var), ]
           
-          if (
-            length(x_vals) >= 2 &&
-            length(y_vals) == length(x_vals) &&
-            length(unique(x_vals)) >= 2
-          ) {
-            if (length(x_vals) < 2 || length(unique(x_vals)) < 2) {
-              print(paste("x_vals:", paste(round(x_vals, 2), collapse = ", ")))
-              print(paste("y_vals:", paste(round(y_vals, 2), collapse = ", ")))
+          interpolated <- safe_approx(
+            x = sub_df$Continuous_Var,
+            y = sub_df$Density,
+            xout = y_seq
+          )
+          
+          f_scaled <- interpolated * fade_factor
+          f_scaled[!is.finite(f_scaled)] <- 0
+          
+          if (max(f_scaled) > 0) {
+            cat <- as.character(cat)
+            f_scaled <- f_scaled / max(f_scaled)
+            
+            if (max(f_scaled) < 0.01) {
+              f_scaled <- f_scaled * 50
             }
-            interpolated <- approx(x_vals, y_vals, xout = y_seq, rule = 2)$y
-            f_scaled <- interpolated * fade_factor
-            f_scaled[!is.finite(f_scaled)] <- 0
-            if (max(f_scaled) > 0) {
-              f_scaled <- f_scaled / max(f_scaled) * density_scaling
+            
+            if (!is.na(category_numeric[cat])) {
+              xi_numeric <- as.numeric(category_numeric[cat])
+              
               density_data[[length(density_data) + 1]] <- data.frame(
-                x = xi_numeric - f_scaled,
+                x = xi_numeric,
                 y = y_seq,
-                section = level_label,
-                type = "KDE"
-              )
-            }
-          } else {
-            warning(paste("Preskakujem approx() pre level:", level_label, "- má nevalidné x_vals"))
-          }
-        }
-        
-        # Normal
-        if (normal_density) {
-          mu_y <- mean(y_subset)
-          sigma_y <- sd(y_subset)
-          if (is.finite(sigma_y) && sigma_y > 0) {
-            f_y <- dnorm(y_seq, mean = mu_y, sd = sigma_y)
-            f_scaled <- f_y * fade_factor
-            f_scaled[!is.finite(f_scaled)] <- 0
-            if (max(f_scaled) > 0) {
-              f_scaled <- f_scaled / max(f_scaled) * density_scaling
-              density_data[[length(density_data) + 1]] <- data.frame(
-                x = xi_numeric - f_scaled,
-                y = y_seq,
-                section = level_label,
-                type = "normal"
+                width = f_scaled,
+                section = cat,
+                type = model_type,
+                category_numeric = xi_numeric,
+                category_label = cat
               )
             }
           }
@@ -2516,9 +2514,9 @@ model_conditional_continuous_densities <- function(df, n_breaks, density_scaling
       }
     }
     
-    df$predictor_numeric <- x_numeric
-  }
-  else {
+    df$predictor_numeric <- x
+    
+  } else {
     
     epsilon <- 0.02 * diff(range(x))
     max_n_local <- max(sapply(breaks, function(xi) sum(abs(x - xi) <= epsilon)))
@@ -2531,41 +2529,107 @@ model_conditional_continuous_densities <- function(df, n_breaks, density_scaling
       fade_density <- density(rep(0, 100), bw = 0.3, n = length(y_seq), from = -1, to = 1)
       fade_factor <- fade_density$y / max(fade_density$y)
       
-      # Neparametricky odhad: jadrove vyhladzovanie
-      if (kernel_density) {
-        col_idx <- which.min(abs(dens2d$x - xi))
-        fxy <- dens2d$z[, col_idx]
-        fx <- approx(dens_x$x, dens_x$y, xout = xi, rule = 2)$y
-        if (!is.na(fx) && fx > 1e-6) {
+      if (!is.null(model_output_copula)) {
+        col_idx <- which.min(abs(model_output_copula$y_vals - xi))
+        fxy <- model_output_copula$z_matrix[, col_idx]
+        fx  <- model_output_copula$fx_vals[col_idx]
+  
+        if (!is.na(fx) && fx > .Machine$double.eps) {
           f_cond <- fxy / fx
           f_cond[is.na(f_cond)] <- 0
-          interpolated <- approx(x = dens2d$y, y = f_cond, xout = y_seq, rule = 2)
+          interpolated <- approx(x = model_output_copula$x_vals, y = f_cond, xout = y_seq, rule = 2)
           f_scaled <- interpolated$y * fade_factor
           scale_factor <- if (max_n_local > 0) sqrt(n_local / max_n_local) else 1
           f_scaled <- f_scaled / max(f_scaled) * density_scaling * scale_factor
           density_data[[length(density_data) + 1]] <- data.frame(
-            x = xi - f_scaled, y = y_seq,
-            section = section_label, type = "KDE"
+            x = xi, y = y_seq, width = f_scaled,
+            section = section_label, type = paste0("copula[", model_output_copula$copula_type, "]")
           )
         }
       }
       
-      # Parametricky odhad hustoty: Bivariatne normalne rozdelenie
-      if (normal_density) {
-        mu <- c(mean(x), mean(y))
-        sigma <- cov(cbind(x, y))
-        fxy_norm <- mvtnorm::dmvnorm(cbind(rep(xi, length(y_seq)), y_seq), mean = mu, sigma = sigma)
-        fx_norm <- dnorm(xi, mean = mu[1], sd = sqrt(sigma[1, 1]))
-        f_cond <- fxy_norm / fx_norm
-        f_cond[is.na(f_cond)] <- 0
-        f_scaled <- f_cond * fade_factor
-        scale_factor <- if (max_n_local > 0) sqrt(n_local / max_n_local) else 1
-        if (n_local < 5) scale_factor <- scale_factor^2
-        f_scaled <- f_scaled / max(f_scaled) * density_scaling * scale_factor
-        density_data[[length(density_data) + 1]] <- data.frame(
-          x = xi - f_scaled, y = y_seq,
-          section = section_label, type = "normal"
-        )
+      if (!is.null(model_output_kernel)) {
+        col_idx <- which.min(abs(model_output_kernel$x_vals - xi))
+        fxy <- model_output_kernel$z_matrix[, col_idx]
+        
+        print(dim(model_output_kernel$z_matrix))
+        print(length(model_output_kernel$x_vals))
+        print(length(model_output_kernel$y_vals))
+        
+        delta_y <- diff(model_output_kernel$y_vals[1:2])
+        fx <- sum(fxy) * delta_y
+        
+        if (!is.na(fx) && fx > .Machine$double.eps) {
+          f_cond <- fxy / fx
+          f_cond[is.na(f_cond)] <- 0
+          
+          interpolated <- approx(
+            x = model_output_kernel$y_vals,
+            y = f_cond,
+            xout = y_seq,
+            rule = 2
+          )
+          
+          f_scaled <- interpolated$y * fade_factor
+          scale_factor <- if (max_n_local > 0) sqrt(n_local / max_n_local) else 1
+          f_scaled <- f_scaled / max(f_scaled) * density_scaling * scale_factor
+          
+          density_data[[length(density_data) + 1]] <- data.frame(
+            x = xi,
+            y = y_seq,
+            width = f_scaled,
+            section = section_label,
+            type = "KDE"
+          )
+        }
+      }
+      
+      if (!is.null(model_output_normal)) {
+        row_idx <- which.min(abs(model_output_normal$x_vals - xi))
+        fxy <- model_output_normal$z_matrix[row_idx, ]
+        
+        fx_vals <- rowSums(model_output_normal$z_matrix) * diff(model_output_normal$y_vals[1:2])
+        fx <- fx_vals[row_idx]
+        
+        if (!is.na(fx) && fx > .Machine$double.eps) {
+          f_cond <- fxy / fx
+          f_cond[is.na(f_cond)] <- 0
+          interpolated <- approx(
+            x = model_output_normal$y_vals,
+            y = f_cond,
+            xout = y_seq,
+            rule = 2
+          )
+          f_scaled <- interpolated$y * fade_factor
+          scale_factor <- if (max_n_local > 0) sqrt(n_local / max_n_local) else 1
+          f_scaled <- f_scaled / max(f_scaled) * density_scaling * scale_factor
+          
+          density_data[[length(density_data) + 1]] <- data.frame(
+            x = xi, y = y_seq, width = f_scaled,
+            section = section_label, type = "normal"
+          )
+        }
+      }
+      
+      if (!is.null(model_output_t)) {
+        row_idx <- which.min(abs(model_output_t$x_vals - xi))
+        fxy <- model_output_t$z_matrix[row_idx, ]
+        
+        fx_vals <- rowSums(model_output_t$z_matrix) * diff(model_output_t$y_vals[1:2])
+        fx <- fx_vals[row_idx]
+        
+        if (!is.na(fx) && fx > .Machine$double.eps) {
+          f_cond <- fxy / fx
+          f_cond[is.na(f_cond)] <- 0
+          interpolated <- approx(x = model_output_t$y_vals, y = f_cond, xout = y_seq, rule = 2)
+          f_scaled <- interpolated$y * fade_factor
+          scale_factor <- if (max_n_local > 0) sqrt(n_local / max_n_local) else 1
+          f_scaled <- f_scaled / max(f_scaled) * density_scaling * scale_factor
+          density_data[[length(density_data) + 1]] <- data.frame(
+            x = xi, y = y_seq, width = f_scaled,
+            section = section_label, type = "t"
+          )
+        }
       }
     }
   }
@@ -2573,22 +2637,28 @@ model_conditional_continuous_densities <- function(df, n_breaks, density_scaling
   if (!predictor_is_discrete && mean_curve) {
     fit <- lm(response ~ poly(predictor_numeric, mean_poly_degree, raw = TRUE), data = df)
     mean_pred <- predict(fit, newdata = data.frame(predictor_numeric = x_seq))
-    mean_curve_data <- data.frame(predictor_numeric = x_seq, y = mean_pred)
+    newdata = data.frame(predictor_numeric = x_seq)
+    mean_curve_data <- data.frame(x = x_seq, y = mean_pred)
   }
   
   if (!predictor_is_discrete && !is.null(quantiles)) {
     for (q in quantiles) {
       rq_fit <- quantreg::rq(response ~ poly(predictor_numeric, quantile_poly_degree, raw = TRUE), tau = q, data = df)
       q_pred <- predict(rq_fit, newdata = data.frame(predictor_numeric = x_seq))
-      quantile_data[[as.character(q)]] <- data.frame(predictor_numeric = x_seq, y = q_pred)
+      quantile_data[[as.character(q)]] <- data.frame(x = x_seq, y = q_pred)
     }
   }
   
-  mu_x <- mean(x, na.rm = TRUE)
-  mu_y <- mean(y, na.rm = TRUE)
-  sd_x <- sd(x, na.rm = TRUE)
-  sd_y <- sd(y, na.rm = TRUE)
-  cor_xy <- cor(x, y, use = "complete.obs")
+  if (length(x) >= 2 && length(y) >= 2 && sum(complete.cases(x, y)) >= 2) {
+    mu_x <- mean(x, na.rm = TRUE)
+    mu_y <- mean(y, na.rm = TRUE)
+    sd_x <- sd(x, na.rm = TRUE)
+    sd_y <- sd(y, na.rm = TRUE)
+    cor_xy <- cor(x, y, use = "complete.obs")
+  } else {
+    warning("Nedostatok platných párov (x, y) na výpočet štatistiky.")
+    mu_x <- mu_y <- sd_x <- sd_y <- cor_xy <- NA
+  }
   
   epsilon <- 0.02 * diff(range(x))
   summary_table <- lapply(breaks, function(xi) {
@@ -2618,7 +2688,6 @@ model_conditional_continuous_densities <- function(df, n_breaks, density_scaling
       response_name = response_name,
       predictor_name = predictor_name,
       predictor_is_discrete = predictor_is_discrete,
-      h_scaled = h_scaled,
       epsilon = epsilon,
       mu_x = mu_x,
       mu_y = mu_y,
@@ -2640,27 +2709,90 @@ render_conditional_continuous_densities <- function(model_output) {
   meta <- model_output$meta
   
   if (meta$predictor_is_discrete) {
-    p <- ggplot(df, aes(x = predictor_numeric, y = response)) +
-      geom_point(alpha = 0.6, color = "darkorange") +
-      geom_vline(xintercept = breaks, linetype = "dashed", color = "grey50")
-  } else {
+    density_df <- dplyr::bind_rows(density_data)
+    
+    category_levels <- sort(unique(density_df$category_label))
+    
+    if (all(suppressWarnings(!is.na(as.numeric(category_levels))))) {
+      
+      category_levels <- as.numeric(category_levels)
+      df$category_label <- as.character(df$predictor)
+      df$category_numeric <- as.numeric(factor(df$category_label, levels = as.character(category_levels)))
+      
+      density_df$category_numeric <- as.numeric(factor(density_df$category_label, levels = as.character(category_levels)))
+      
+      p <- ggplot(df, aes(x = category_numeric, y = response)) +
+        geom_point(alpha = 0.6, color = "darkorange")
+      
+    } else {
+
+      category_levels <- as.character(category_levels)
+      df$category_label <- as.character(df$predictor)
+      df$category_numeric <- as.numeric(factor(df$category_label, levels = category_levels))
+      
+      density_df$category_numeric <- as.numeric(factor(density_df$category_label, levels = category_levels))
+      
+      p <- ggplot(density_df, aes(x = category_numeric, y = y)) +
+        geom_point(alpha = 0.6, color = "darkorange")
+    }
+    
+    # Hustoty
+    if (length(density_data) > 0) {
+      p <- p +
+        geom_path(
+          data = density_df,
+          aes(x = category_numeric - width, y = y, group = interaction(section, type), color = type),
+          linewidth = 1,
+          inherit.aes = FALSE
+        )
+    }
+    
+    # Osy a popis
+    p <- p +
+      scale_x_continuous(
+        breaks = seq_along(category_levels),
+        labels = category_levels,
+        expand = expansion(add = 0.3)
+      ) +
+      labs(
+        x = paste0(meta$predictor_name, " (Prediktor)"),
+        y = paste0(meta$response_name, " (Odozva)")
+      )
+  }
+  else {
     p <- ggplot(df, aes(x = predictor, y = response)) +
       geom_point(alpha = 0.6, color = "darkorange") +
       geom_vline(xintercept = breaks, linetype = "dashed", color = "grey50")
-  }
-  
-  if (length(density_data) > 0) {
-    p <- p + geom_path(
-      data = dplyr::bind_rows(density_data),
-      aes(x = x, y = y, group = interaction(section, type), color = type),
-      linewidth = 1
-    )
+    
+    if (length(density_data) > 0) {
+      density_df <- dplyr::bind_rows(density_data)
+      
+      print("Typy v density_data:")
+      print(sapply(density_data, function(df) unique(df$type)))
+      
+      print("Typy density vrstiev:")
+      print(unique(density_df$type))
+      
+      print("Ukážka density data:")
+      print(head(density_df))
+      
+      type_levels <- unique(density_df$type)
+      colors <- scales::hue_pal()(length(type_levels))
+      names(colors) <- type_levels
+      
+      p <- p + geom_path(
+        data = density_df,
+        aes(x = x - width, y = y, group = interaction(section, type), color = type),
+        linewidth = 1
+      ) +
+        scale_color_manual(values = colors)
+    }
   }
   
   if (!is.null(mean_curve_data)) {
     p <- p + geom_line(
       data = mean_curve_data,
-      aes(x = predictor_numeric, y = y),
+      aes(x = x, y = y),
       color = "blue", linewidth = 1.2
     )
   }
@@ -2669,7 +2801,7 @@ render_conditional_continuous_densities <- function(model_output) {
     for (qdat in quantile_data) {
       p <- p + geom_line(
         data = qdat,
-        aes(x = predictor_numeric, y = y),
+        aes(x = x, y = y),
         color = "purple", linetype = "dashed"
       )
     }
@@ -2679,7 +2811,7 @@ render_conditional_continuous_densities <- function(model_output) {
     labs(
       title = paste("Podmienené hustoty pre", meta$response_name, "podľa", meta$predictor_name),
       x = paste0(meta$predictor_name, " (Prediktor)"),
-      y = paste0(meta$response_name, " (Spojitá odozva)")
+      y = paste0(meta$response_name, " (Odozva)")
     )
   
   summary_gt <- apply_dark_gt_theme(
@@ -2700,7 +2832,7 @@ render_conditional_continuous_densities <- function(model_output) {
   ))
 }
 
-model_conditional_discrete_densities <- function(df, n_breaks = 4, density_scaling = 1, normal_density = TRUE, kernel_density = TRUE) {
+model_conditional_discrete_densities <- function(df, n_breaks, density_scaling, normal_density, kernel_density) {
   response_name <- attr(df, "response_var")
   predictor_name <- attr(df, "predictor_var")
   
@@ -2714,6 +2846,7 @@ model_conditional_discrete_densities <- function(df, n_breaks = 4, density_scali
   density_data <- list()
   
   if (predictor_is_discrete) {
+    
     df$predictor_cat <- factor(df$predictor)
     predictor_levels <- levels(df$predictor_cat)
     df$predictor_numeric <- as.numeric(df$predictor_cat)
