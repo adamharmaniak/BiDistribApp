@@ -2381,7 +2381,7 @@ model_conditional_continuous_densities <- function(df, n_breaks, density_scaling
   var_types <- identify_variables(df)
   predictor_is_discrete <- "predictor" %in% var_types$Diskretne
   
-  valid_idx <- is.finite(x) & is.finite(y)
+  valid_idx <- if (is.numeric(x)) is.finite(x) & is.finite(y) else !is.na(x) & !is.na(y)
   df <- df[valid_idx, ]
   x <- x[valid_idx]
   y <- y[valid_idx]
@@ -2713,28 +2713,16 @@ render_conditional_continuous_densities <- function(model_output) {
     
     category_levels <- sort(unique(density_df$category_label))
     
-    if (all(suppressWarnings(!is.na(as.numeric(category_levels))))) {
-      
-      category_levels <- as.numeric(category_levels)
-      df$category_label <- as.character(df$predictor)
-      df$category_numeric <- as.numeric(factor(df$category_label, levels = as.character(category_levels)))
-      
-      density_df$category_numeric <- as.numeric(factor(density_df$category_label, levels = as.character(category_levels)))
-      
-      p <- ggplot(df, aes(x = category_numeric, y = response)) +
-        geom_point(alpha = 0.6, color = "darkorange")
-      
-    } else {
-
-      category_levels <- as.character(category_levels)
-      df$category_label <- as.character(df$predictor)
-      df$category_numeric <- as.numeric(factor(df$category_label, levels = category_levels))
-      
-      density_df$category_numeric <- as.numeric(factor(density_df$category_label, levels = category_levels))
-      
-      p <- ggplot(density_df, aes(x = category_numeric, y = y)) +
-        geom_point(alpha = 0.6, color = "darkorange")
-    }
+    category_levels <- sort(unique(density_df$category_label))
+    category_levels <- as.character(category_levels)
+    
+    df$category_label <- as.character(df$predictor)
+    df$category_numeric <- as.numeric(factor(df$category_label, levels = category_levels))
+    
+    density_df$category_numeric <- as.numeric(factor(density_df$category_label, levels = category_levels))
+    
+    p <- ggplot(df, aes(x = category_numeric, y = response)) +
+      geom_point(alpha = 0.6, color = "darkorange")
     
     # Hustoty
     if (length(density_data) > 0) {
