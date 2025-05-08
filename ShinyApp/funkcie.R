@@ -2,6 +2,16 @@ source("global.R")
 
 # Funkcie
 
+compute_area <- function(y, f) {
+  valid <- is.finite(y) & is.finite(f)
+  y <- y[valid]
+  f <- f[valid]
+  
+  if (length(y) < 2) return(NA)
+  
+  sum(diff(y) * (head(f, -1) + tail(f, -1)) / 2)
+}
+
 apply_dark_gt_theme <- function(gt_tbl, highlight_rows = NULL, highlight_color = "#ffe0b2") {
   gt_tbl <- gt_tbl %>%
     # Základné nastavenia tmavého štýlu
@@ -834,10 +844,20 @@ model_continuous_density_copula <- function(data, continuous_vars, model_type = 
       copula_part * marginal_x * marginal_y
     }
     
-    fx_vals <- sapply(x_vals, function(xi) marginal_density_function(xi, mean_x, sd_x, 1))
+    fx_vals <- sapply(y_vals, function(xi) marginal_density_function(xi, mean_y, sd_y, 2))
     
     grid$z <- mapply(copula_density_function, grid$x, grid$y)
-    z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
+    #z_matrix <- matrix(grid$z, nrow = 100, byrow = FALSE)
+    z_matrix <- matrix(grid$z, nrow = 100, ncol = 100, byrow = FALSE)
+    
+    dx <- diff(x_vals[1:2])
+    dy <- diff(y_vals[1:2])
+    area_total <- sum(z_matrix) * dx * dy
+    
+    if (!is.na(area_total) && area_total > 0 && abs(area_total - 1) > 0.01) {
+      z_matrix <- z_matrix / area_total
+      message(sprintf("Znormalizovaná hustota – pôvodná plocha bola %.8f", area_total))
+    }
     
     df_value <- tryCatch({
       if (inherits(copula_model_fitted, "tCopula")) {
@@ -2485,12 +2505,16 @@ model_conditional_continuous_densities <- function(df, n_breaks, density_scaling
             xout = y_seq
           )
           
-          f_scaled <- interpolated * fade_factor
+          area <- compute_area(y_seq, interpolated)
+          message(sprintf("Plocha pod f_cond pre kategóriu = %s (model: %s): %.6f", cat, model_type, area))
+          
+          # f_scaled <- interpolated * fade_factor
+          f_scaled <- interpolated
           f_scaled[!is.finite(f_scaled)] <- 0
           
           if (max(f_scaled) > 0) {
             cat <- as.character(cat)
-            f_scaled <- f_scaled / max(f_scaled)
+            #f_scaled <- f_scaled / max(f_scaled)
             
             if (max(f_scaled) < 0.01) {
               f_scaled <- f_scaled * 50
@@ -2530,6 +2554,7 @@ model_conditional_continuous_densities <- function(df, n_breaks, density_scaling
       fade_factor <- fade_density$y / max(fade_density$y)
       
       if (!is.null(model_output_copula)) {
+        
         col_idx <- which.min(abs(model_output_copula$y_vals - xi))
         fxy <- model_output_copula$z_matrix[, col_idx]
         fx  <- model_output_copula$fx_vals[col_idx]
@@ -2537,10 +2562,19 @@ model_conditional_continuous_densities <- function(df, n_breaks, density_scaling
         if (!is.na(fx) && fx > .Machine$double.eps) {
           f_cond <- fxy / fx
           f_cond[is.na(f_cond)] <- 0
+          
           interpolated <- approx(x = model_output_copula$x_vals, y = f_cond, xout = y_seq, rule = 2)
-          f_scaled <- interpolated$y * fade_factor
-          scale_factor <- if (max_n_local > 0) sqrt(n_local / max_n_local) else 1
-          f_scaled <- f_scaled / max(f_scaled) * density_scaling * scale_factor
+          
+          area_before_scaling <- compute_area(y_seq, interpolated$y)
+          
+          print(area_before_scaling)
+          
+          if (!is.na(area_before_scaling) && abs(area_before_scaling - 1) > 0.05) {
+            warning(sprintf("Plocha pod f_cond pre x = %.2f (model: %s) = %.4f", xi, paste0("copula[", model_output_copula$copula_type, "]"), area_before_scaling))
+          }
+          
+          f_scaled <- interpolated$y * density_scaling
+          
           density_data[[length(density_data) + 1]] <- data.frame(
             x = xi, y = y_seq, width = f_scaled,
             section = section_label, type = paste0("copula[", model_output_copula$copula_type, "]")
@@ -2551,10 +2585,6 @@ model_conditional_continuous_densities <- function(df, n_breaks, density_scaling
       if (!is.null(model_output_kernel)) {
         col_idx <- which.min(abs(model_output_kernel$x_vals - xi))
         fxy <- model_output_kernel$z_matrix[, col_idx]
-        
-        print(dim(model_output_kernel$z_matrix))
-        print(length(model_output_kernel$x_vals))
-        print(length(model_output_kernel$y_vals))
         
         delta_y <- diff(model_output_kernel$y_vals[1:2])
         fx <- sum(fxy) * delta_y
@@ -2570,9 +2600,20 @@ model_conditional_continuous_densities <- function(df, n_breaks, density_scaling
             rule = 2
           )
           
-          f_scaled <- interpolated$y * fade_factor
-          scale_factor <- if (max_n_local > 0) sqrt(n_local / max_n_local) else 1
-          f_scaled <- f_scaled / max(f_scaled) * density_scaling * scale_factor
+          area_before_scaling <- compute_area(y_seq, interpolated$y)
+          
+          message(sprintf("Plocha pod f_cond pre x = %.2f (model: %s): %.6f",
+                          xi, "KDE", area_before_scaling))
+          
+          if (!is.na(area_before_scaling) && abs(area_before_scaling - 1) > 0.05) {
+            warning(sprintf("Plocha sa výrazne líši od 1 pre x = %.2f (KDE): %.6f",
+                            xi, area_before_scaling))
+          }
+          
+          # f_scaled <- interpolated$y * fade_factor
+          # scale_factor <- if (max_n_local > 0) sqrt(n_local / max_n_local) else 1
+          # f_scaled <- f_scaled / max(f_scaled) * density_scaling * scale_factor
+          f_scaled <- interpolated$y * density_scaling
           
           density_data[[length(density_data) + 1]] <- data.frame(
             x = xi,
@@ -2600,9 +2641,11 @@ model_conditional_continuous_densities <- function(df, n_breaks, density_scaling
             xout = y_seq,
             rule = 2
           )
-          f_scaled <- interpolated$y * fade_factor
-          scale_factor <- if (max_n_local > 0) sqrt(n_local / max_n_local) else 1
-          f_scaled <- f_scaled / max(f_scaled) * density_scaling * scale_factor
+          
+          # f_scaled <- interpolated$y * fade_factor
+          # scale_factor <- if (max_n_local > 0) sqrt(n_local / max_n_local) else 1
+          # f_scaled <- f_scaled / max(f_scaled) * density_scaling * scale_factor
+          f_scaled <- interpolated$y * density_scaling
           
           density_data[[length(density_data) + 1]] <- data.frame(
             x = xi, y = y_seq, width = f_scaled,
@@ -2622,9 +2665,12 @@ model_conditional_continuous_densities <- function(df, n_breaks, density_scaling
           f_cond <- fxy / fx
           f_cond[is.na(f_cond)] <- 0
           interpolated <- approx(x = model_output_t$y_vals, y = f_cond, xout = y_seq, rule = 2)
-          f_scaled <- interpolated$y * fade_factor
-          scale_factor <- if (max_n_local > 0) sqrt(n_local / max_n_local) else 1
-          f_scaled <- f_scaled / max(f_scaled) * density_scaling * scale_factor
+          
+          # f_scaled <- interpolated$y * fade_factor
+          # scale_factor <- if (max_n_local > 0) sqrt(n_local / max_n_local) else 1
+          # f_scaled <- f_scaled / max(f_scaled) * density_scaling * scale_factor
+          f_scaled <- interpolated$y * density_scaling
+          
           density_data[[length(density_data) + 1]] <- data.frame(
             x = xi, y = y_seq, width = f_scaled,
             section = section_label, type = "t"
@@ -2754,15 +2800,6 @@ render_conditional_continuous_densities <- function(model_output) {
     
     if (length(density_data) > 0) {
       density_df <- dplyr::bind_rows(density_data)
-      
-      print("Typy v density_data:")
-      print(sapply(density_data, function(df) unique(df$type)))
-      
-      print("Typy density vrstiev:")
-      print(unique(density_df$type))
-      
-      print("Ukážka density data:")
-      print(head(density_df))
       
       type_levels <- unique(density_df$type)
       colors <- scales::hue_pal()(length(type_levels))
