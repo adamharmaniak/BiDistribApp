@@ -18,6 +18,45 @@ server <- function(input, output, session) {
   classification_model_result <- reactiveVal()
   conditional_discrete_result <- reactiveVal()
   
+  stored_results <- reactiveValues(
+    plot2d = NULL,
+    plot3d = NULL
+  )
+  
+  tab_outputs <- reactiveValues(
+    data = NULL,
+    joint_density = NULL,
+    regression = NULL,
+    classification = NULL,
+    conditional_densities = NULL
+  )
+  
+  observeEvent(input$main_tabs, {
+    # Vymazanie vystupov
+    output$model_outputs_combined <- renderUI({ NULL })
+    output$model_outputs_plot2d <- renderPlot({ NULL })
+    output$model_outputs_plot3d <- renderPlotly({ NULL })
+    output$model_outputs_table <- renderTable({ NULL })
+    
+    # Posledne ulozene vystupy podla tabu
+    restore_ui <- switch(input$main_tabs,
+                         "data" = tab_outputs$data,
+                         "joint_density" = {
+                           output$model_outputs_plot2d <- renderPlot({ stored_results$plot2d })
+                           output$model_outputs_plot3d <- renderPlotly({ stored_results$plot3d })
+                           tab_outputs$joint_density
+                         },
+                         "regression" = tab_outputs$regression,
+                         "classification" = tab_outputs$classification,
+                         "conditional_densities" = tab_outputs$conditional_densities,
+                         NULL
+    )
+    
+    if (!is.null(restore_ui)) {
+      output$model_outputs_combined <- renderUI({ restore_ui })
+    }
+  })
+  
   observe({
     if (input$main_tabs == "classification" &&
         !is.null(loaded_data()) &&
@@ -643,6 +682,7 @@ server <- function(input, output, session) {
     output$model_outputs_plot2d <- renderPlot({ NULL })
     output$model_outputs_plot3d <- renderPlotly({ NULL })
     output$model_outputs_table <- renderTable({ NULL })
+    tab_outputs$joint_density <- NULL
     
     clicked_points(data.frame(x = numeric(), y = numeric()))
     tryCatch({
@@ -663,20 +703,6 @@ server <- function(input, output, session) {
         Sys.sleep(1.5)
       })
       
-      # Rozhodnutie podla typu vystupu
-      if (is.data.frame(result)) {
-        output$model_outputs_combined <- renderUI({
-          tagList(
-            h4("Joint distribution table:"),
-            tableOutput("model_outputs_table")
-          )
-        })
-        
-        output$model_outputs_table <- renderTable({
-          result
-        })
-        
-      } else {
         rendered_outputs <- list()
         
         for (plot_type in selected_plot_types) {
@@ -701,6 +727,8 @@ server <- function(input, output, session) {
             
             output$model_outputs_plot2d <- renderPlot({ result2D })
             rendered_outputs <- append(rendered_outputs, list(plotOutput("model_outputs_plot2d")))
+            
+            stored_results$plot2d <- result2D
           }
           
           if (plot_type == "3D") {
@@ -779,12 +807,14 @@ server <- function(input, output, session) {
                   }
                 }
                 
+                stored_results$plot3d <- base_plot 
                 base_plot
               })
+              
               rendered_outputs <- append(rendered_outputs, list(plotlyOutput("model_outputs_plot3d")))
             } else {
               output$model_outputs_plot3d <- renderPlotly({
-                if ("plotly" %in% class(result3D)) {
+                p <- if ("plotly" %in% class(result3D)) {
                   result3D
                 } else if (is.list(result3D) && "plot" %in% names(result3D)) {
                   result3D$plot
@@ -792,50 +822,61 @@ server <- function(input, output, session) {
                   NULL
                 }
               })
-              rendered_outputs <- append(rendered_outputs, list(plotlyOutput("model_outputs_plot3d")))
+              
+              stored_results$plot3d <- p
+              p
             }
             
             showNotification("Plots rendering complete!", type = "message", duration = 4)
+            
+            stored_results$plot3d <- if ("plotly" %in% class(result3D)) {
+              result3D
+            } else if (is.list(result3D) && "plot" %in% names(result3D)) {
+              result3D$plot
+            } else {
+              NULL
+            }
           }
         }
         
-        output$model_outputs_combined <- renderUI({
-          tagList(rendered_outputs)
-        })
-        
-        output$model_summary_ui <- renderUI({
-          summary_ui <- NULL
-          if (!is.null(model_result_summary())) {
-            summary_ui <- list(
-              h4("Summary Table"),
-              div(
-                style = "max-height: 300px; min-height: 150px; overflow-y: auto; min-width: 300px; border: 1px solid #ccc; padding: 5px;",
-                gt_output("summary_table")
-              )
+        summary_block <- NULL
+        if (!is.null(model_result_summary())) {
+          summary_block <- list(
+            h4("Summary Table"),
+            div(
+              style = "max-height: 300px; min-height: 150px; overflow-y: auto; min-width: 300px; border: 1px solid #ccc; padding: 5px;",
+              gt_output("summary_table")
             )
-          }
-          
-          cuts_ui <- NULL
-          if (isTRUE(input$density_cut) && exists("last_density_result", envir = .GlobalEnv)) {
-            cuts_ui <- list(
-              h4("Density Cuts Table"),
-              div(
-                style = "max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 5px;",
-                tableOutput("cut_slices_table")
-              )
-            )
-          }
-          
-          tagList(
-            summary_ui,
-            cuts_ui
           )
+        }
+        
+        cuts_block <- NULL
+        if (isTRUE(input$density_cut) && exists("last_density_result", envir = .GlobalEnv)) {
+          cuts_block <- list(
+            h4("Density Cuts Table"),
+            div(
+              style = "max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 5px;",
+              tableOutput("cut_slices_table")
+            )
+          )
+        }
+        
+        tab_outputs$joint_density <- tagList(
+          h4("Density Output"),
+          if ("2D" %in% selected_plot_types) plotOutput("model_outputs_plot2d"),
+          if ("3D" %in% selected_plot_types) plotlyOutput("model_outputs_plot3d"),
+          summary_block,
+          cuts_block
+        )
+        
+        output$model_outputs_combined <- renderUI({
+          tab_outputs$joint_density
         })
-      }
       
     }, error = function(e) {
       showNotification(paste("Chyba:", e$message), type = "error")
     })
+    
   })
   
   observeEvent(input$density_vars, {
@@ -1078,58 +1119,55 @@ server <- function(input, output, session) {
         result$combined_plot
       })
       
-      output$model_outputs_combined <- renderUI({
-        ui_elements <- list(
-          h4("Regression Plot:"),
-          plotOutput("model_outputs_regression")
+      r2_label <- NULL
+      if (!is.null(result$mean_result) &&
+          !is.null(result$mean_result$r_squared) &&
+          !is.na(result$mean_result$r_squared)) {
+        r2_label <- h5(paste("Presnosť modelu (R²):",
+                             round(result$mean_result$r_squared * 100, 2), "%"))
+      }
+      
+      summary_block <- NULL
+      if (!is.null(result$mean_result$summary)) {
+        summary_block <- list(
+          h4("Summary Table – Mean"),
+          div(
+            style = "max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 5px;",
+            gt_output("regression_summary")
+          )
         )
-        
-        if (!is.null(result$mean_result) &&
-            !is.null(result$mean_result$r_squared) &&
-            !is.na(result$mean_result$r_squared)) {
-          
-          r2_label <- h5(paste("Presnosť modelu (R²):",
-                               round(result$mean_result$r_squared * 100, 2), "%"))
-          ui_elements <- append(ui_elements, list(r2_label))
-        }
-        
-        # Summary pre strednu hodnotu
-        if (!is.null(result$mean_result$summary)) {
-          output$regression_summary <- gt::render_gt({
-            result$mean_result$summary
-          })
-          
-          summary_block <- list(
-            h4("Summary Table – Mean"),
+      }
+      
+      quantile_tables <- NULL
+      if (!is.null(result$quantile_result$summaries)) {
+        quantile_tables <- lapply(names(result$quantile_result$summaries), function(q) {
+          list(
+            tags$hr(),
+            h4(paste("Summary Table – Quantile τ =", q)),
             div(
               style = "max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 5px;",
-              gt_output("regression_summary")
+              gt_output(outputId = paste0("quantile_summary_", q))
             )
           )
-          ui_elements <- append(ui_elements, summary_block)
-        }
-        
-        # Summary pre kvantily
-        if (!is.null(result$quantile_result$summaries)) {
-          quantile_tables <- lapply(names(result$quantile_result$summaries), function(q) {
-            list(
-              tags$hr(),
-              h4(paste("Summary Table – Quantile τ =", q)),
-              div(
-                style = "max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 5px;",
-                gt_output(outputId = paste0("quantile_summary_", q))
-              )
-            )
-          })
-          ui_elements <- append(ui_elements, quantile_tables)
-        }
-        
-        tagList(ui_elements)
+        })
+      }
+      
+      tab_outputs$regression <- tagList(
+        h4("Regression Plot:"),
+        plotOutput("model_outputs_regression"),
+        r2_label,
+        summary_block,
+        quantile_tables
+      )
+      
+      output$model_outputs_combined <- renderUI({
+        tab_outputs$regression
       })
       
     }, error = function(e) {
       showNotification(paste("Chyba:", e$message), type = "error")
     })
+    
   })
   
   
@@ -1220,29 +1258,31 @@ server <- function(input, output, session) {
         result$decision_plot
       })
       
-      output$model_outputs_combined <- renderUI({
-        ui_elements <- list(
-          h4("Prediction Model"),
-          plotOutput("model_outputs_classification")
-        )
-        
-        if (!is.null(result$summary_gt)) {
-          summary_block <- list(
-            h4("Summary Table – Classification Model"),
-            div(
-              style = "max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 5px;",
-              gt_output("classification_summary")
-            )
+      summary_block <- NULL
+      if (!is.null(result$summary_gt)) {
+        summary_block <- list(
+          h4("Summary Table – Classification Model"),
+          div(
+            style = "max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 5px;",
+            gt_output("classification_summary")
           )
-          ui_elements <- append(ui_elements, summary_block)
-        }
-        
-        ui_elements <- append(ui_elements, list(
-          h4("Confusion Matrix"),
-          tableOutput("confusion_matrix_table")
-        ))
-        
-        tagList(ui_elements)
+        )
+      }
+      
+      confusion_matrix_block <- list(
+        h4("Confusion Matrix"),
+        tableOutput("confusion_matrix_table")
+      )
+      
+      tab_outputs$classification <- tagList(
+        h4("Prediction Model"),
+        plotOutput("model_outputs_classification"),
+        summary_block,
+        confusion_matrix_block
+      )
+      
+      output$model_outputs_combined <- renderUI({
+        tab_outputs$classification
       })
       
       output$confusion_matrix_table <- renderTable({
@@ -1564,17 +1604,19 @@ server <- function(input, output, session) {
         })
       }
       
-      output$model_outputs_combined <- renderUI({
-        tagList(
-          h4("Conditional Densities Plot"),
-          plotOutput("model_outputs_conditional"),
-          tags$hr(),
-          h4("Summary Table – Conditional Densities"),
-          div(
-            style = "max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 5px;",
-            gt_output(if (cond_response_type() == "spojita") "conditional_density_summary" else "discrete_density_summary")
-          )
+      tab_outputs$conditional_densities <- tagList(
+        h4("Conditional Densities Plot"),
+        plotOutput("model_outputs_conditional"),
+        tags$hr(),
+        h4("Summary Table – Conditional Densities"),
+        div(
+          style = "max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 5px;",
+          gt_output(if (cond_response_type() == "spojita") "conditional_density_summary" else "discrete_density_summary")
         )
+      )
+      
+      output$model_outputs_combined <- renderUI({
+        tab_outputs$conditional_densities
       })
       
     }, error = function(e) {
@@ -1588,6 +1630,6 @@ server <- function(input, output, session) {
     
   })
   
-  }
+}
 
   
