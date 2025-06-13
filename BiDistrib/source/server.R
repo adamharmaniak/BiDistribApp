@@ -120,10 +120,10 @@ server <- function(input, output, session) {
     var_types <- identify_variables(loaded_data())
     if (input$cond_predictor %in% var_types$Diskretne) {
       cond_predictor_type("diskretna")
-    } else if (input$cond_response %in% var_types$Spojite) {
+    } else if (input$cond_predictor %in% var_types$Spojite) {
       cond_predictor_type("spojita")
     } else {
-      cond_response_type(NULL)
+      cond_predictor_type(NULL)
     }
   })
   
@@ -622,12 +622,22 @@ server <- function(input, output, session) {
             checkboxInput("normal_density", "Show normal conditional density", value = FALSE),
             checkboxInput("kernel_density", "Show kernel conditional density", value = FALSE),
             checkboxInput("ordinal", "Ordinal (for discrete responses)", value = FALSE),
+            conditionalPanel(
+              condition = "output.condResponseType != null",
+              numericInput("density_scaling", "Density scaling:",
+                           value = 100, min = 0.1, max = 100000, step = 100)
+            ),
             numericInput("n_breaks", "Number of subwindows (n_breaks):",
                          value = 5, min = 1, max = 10, step = 1)
           ),
           
           conditionalPanel(
             condition = "output.condPredictorType == 'diskretna'",
+            conditionalPanel(
+              condition = "output.condResponseType != null",
+              numericInput("density_scaling", "Density scaling:",
+                           value = 100, min = 0.1, max = 100000, step = 100)
+            ),
             checkboxInput("ordinal", "Ordinal (for discrete responses)", value = FALSE)
           )
         ),
@@ -1383,10 +1393,10 @@ server <- function(input, output, session) {
     quant_poly_degree <- input$cond_quantile_poly_degree
     n_breaks <- NULL
     density_scaling <- input$density_scaling
-    normal_density <- input$normal_density
-    kernel_density <- input$kernel_density
-    copula_density <- input$copula_density
-    t_density <- input$t_density
+    normal_density <- isTRUE(input$normal_density)
+    kernel_density <- isTRUE(input$kernel_density)
+    copula_density <- isTRUE(input$copula_density)
+    t_density <- isTRUE(input$t_density)
     ordinal <- input$ordinal
     bw <- if (isTRUE(input$manual_bw)) input$bw else NULL
     copula_type_cond <- input$copula_type_cond

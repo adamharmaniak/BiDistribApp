@@ -528,12 +528,12 @@ render_continuous_density <- function(model_output, data, plot_type = "2D") {
     contour_df <- expand.grid(x = x_vals, y = y_vals)
     contour_df$z <- as.vector(t(z_matrix))
     
-    scatter_plot <- ggplot(data, aes_string(x = vars[1], y = vars[2])) +
-      geom_point(size = 3, alpha = 0.7, aes_string(color = vars[2])) +
+    scatter_plot <- ggplot(data, aes_string(x = vars[2], y = vars[1])) +
+      geom_point(size = 3, alpha = 0.7, aes_string(color = vars[1])) +
       geom_contour(data = contour_df, aes(x = x, y = y, z = z), color = "black") +
       labs(
-        x = vars[1],
-        y = vars[2],
+        x = vars[2],
+        y = vars[1],
         title = paste("Scatter plot s vrstevnicami", ifelse(model_output$model_type == "kernel", "(jadrové vyhladzovanie)", ifelse(model_output$model_type == "normal", "(bivariátne normálne)", "(bivariátne t-rozdelenie)")))
       ) +
       scale_color_gradient(low = "blue", high = "red") +
@@ -547,30 +547,30 @@ render_continuous_density <- function(model_output, data, plot_type = "2D") {
       sd_y <- model_output$params$sd_y
       df <- model_output$params$df
       
-      density_x <- ggplot(data, aes_string(x = vars[1])) +
+      density_x <- ggplot(data, aes_string(x = vars[2])) +
         stat_function(fun = function(x) dt((x - mean_x) / sd_x, df = df) / sd_x, fill = "blue", geom = "area", alpha = 0.5) +
-        labs(x = NULL, y = paste("Hustota (", vars[1], ")", sep = "")) +
+        labs(x = NULL, y = paste("Hustota (", vars[2], ")", sep = "")) +
         theme_minimal() +
         theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
       
-      density_y <- ggplot(data, aes_string(x = vars[2])) +
+      density_y <- ggplot(data, aes_string(x = vars[1])) +
         stat_function(fun = function(y) dt((y - mean_y) / sd_y, df = df) / sd_y, fill = "red", geom = "area", alpha = 0.5) +
         coord_flip() +
-        labs(x = NULL, y = paste("Hustota (", vars[2], ")", sep = "")) +
+        labs(x = NULL, y = paste("Hustota (", vars[1], ")", sep = "")) +
         theme_minimal() +
         theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
       
     } else {
-      density_x <- ggplot(data, aes_string(x = vars[1])) +
+      density_x <- ggplot(data, aes_string(x = vars[2])) +
         geom_density(fill = "blue", alpha = 0.5) +
-        labs(x = NULL, y = paste("Hustota (", vars[1], ")", sep = "")) +
+        labs(x = NULL, y = paste("Hustota (", vars[2], ")", sep = "")) +
         theme_minimal() +
         theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
       
-      density_y <- ggplot(data, aes_string(x = vars[2])) +
+      density_y <- ggplot(data, aes_string(x = vars[1])) +
         geom_density(fill = "red", alpha = 0.5) +
         coord_flip() +
-        labs(x = NULL, y = paste("Hustota (", vars[2], ")", sep = "")) +
+        labs(x = NULL, y = paste("Hustota (", vars[1], ")", sep = "")) +
         theme_minimal() +
         theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
     }
@@ -925,7 +925,7 @@ render_continuous_density_copula <- function(model_output, data, model_type = "n
     contour_df$z <- as.vector(t(z_matrix))
     
     scatter_plot <- ggplot(data, aes_string(x = continuous_vars[1], y = continuous_vars[2])) +
-      geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[2])) +
+      geom_point(size = 3, alpha = 0.7, aes_string(color = continuous_vars[1])) +
       geom_contour(data = contour_df, aes(x = x, y = y, z = z), color = "black", size = 0.6) +
       labs(
         x = continuous_vars[1],
