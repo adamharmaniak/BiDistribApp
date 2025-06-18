@@ -547,16 +547,21 @@ server <- function(input, output, session) {
             
             conditionalPanel(
               condition = "input.quantile_curve == true",
+              
+              selectInput("cond_quantile_poly_degree", "Polynomial degree of quantiles:",
+                          choices = 1:4,
+                          selected = isolate(input$cond_quantile_poly_degree) %||% 1),
+              
               uiOutput("cond_quantiles_ui")
             ),
             
-            selectInput("cond_mean_poly_degree", "Polynomial degree of mean:",
-                        choices = 1:4,
-                        selected = isolate(input$cond_mean_poly_degree) %||% 1),
-            
-            selectInput("cond_quantile_poly_degree", "Polynomial degree of quantiles:",
-                        choices = 1:4,
-                        selected = isolate(input$cond_quantile_poly_degree) %||% 1),
+            conditionalPanel(
+              condition = "input.mean_curve == true",
+              
+              selectInput("cond_mean_poly_degree", "Polynomial degree of mean:",
+                          choices = 1:4,
+                          selected = isolate(input$cond_mean_poly_degree) %||% 1)
+            ),
             
             checkboxInput("normal_density", "Show normal conditional density", value = FALSE),
             checkboxInput("kernel_density", "Show kernel conditional density", value = FALSE),
