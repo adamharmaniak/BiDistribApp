@@ -1,9 +1,0 @@
-div[id^='model_outputs_combined'] {
-  border: none !important;
-  box-shadow: none !important;
-}
-
-.well, .panel, .shiny-html-output, .form-group, .form-control {
-  border: none !important;
-  box-shadow: none !important;
-}
